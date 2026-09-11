@@ -1,6 +1,6 @@
 # Development plan and agent task ledger
 
-Status: **T01 merged; T02 implemented, pending PR review/merge**; T03 onward not started. This plan is implementation-ready guidance,
+Status: **T01 and T02 complete and merged**; T03 onward not started. This plan is implementation-ready guidance,
 not a claim of implemented capabilities. Task order follows dependencies rather
 than estimated calendar dates. Do not implement the entire roadmap in one turn.
 
@@ -174,8 +174,9 @@ Preserve any new unrelated local edits when committing this task.
 
 ## T02 — Register an owned application
 
-**Status:** implemented in draft PR #6; pending review/merge. **Depends on:** T01 (confirmed
-merged at `07e90c5`, matching current GitHub main at implementation start).
+**Status:** complete and merged via PR #6 at `712aa25` on 2026-09-11.
+**Depends on:** T01 (merged at `07e90c5`). Merge confirmed through GitHub and
+ancestry of T02 head `fa8b7f4` in updated `origin/main`.
 
 **Implemented:** migration `005_owned_applications`; active/admin user flags with
 safe defaults for legacy users; new teams, memberships, applications, direct/team
@@ -196,7 +197,7 @@ passed at `77a9a03`: actual logs report **6 PostgreSQL tests passed**, no skips,
 **67 offline tests passed**, Ruff and mypy clean. The handoff check also passed.
 Exact evidence and limitations are recorded in [next-agent.md](next-agent.md). Docker's launcher reports WSL integration unavailable.
 
-**Next:** review/merge T02 after its checks, then T03 only. Existing T01b Docker
+**Next:** T03 only, when assigned, on its own branch from updated main. Existing T01b Docker
 build/startup verification remains outstanding.
 
 **Read:** [domain contracts](domain-contracts.md), T02 rows in
