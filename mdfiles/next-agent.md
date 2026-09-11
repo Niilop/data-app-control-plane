@@ -8,7 +8,8 @@ implementation; it does not imply that its PR has merged.
 
 T01–T04 are merged. T04 PR #9 was confirmed merged at
 `9a36e56aac10a3b8c87cafbdc0f75f85b7752ff1`. T04a is implemented from that main and
-awaits review/merge. T05 has not started. AI/chat/RAG/LLM/inference remain removed;
+awaits review/merge in [PR #10](https://github.com/Niilop/data-app-control-plane/pull/10).
+T05 has not started. AI/chat/RAG/LLM/inference remain removed;
 historical tables and all migrations through `007_durable_operations` are retained.
 
 The platform provides development accounts/admin bootstrap, teams/memberships,
@@ -24,7 +25,9 @@ T04a replaces Streamlit with React + TypeScript + Vite:
   edit, ownership and role controls, teams/memberships, environment policy/bindings,
   audit history and operation/attempt recovery. Paginated reads, error/loading/empty
   states, simulation labels, responsive navigation and keyboard dialog/tab controls.
-- Edit forms retain the version captured when opened. Recovery keys persist per
+- Versioned edit controls stay disabled while fresh records are loading, and
+  lists visibly report refresh progress. Forms retain the version captured when
+  opened. Recovery keys persist per
   operation/action/payload in workspace memory across transport retries/dialog
   reopen. API policy/version/idempotency and worker policy remain authoritative.
 - Browser `POST/DELETE /auth/session` uses an HTTP-only, SameSite=Strict cookie
@@ -75,9 +78,15 @@ On 2026-09-11/12:
   interactive authentication. No host-global packages were installed. Tests instead
   used `tests/Dockerfile.browser`. Docker worked through regular Ubuntu via
   `wsl.exe`; this agent session's direct Docker CLI mount still returned I/O errors.
-- Local PostgreSQL integration tests were not rerun for T04a. T04's historical CI
-  run 34632237191 had 15 PostgreSQL passes, but that is not evidence for this head.
-  Inspect T04a's current CI before merge; hosted checks are not yet claimed here.
+- Hosted run 34649041586 at `f8395c3` confirmed **125 offline tests** and **15
+  PostgreSQL integration tests passed** (10.02s, no skips), plus Ruff/mypy.
+  Its frontend check caught reopening a stale binding before a refresh finished.
+  The UI now disables versioned edits during refresh; the browser regression holds
+  the real list response and asserts loading, disabled controls and the refreshed
+  version before saving. Frontend lint/build and browser workflows were rerun locally.
+  Inspect the subsequent hosted run before merge; this initial run was not fully green.
+  PostgreSQL integration tests were not rerun locally.
+
 
 ## Remaining work and limitations
 

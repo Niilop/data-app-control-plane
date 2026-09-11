@@ -374,6 +374,7 @@ function ApplicationContent({ id }: { id: string }) {
               <button
                 className="button primary"
                 onClick={() => setEdit({ kind: "metadata", snapshot: app })}
+                disabled={resource.loading || permissions.loading}
               >
                 <Pencil size={16} />
                 Edit application
@@ -472,6 +473,7 @@ function ApplicationContent({ id }: { id: string }) {
                 {caps?.manage_access && (
                   <button
                     className="text-button"
+                    disabled={resource.loading || permissions.loading}
                     onClick={() =>
                       setEdit({ kind: "ownership", snapshot: app })
                     }

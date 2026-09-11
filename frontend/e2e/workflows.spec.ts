@@ -231,10 +231,31 @@ test("environment policy, binding, and stale binding version", async ({
     "changed since you opened",
   );
   await dialog.getByRole("button", { name: "Close dialog" }).click();
+  // Hold the real refreshed list response: old snapshots must not be editable.
+  let releaseRefresh!: () => void;
+  const refreshed = new Promise<void>((resolve) => {
+    releaseRefresh = resolve;
+  });
+  const bindingsURL = `**/api/v1/applications/${app.id}/bindings?*`;
+  await page.route(bindingsURL, async (route) => {
+    await refreshed;
+    await route.continue();
+  });
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  const editBinding = page.getByRole("button", {
+    name: "Edit binding for Browser sandbox",
+  });
+  await expect(editBinding).toBeDisabled();
+  await expect(
+    page.getByText("Refreshing records…", { exact: true }),
+  ).toBeVisible();
+  releaseRefresh();
+  await expect(editBinding).toBeEnabled();
+  await page.unroute(bindingsURL);
   await page
     .getByRole("button", { name: "Edit binding for Browser sandbox" })
     .click();
+  await expect(dialog.getByText("Editing binding version 2.")).toBeVisible();
   await dialog.getByLabel("Synthetic row count").fill("200");
   await dialog.getByRole("button", { name: "Save binding" }).click();
   await expect(dialog).not.toBeVisible();

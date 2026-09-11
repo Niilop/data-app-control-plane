@@ -345,8 +345,10 @@ using a disposable FastAPI/SQLite API and simulated worker fixtures. Desktop and
 services started, and `/ready` through nginx returned ready. An isolated production
 nginx browser smoke passed routing, CSP, login, cookie reload, an authenticated
 write, readiness and logout. Browser assets contain no configured server secrets
-or test credentials. Local PostgreSQL integration tests were not rerun in this
-slice; the required CI job remains. Recheck current CI before merge.
+or test credentials. Hosted run 34649041586 confirmed 125 offline and 15 PostgreSQL passes, with no
+PostgreSQL skips. Its browser check exposed a refresh race; versioned edit controls
+now wait for fresh data, with a delayed-response regression. Recheck the subsequent
+CI run before merge. PostgreSQL integration tests were not rerun locally.
 
 **Decision:** [ADR-015](decisions.md#adr-015--replace-streamlit-before-t05).
 

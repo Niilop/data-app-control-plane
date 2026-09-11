@@ -311,7 +311,7 @@ export function Environments() {
         empty="No environments available"
         description="Administrators can create a simulated environment. Members see environments linked to their applications."
       >
-        {(items) => (
+        {(items, loading) => (
           <div className="environment-grid">
             {items.map((env) => (
               <section className="panel environment-card" key={env.id}>
@@ -346,6 +346,7 @@ export function Environments() {
                   <button
                     className="button secondary wide"
                     aria-label={`Edit ${env.name}`}
+                    disabled={loading}
                     onClick={() => setEdit(env)}
                   >
                     Edit environment
@@ -456,7 +457,7 @@ export function Bindings({
         empty="No environments bound"
         description="An administrator can connect this application to an approved environment."
       >
-        {(items) => (
+        {(items, loading) => (
           <div className="environment-grid">
             {items.map((binding) => (
               <section className="panel environment-card" key={binding.id}>
@@ -496,7 +497,7 @@ export function Bindings({
                 {canManage && (
                   <button
                     className="button secondary wide"
-                    disabled={!binding.environment.enabled}
+                    disabled={loading || !binding.environment.enabled}
                     aria-label={`Edit binding for ${binding.environment.name}`}
                     onClick={() => setEdit(binding)}
                   >

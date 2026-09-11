@@ -109,15 +109,17 @@ export function useResource<T>(path: string | null) {
   const { version } = useData();
   const [state, setState] = useState<{
     path: string | null;
+    version: number;
     data: T | null;
     loading: boolean;
     error: Error | null;
-  }>({ path, data: null, loading: true, error: null });
+  }>({ path, version, data: null, loading: true, error: null });
   useEffect(() => {
     if (!path) return;
     const controller = new AbortController();
     setState((previous) => ({
       path,
+      version,
       data: previous.path === path ? previous.data : null,
       loading: true,
       error: null,
@@ -125,16 +127,20 @@ export function useResource<T>(path: string | null) {
     api<T>(path, { signal: controller.signal })
       .then((data) => {
         if (!controller.signal.aborted)
-          setState({ path, data, loading: false, error: null });
+          setState({ path, version, data, loading: false, error: null });
       })
       .catch((error) => {
         if (!controller.signal.aborted)
-          setState({ path, data: null, loading: false, error });
+          setState({ path, version, data: null, loading: false, error });
       });
     return () => controller.abort();
   }, [path, version]);
   return state.path === path
-    ? state
+    ? {
+        ...state,
+        loading: state.loading || state.version !== version,
+        error: state.version === version ? state.error : null,
+      }
     : { ...state, data: null, loading: true, error: null };
 }
 

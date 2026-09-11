@@ -261,7 +261,7 @@ export function Paged<T>({
   description,
 }: {
   path: string;
-  children: (items: T[]) => ReactNode;
+  children: (items: T[], loading: boolean) => ReactNode;
   empty?: string;
   description?: string;
 }) {
@@ -269,12 +269,18 @@ export function Paged<T>({
   return (
     <>
       <ErrorNotice error={page.error} />
+      {page.loading && page.data && (
+        <div className="loading" role="status">
+          <LoaderCircle size={16} className="spin" />
+          Refreshing records…
+        </div>
+      )}
       {page.loading && !page.data ? (
         <Loading />
       ) : (
         page.data &&
         (page.data.items.length ? (
-          children(page.data.items)
+          children(page.data.items, page.loading)
         ) : (
           <Empty title={empty}>{description}</Empty>
         ))
