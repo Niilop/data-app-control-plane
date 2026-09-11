@@ -124,8 +124,19 @@ On 2026-09-12, from branch `feat/t05-bundle-generation`:
   `/app/data/artifacts` and load the same template content digest.
   `GET /api/v1/templates` and `GET /api/v1/artifacts/...` return 401 unauthenticated.
 
-**Not run.** No hosted CI run exists for this branch yet — inspect it before merge
-and do not treat the local results above as CI evidence. No interactive UI journey
+- Hosted [Platform CI run 34656350744](https://github.com/Niilop/data-app-control-plane/actions/runs/34656350744)
+  passed at implementation commit `5893851`. Actual logs were inspected and
+  confirm **188 offline tests** (20.99s), **23 PostgreSQL tests** (20.11s, no
+  skips), **11 browser workflows** (32.8s), the production nginx smoke, Ruff
+  clean over 61 files and mypy clean over 36 source files. The generated-project
+  step reported **`Ran 7 tests ... Generated project installed from its lock and
+  passed its own tests.`** Its archive digest
+  `baee91f005812737f689384a8b3158efe4c01fc217fd7039aae01afab81fed63` is byte-identical
+  to the digest produced on the development machine, which is cross-machine
+  evidence for the determinism claim, not just a repeat run. Handoff run
+  34656350695 also passed.
+
+**Not run.** No interactive UI journey
 was performed against the developer's own database: no team, application, binding
 or artifact was created there, so the end-to-end screen flow is covered by the
 browser tests rather than by a manual walkthrough. Firefox and WebKit were not
@@ -134,8 +145,10 @@ external workload ran.
 
 ## Remaining work and limitations
 
-- Review T05 and its hosted CI before merge; it is **not** claimed merged. T06
-  must wait for that merge.
+- Review T05 in [PR #11](https://github.com/Niilop/data-app-control-plane/pull/11)
+  before merge; it is open as a draft and is **not** claimed merged. Re-inspect
+  current CI rather than trusting the run recorded above indefinitely. T06 must
+  wait for that merge.
 - Offline validation is exactly that. It proves the captured artifact is
   internally consistent and safe to extract. It is **not** `databricks bundle
   validate`, not evidence of workspace validity or deployability, and must never
