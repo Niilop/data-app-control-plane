@@ -1,22 +1,11 @@
-# Next agent: T01b containers, PostgreSQL verification, and CI
+# Agent handoff
 
-Prepared 2026-09-11. This is a focused starting point; no prior conversation is
-required. Read the versioned root `AGENTS.md`, then this file and the linked context.
+This describes the proposed code state of this PR, not its merge status. Inspect
+Git status, preserve unrelated changes, and verify prerequisites on updated main
+before starting the next task. Read AGENTS.md and the linked task contracts.
 
-## Starting state
+## Implemented state
 
-- PR #1 (documentation) and PR #2 (T01a implementation) are merged into `main`.
-- Verified merged baseline: `fd28d94`. It includes T01a `7935a6c` and follow-up
-  `f1e4381`, which already changed the Compose backend URL to use `POSTGRES_DB`.
-- Local `main` has been fast-forwarded to that baseline.
-- Continue on **`build/t01b-containers-ci`**, prepared locally from updated `main`.
-  On a fresh clone where this branch is absent, create it from updated `main`.
-  This handoff is committed on main; T01b implementation is pending.
-- `AGENTS.md`, `mdfiles/`, and `uv.lock` are deliberately versioned per the user's
-  latest decision. `.gitignore` excludes local secrets/caches, not shared agent
-  context. Inspect current status and preserve any new unrelated user changes.
-
-## Product constraints
 
 Build a local-first control plane for governed Databricks data applications, with
 GitHub repositories and GitHub Actions. The developer has essentially no cloud
@@ -29,7 +18,6 @@ removed. Do not restore them or add a legacy AI feature toggle. Historical table
 and migration versions are preserved. New registry/workflow features start after
 T01, not in this task. No Databricks account is needed for T01b.
 
-## What already works
 
 - Python 3.11 selection, tracked uv lock, project-local pytest/Ruff/mypy tools.
 - API assembly without AI settings/provider imports; development auth and
@@ -42,7 +30,55 @@ T01, not in this task. No Databricks account is needed for T01b.
   by Alembic. `EMBEDDING_DIM` remains a compatibility constant required by migration
   002. Do not recreate `backend/alembic/__init__.py`: it shadowed installed Alembic.
 
-## T01b scope and acceptance
+
+This PR adds a handoff requirement to AGENTS.md, a PR checklist, and the
+`Agent handoff / Check agent handoff` workflow. Its standard-library checker
+compares the PR head with its merge base, requires substantive handoff changes
+for non-documentation files, and validates the six handoff sections. It also
+handles deletions/renames and refuses whitespace-only updates.
+
+## Verification performed
+
+T01a's recorded baseline is 17 passing offline tests plus focused Ruff/mypy.
+For this change, 18 checker tests using disposable Git histories passed, along
+with Ruff lint/format and mypy for the checker. See the task ledger for commands.
+The application suite was not rerun for this tooling-only change. Hosted workflow
+results must be inspected on the PR rather than assumed from local tests.
+
+## Remaining work and limitations
+
+The handoff check establishes an update and section structure, not factual accuracy.
+Reviewers must compare claims to the code and test evidence. Making this status
+check a required merge condition needs a repository rule; no rules are changed
+by this PR. Full application CI, live PostgreSQL migrations, Docker builds, and
+real DB login remain unverified and belong to T01b.
+
+
+- Root pytest `testpaths` currently includes only `tests/unit`. Add explicit
+  integration discovery/markers and documented commands as part of this task.
+- `tests/conftest.py` currently blocks sockets for every test. Scope that guard to
+  offline tests while requiring deliberate isolated DB configuration for integration
+  tests. Preserve tests proving the offline suite cannot contact providers.
+- Starlette TestClient stalled inside the prior execution sandbox and passed
+  outside it with outbound-network guards still active. If repeated, report the
+  environment restriction and use the approved execution mechanism; do not weaken
+  tests, remove assertions, or increase timeouts indefinitely.
+- Prior sandbox uv commands used `UV_CACHE_DIR=/tmp/data-app-uv-cache` because the
+  default cache was not writable. `.venv` is project-local. Use `uv`, never system
+  Python or pip. Cache contents are not part of reproducibility evidence.
+- GitHub CLI authentication worked, while the saved SSH remote could not
+  authenticate. A direct HTTPS push using `gh auth git-credential` worked. Prefer
+  the available authenticated mechanism without printing credentials or rewriting
+  the user's saved remote globally. Do not treat a sandbox network failure as
+  proof that credentials are invalid.
+
+
+## Next task
+
+Verify the handoff-policy PR is merged before building on its workflow. Then
+implement **T01b only**. Create `build/t01b-containers-ci` from updated main if it
+does not exist; otherwise inspect and update its base without losing local work.
+
 
 Deliver one focused PR against **`main`**:
 
@@ -74,7 +110,9 @@ Do not merge your own PR or activate paid workloads. Project-local dependency
 downloads and Docker image pulls may require environment approval; do not install
 global tools or change shared devstack configuration to get around a blocker.
 
-## Read these files first
+
+## Files to read first
+
 
 | Purpose | Files |
 |---|---|
@@ -89,41 +127,15 @@ global tools or change shared devstack configuration to get around a blocker.
 Do not read `.env` into tool output. The [repository map](repository-map.md) covers
 additional paths if needed; a full repository crawl is unnecessary.
 
-## Known testing and execution pitfalls
 
-- Root pytest `testpaths` currently includes only `tests/unit`. Add explicit
-  integration discovery/markers and documented commands as part of this task.
-- `tests/conftest.py` currently blocks sockets for every test. Scope that guard to
-  offline tests while requiring deliberate isolated DB configuration for integration
-  tests. Preserve tests proving the offline suite cannot contact providers.
-- Starlette TestClient stalled inside the prior execution sandbox and passed
-  outside it with outbound-network guards still active. If repeated, report the
-  environment restriction and use the approved execution mechanism; do not weaken
-  tests, remove assertions, or increase timeouts indefinitely.
-- Prior sandbox uv commands used `UV_CACHE_DIR=/tmp/data-app-uv-cache` because the
-  default cache was not writable. `.venv` is project-local. Use `uv`, never system
-  Python or pip. Cache contents are not part of reproducibility evidence.
-- GitHub CLI authentication worked, while the saved SSH remote could not
-  authenticate. A direct HTTPS push using `gh auth git-credential` worked. Prefer
-  the available authenticated mechanism without printing credentials or rewriting
-  the user's saved remote globally. Do not treat a sandbox network failure as
-  proof that credentials are invalid.
+Also inspect `.github/workflows/agent-handoff.yml`,
+`.github/pull_request_template.md`, and `scripts/check_agent_handoff.py` so T01b
+extends CI without replacing the handoff check.
 
-## Handoff and review
+## Suggested agent prompt
 
-Explain the multi-file plan before editing. Implement T01b only. Before opening a
-draft PR, review the diff for unrelated user changes and secrets, run the relevant
-checks, and update the T01 ledger plus affected repository/runbook documentation.
-Report commands, outcomes, missing verification, and remaining limitations. T01
-can be marked complete only when both T01a and T01b acceptance criteria are met.
-
-Use a fresh review agent after implementation to inspect the PR against these
-criteria. Do not delegate during implementation unless the user asks for it.
-
-## Copy-paste assignment
-
-> Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Continue
-> T01b only on build/t01b-containers-ci, based on merged main. Inspect Git status
-> and preserve my unrelated local changes. Explain the plan, implement the bounded
-> container/database/CI work, run its acceptance checks, update the handoff, and
+> Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Inspect Git status
+> and verify the prerequisite PRs are merged into updated main. Implement T01b
+> only on its own branch. Preserve unrelated changes, explain the plan, run the
+> acceptance checks, update the handoff and affected docs in the same PR, and
 > open a draft PR against main. Do not merge, start T02, or deploy cloud resources.

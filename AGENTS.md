@@ -48,6 +48,20 @@
 
 ## Handoff
 
+Before opening or updating an implementation PR, update
+[mdfiles/next-agent.md](mdfiles/next-agent.md) in the same PR. Record implemented
+behavior, checks actually run, remaining limitations, and the next bounded task.
+Replace stale instructions; do not append an endless session log. Keep the handoff
+self-contained and never claim an unmerged PR is merged or an unrun check passed.
+Use the sections: Implemented state, Verification performed, Remaining work and
+limitations, Next task, Files to read first, and Suggested agent prompt.
+
+Avoid temporary checkout/branch-state assumptions. Tell the next agent to inspect
+Git status, verify prerequisites on updated main, and create its task branch if
+needed. A reviewer must check handoff accuracy; CI checks presence and structure,
+not whether its claims are true. Documentation-only PRs need no handoff change
+unless they change the next agent's instructions.
+
 Update task status, test evidence, and next steps in
 [mdfiles/development-plan.md](mdfiles/development-plan.md). Update affected
 contracts and [mdfiles/repository-map.md](mdfiles/repository-map.md) when behavior

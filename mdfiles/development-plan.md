@@ -4,6 +4,24 @@ Status: **T01 in progress**; subsequent tasks not started. This plan is implemen
 not a claim of implemented capabilities. Task order follows dependencies rather
 than estimated calendar dates. Do not implement the entire roadmap in one turn.
 
+## Supporting change — PR handoff policy
+
+Implemented separately from T01b: AGENTS.md now requires same-PR handoff updates;
+the PR template prompts for evidence and affected docs; the `Agent handoff` workflow
+checks `mdfiles/next-agent.md` against the PR merge-base diff. Non-documentation
+changes require a content update and six standard sections. Documentation-only
+changes are exempt from updating the handoff, but its structure must remain valid.
+
+Verification: 18 disposable-Git-history tests passed using
+`uv run --locked pytest tests/unit/test_agent_handoff.py -q`; Ruff lint/format and
+`uv run --locked mypy scripts/check_agent_handoff.py` passed. Hosted CI is not
+claimed as verified here. No application code changed, and the existing application
+suite was not rerun for this tooling-only change. T01b remains pending.
+
+Reviewers must check factual accuracy. Required-status enforcement needs repository
+rules configured separately; this change does not alter repository permissions or
+merge rules. The handoff describes proposed code state rather than merge status.
+
 ## Delivery order
 
 ```text

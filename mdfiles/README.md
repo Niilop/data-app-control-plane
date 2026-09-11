@@ -2,8 +2,9 @@
 
 Documentation baseline: 2026-09-11. Implementation status: **T01a complete; T01b and platform workflows remain planned**.
 
-**Resume here:** [next-agent.md](next-agent.md). PRs #1 and #2 are merged; the next
-block is T01b on `build/t01b-containers-ci`, based on merged `main`.
+**Resume here:** [next-agent.md](next-agent.md). The next platform
+block is T01b. Verify prerequisite changes on updated `main` before creating or
+continuing its task branch; the handoff describes code state, not merge status.
 
 Build a self-service platform where a team requests onboarding of a Git repository
 as a governed Databricks data application. The platform manages ownership, access
@@ -51,8 +52,8 @@ be resolved and documented, not silently treated as completed work.
 
 Use this prompt:
 
-> Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Continue
-> T01b only on build/t01b-containers-ci, based on merged main. Inspect Git status
+> Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Verify prerequisites
+> on updated main and implement T01b only on its own branch. Inspect Git status
 > and preserve my unrelated local changes. Explain the plan, implement the bounded
 > container/database/CI work, run its acceptance checks, update the handoff, and
 > open a draft PR against main. Do not merge, start T02, or deploy cloud resources.

@@ -28,6 +28,10 @@ affected files before editing; avoid a full repository crawl for each task.
 | `tests/manual/auth_smoke.py`, `tests/manual/request_smoke.py` | Historical manual HTTP examples; not pytest tests |
 | `tests/unit/`, `tests/conftest.py` | Offline settings/startup/UI/migration-rendering tests and network guards |
 | `README.md` | Current local startup and focused verification commands |
+| `.github/pull_request_template.md` | Same-PR handoff, verification, and related documentation checklist |
+| `.github/workflows/agent-handoff.yml` | Lightweight PR handoff validation; application CI remains T01b |
+| `scripts/check_agent_handoff.py` | Standard-library checker for merge-base changes, handoff structure, and substantive update |
+| `tests/unit/test_agent_handoff.py` | Disposable Git histories exercise enforcement and exemptions |
 
 ## Reuse and migration strategy
 
