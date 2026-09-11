@@ -78,14 +78,16 @@ On 2026-09-11/12:
   interactive authentication. No host-global packages were installed. Tests instead
   used `tests/Dockerfile.browser`. Docker worked through regular Ubuntu via
   `wsl.exe`; this agent session's direct Docker CLI mount still returned I/O errors.
-- Hosted run 34649041586 at `f8395c3` confirmed **125 offline tests** and **15
-  PostgreSQL integration tests passed** (10.02s, no skips), plus Ruff/mypy.
-  Its frontend check caught reopening a stale binding before a refresh finished.
-  The UI now disables versioned edits during refresh; the browser regression holds
-  the real list response and asserts loading, disabled controls and the refreshed
-  version before saving. Frontend lint/build and browser workflows were rerun locally.
-  Inspect the subsequent hosted run before merge; this initial run was not fully green.
-  PostgreSQL integration tests were not rerun locally.
+- Hosted [Platform CI run 34649546595](https://github.com/Niilop/data-app-control-plane/actions/runs/34649546595)
+  passed at implementation commit `7cb2c2025a178ac4ebba5973c3a5f55e98b81aaa`.
+  Actual logs confirm **125 offline tests** (12.70s), **15 PostgreSQL tests**
+  (9.78s, no skips), **9 browser workflows** (30.6s), production nginx smoke,
+  frontend checks and Python Ruff/mypy. The browser regression holds the real
+  binding-list response and checks disabled edits, visible refresh progress and
+  the updated version before saving. Handoff CI run 34649546592 also passed.
+  PostgreSQL integration tests were not rerun locally. This final follow-up changes
+  documentation only; application checks were not rerun locally for that edit.
+  Inspect current CI before merge; this PR is not claimed merged.
 
 
 ## Remaining work and limitations

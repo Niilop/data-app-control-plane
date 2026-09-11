@@ -345,10 +345,15 @@ using a disposable FastAPI/SQLite API and simulated worker fixtures. Desktop and
 services started, and `/ready` through nginx returned ready. An isolated production
 nginx browser smoke passed routing, CSP, login, cookie reload, an authenticated
 write, readiness and logout. Browser assets contain no configured server secrets
-or test credentials. Hosted run 34649041586 confirmed 125 offline and 15 PostgreSQL passes, with no
-PostgreSQL skips. Its browser check exposed a refresh race; versioned edit controls
-now wait for fresh data, with a delayed-response regression. Recheck the subsequent
-CI run before merge. PostgreSQL integration tests were not rerun locally.
+or test credentials. Hosted
+[Platform CI run 34649546595](https://github.com/Niilop/data-app-control-plane/actions/runs/34649546595)
+passed at `7cb2c20`: actual logs confirm **125 offline**, **15 PostgreSQL** (no skips),
+**9 browser** tests and production nginx smoke, with all lint/type/build checks.
+The delayed-response regression verifies that versioned edit controls wait for
+fresh records after refresh. PostgreSQL integration tests were not rerun locally.
+The final follow-up only records verification in docs; no local application rerun
+was needed for it. Recheck current CI before merge.
+
 
 **Decision:** [ADR-015](decisions.md#adr-015--replace-streamlit-before-t05).
 
