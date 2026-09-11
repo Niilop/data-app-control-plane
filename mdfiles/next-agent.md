@@ -8,8 +8,8 @@ AGENTS.md before starting the next bounded task. Do not assume T03 is merged.
 
 T01/T02 are merged; T02 is PR #6 at `712aa25`. Its handoff reconciliation PR #7
 is also merged. T03 started from updated main `928f2f7` on its own branch.
-**T03 — Register a sandbox environment binding is implemented, awaiting review
-and merge.** T04/worker, real adapters and deployment were not started. AI/chat/
+**T03 — Register a sandbox environment binding is implemented in draft PR #8,
+awaiting review and merge.** T04/worker, real adapters and deployment were not started. AI/chat/
 RAG/LLM/inference remain removed.
 
 T02 behavior is preserved: development login/accounts, explicit local admin
@@ -80,16 +80,28 @@ Actually run locally:
 - `uv run --locked pytest tests/integration -q -rs`: **10 skipped**, with explicit
   missing-`TEST_DATABASE_URL` reasons. These skips are not PostgreSQL verification.
 
-The PostgreSQL suite now includes T02-data preservation through migration 006,
-T03 schema parity, unique/FK constraints, transactional rollback, concurrent
-binding updates and policy-edit/binding-create serialization. Hosted T03 CI
-must be checked at the actual PR revision; no hosted result is yet recorded here.
-Prior T02 evidence remains Platform CI run 34615449895 at `77a9a03`: 67 offline
-and 6 PostgreSQL tests passed; it does not validate T03.
+**Hosted T03 verification passed** at implementation commit
+`974c16ec76178328e90ed66f3db6e96714294cf3` in
+[draft PR #8](https://github.com/Niilop/data-app-control-plane/pull/8).
+[Platform CI run 34624002359](https://github.com/Niilop/data-app-control-plane/actions/runs/34624002359)
+passed both jobs. The actual
+[PostgreSQL job log](https://github.com/Niilop/data-app-control-plane/actions/runs/34624002359/job/103344569742)
+reports **10 passed in 2.92s**, no skips, against `pgvector/pgvector:pg16`.
+This verifies T02-data preservation through migration 006, T03 schema parity,
+unique/FK constraints, rollback, concurrent binding updates and serialization of
+policy edits with binding creation. The offline job reports **108 passed in
+12.90s**, Ruff clean/42 files formatted and mypy clean/24 files. Agent handoff run
+34624002288 also passed. Actual logs were inspected; CI configuration alone was
+not treated as evidence.
+
+Locked offline sync and the local handoff checker against updated `origin/main`
+also passed. This follow-up records evidence without changing implementation;
+application tests were not rerun for the documentation follow-up. Recheck current
+CI on later revisions. This PR is not claimed merged.
 
 ## Remaining work and limitations
 
-- Review T03 and verify hosted PostgreSQL/CI before merge. Do not infer merge or
+- Review draft PR #8 and confirm current CI before merge. Do not infer merge or
   live database correctness from code or local SQLite tests alone.
 - Local PostgreSQL/devstack and Docker builds/live container startup remain
   unverified. No configured disposable test DB or devstack checkout is available

@@ -24,8 +24,12 @@ passed for **24 source files**. Ruff lint/format passed over the current scope.
 because `TEST_DATABASE_URL` is unset. New PostgreSQL tests preserve T02 application/
 audit data through migration 006, enforce unique/FK constraints, verify rollback,
 and race binding writes against each other and environment policy updates.
-Existing tests now verify head 006 and T03 ORM/schema parity. Hosted evidence is
-recorded in the handoff when inspected; local skips prove no PostgreSQL behavior.
+Existing tests now verify head 006 and T03 ORM/schema parity. Hosted
+[Platform CI run 34624002359](https://github.com/Niilop/data-app-control-plane/actions/runs/34624002359)
+at `974c16e` confirmed **10 PostgreSQL tests passed**, no skips, **108 offline
+tests passed**, Ruff clean/42 files and mypy clean/24 files. The actual job logs
+were inspected; see `next-agent.md`. Agent handoff also passed. Local skips alone
+prove no PostgreSQL behavior.
 
 No real seed, provider connectivity, paid execution, Docker image build or live
 container startup was run. Root README documents the optional local simulated

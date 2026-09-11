@@ -228,7 +228,7 @@ rights. Keep existing login compatible for local development.
 
 ## T03 — Register a sandbox environment binding
 
-**Status:** implemented; pending PR review/merge. **Depends on:** T02 (merged).
+**Status:** implemented in draft PR #8; pending review/merge. **Depends on:** T02 (merged).
 Started from updated main `928f2f7`, including the merged T02 handoff PR #7.
 
 **Implemented:** migration 006 adds versioned environments and unique application/
@@ -243,10 +243,12 @@ real executors and mismatches; existing local `.env` files need this opt-in.
 
 **Verification:** 108 offline tests passed, including API/UI authorization, target/
 config validation, stale edits, seed behavior and rollback. Ruff checks passed over
-the T03 scope and mypy passed for 24 source files. Ten PostgreSQL tests are present;
-local execution reports ten skips with `TEST_DATABASE_URL` unset. Hosted evidence,
-when available, is recorded in `next-agent.md`; skips do not verify migrations or
-locking. Docker builds/live startup remain unverified. No real environment was
+the T03 scope and mypy passed for 24 source files. Local PostgreSQL execution
+reports ten skips with `TEST_DATABASE_URL` unset. Hosted
+[Platform CI run 34624002359](https://github.com/Niilop/data-app-control-plane/actions/runs/34624002359)
+at `974c16e` passed: actual logs report **10 PostgreSQL tests passed**, no skips,
+**108 offline tests passed**, Ruff and mypy clean. Agent handoff also passed.
+Exact evidence is in `next-agent.md`; local skips alone prove no database behavior. Docker builds/live startup remain unverified. No real environment was
 seeded and no provider or paid workload was run.
 
 **Next:** review/merge T03 with hosted PostgreSQL checks, then T04 only.
