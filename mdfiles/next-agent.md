@@ -1,236 +1,140 @@
 # Agent handoff
 
-This describes the proposed code state of this PR, not its merge status. Inspect
-Git status, preserve unrelated changes, and verify prerequisites on updated main
-before starting the next task. Read AGENTS.md and the linked task contracts.
+This describes implemented code, not merge status. Inspect Git status, preserve
+unrelated changes, verify prerequisites on updated main, and read AGENTS.md before
+starting the next bounded task. Do not assume this implementation PR is merged.
 
 ## Implemented state
 
-Build a local-first control plane for governed Databricks data applications, with
-GitHub repositories and GitHub Actions. The developer has essentially no cloud
-budget. PostgreSQL/Redis already run under `~/code/devstack`; use an isolated
-application/test database and do not modify shared services or other databases.
-Redis is not required by this application.
+T01 is merged via PR #5 at `07e90c5`. At T02 start, GitHub CLI confirmed that same
+commit was current main and this task branch contained it. The existing handoff
+reconciliation commit was retained. **T02 — Register an owned application is
+implemented and awaiting PR review/merge.** No T03/environment/worker/provider
+features were added. AI/chat/RAG/LLM/inference remain removed.
 
-AI chat, RAG, LLM, inference helpers, and their provider dependencies were
-explicitly removed (T01a). New registry/workflow features start after T01, not
-in this task. This PR is **T01b**: locked container builds, devstack/optional
-database configuration, isolated PostgreSQL migration integration tests, and
-this repository's own GitHub Actions CI. No Databricks account is needed.
-
-- **Dockerfiles** (`backend/Dockerfile`, `frontend/Dockerfile`): rewritten as
-  two-stage builds. The builder stage copies the pinned uv binary from
-  `ghcr.io/astral-sh/uv:0.12.11` and runs `uv sync --locked --package
-  <backend|frontend> --no-dev` (this is a uv workspace, so both members'
-  `pyproject.toml` files must be present in the build context even though only
-  one member's dependencies are installed and only that member's source is
-  copied into the final image). The runtime stage copies just that virtual
-  environment to `/opt/venv` — deliberately outside `/app`, since
-  `docker-compose.yaml` bind-mounts the host source over `/app` for hot reload
-  and would otherwise shadow a venv placed under it — plus the member's source.
-  No `.env`, credentials, local `data/`, or host `.venv` are copied in. A new
-  root `.dockerignore` backs the `context: .` builds in Compose.
-- **`docker-compose.yaml`**: the bundled `db` service (pgvector-enabled
-  Postgres) moved behind an opt-in `local-db` Compose profile — it no longer
-  starts by default and is never a mandatory dependency. Its host port is
-  configurable (`POSTGRES_HOST_PORT`, default `5433`) to avoid colliding with
-  devstack's Postgres on `5432`. The hardcoded
-  `DATABASE_URL=...@db:5432/${POSTGRES_DB}` override on `backend` was removed
-  (it unconditionally pointed at the disabled `db` service even when a
-  developer intended to use devstack); `DATABASE_URL` now comes from `.env` only,
-  as documented. `backend` gets `extra_hosts:
-  host.docker.internal:host-gateway` so `.env` can point a containerized backend
-  at a devstack Postgres published on the host. `backend`'s `depends_on: db` is
-  `required: false` so it does not block startup when the `local-db` profile is
-  inactive.
-- **Isolated PostgreSQL migration integration tests**
-  (`tests/integration/test_migrations.py`, new): marked `integration`, gated on
-  `TEST_DATABASE_URL`, skipped with a visible reason when unset. Each test runs
-  inside a uniquely named, disposable Postgres **schema** in that database
-  (`search_path` scoped via the connection's `options`) rather than a freshly
-  created database, so the test role needs only ordinary schema privileges, not
-  `CREATEDB`. Covers: pgvector extension availability, the full Alembic chain
-  reaching head with the expected tables, and that upgrading from an earlier
-  revision (`001_initial`) preserves a row inserted at that revision instead of
-  losing it on the way to head.
-- **`tests/conftest.py`**: the autouse `block_network` fixture now skips tests
-  marked `integration` (via a small `is_integration_test` helper, itself covered
-  by a new regression test) — those tests legitimately need to reach a real
-  database. `tests/unit` is unaffected: default `testpaths` still resolves to
-  `tests/unit` only, so `pytest -q` collects the same offline suite as before
-  plus the two new files that live under it.
-- **CI** (`.github/workflows/ci.yml`, new; `.github/workflows/agent-handoff.yml`
-  unchanged): a `lint-type-offline-tests` job runs the same locked
-  sync/ruff/mypy/pytest commands documented in the README, pinned to uv
-  `0.12.11` (matching the Dockerfiles and the existing handoff workflow); a
-  separate `postgres-migration` job runs `pytest tests/integration -q` against a
-  throwaway `pgvector/pgvector` GitHub Actions service container with
-  `TEST_DATABASE_URL` pointed at it.
-- **Docs**: README (new "Containers" section, updated verification commands),
-  `mdfiles/testing-and-operation.md` (T01b commands, explicit
-  run/not-run split), `mdfiles/repository-map.md`, `mdfiles/decisions.md`
-  (ADR-011), and `mdfiles/development-plan.md` (T01 status, T01b handoff
-  summary) updated in this PR alongside this file.
-- **Preserved:** existing migrations, `backend/alembic/legacy_models.py`'s
-  content, the handoff-check workflow/script/PR template from PR #4, and the
-  T01a offline-test baseline (all still pass; see below). No domain models,
-  worker, or identity changes; no dormant CSV/example cleanup.
-- **`backend/alembic/env.py` (two real bug fixes, both found via the PR's CI
-  runs against real PostgreSQL, not by inspection):**
-  1. `config.set_main_option("sqlalchemy.url", settings.database_url)` now
-     escapes `%` as `%%` first. `Config` stores this through `configparser`,
-     whose interpolation rejects a raw `%` (e.g. from a percent-encoded
-     password or query string) with `ValueError: invalid interpolation
-     syntax`; escaping and letting `configparser` un-escape it back on read
-     fixes any `DATABASE_URL` containing a literal `%`, not just this PR's
-     tests.
-  2. The `legacy_models.py` loader is now guarded with a `sys.modules` check
-     before executing. Alembic reloads and re-executes all of `env.py` fresh
-     on every migration command (`alembic/util/pyfiles.py:load_module_py` has
-     no caching) — so calling `command.upgrade()` more than once in the same
-     process re-declares the legacy ORM classes against the same shared
-     `Base.metadata` and raises `InvalidRequestError: Table '...' is already
-     defined for this MetaData instance`. Reproduced directly (not just
-     theorized): running the exact loader code twice in one process raises;
-     adding the `sys.modules["platform_legacy_models"]` guard and rerunning
-     three times succeeds with all 8 expected tables in metadata. This was
-     latent and untriggered before T01b because every prior exerciser (the
-     real `alembic` CLI, `test_startup.py`'s subprocess-isolated tests) only
-     ever called it once per process; `tests/integration` is the first
-     in-process, multi-invocation caller.
+- Migration `005_owned_applications` extends users with `is_active=true` and
+  `is_platform_admin=false`, preserving existing users and migrations 001–004.
+  New UUID/UTC tables: teams, unique memberships, applications, direct/team role
+  assignments, and audit. Foreign keys retain references without delete cascades.
+  New models use SQLAlchemy's typed declarative base; sessions remain synchronous.
+- `/auth/register`, form `/auth/login` (email or username), and `/auth/me` remain.
+  Public registration rejects unknown/privilege fields and creates nonadmins.
+  Identity is resolved from the database on every authenticated request; inactive
+  users cannot log in or reuse a token. No external identity integration or
+  account-deactivation management endpoint exists yet.
+- `backend/bootstrap.py` creates explicit new local accounts, prompting twice for
+  passwords; `--admin` is opt-in. It refuses to overwrite/promote existing users
+  and records admin intent with actor kind `local_bootstrap`. No default accounts,
+  passwords, credentials or external identity changes are activated automatically.
+- T02 API covers teams/memberships, application registration/list/detail,
+  versioned metadata/ownership updates, roles/revocation and audit. Supporting
+  reads include team members, application roles and admin-wide audit history.
+  All lists paginate by `(created_at,id)` after current permission filtering;
+  validated base64 cursors are scoped to endpoint and actor, not frozen snapshots.
+- Any registrant, including admin, must belong to the owning team. Creator gets
+  direct developer + viewer. Accountable owner/data owner must be active users;
+  both can read, only owner/admin can manage ownership/roles. Owning-team
+  membership alone gives no read access. Team/direct roles union; revocation
+  affects subsequent requests. Metadata/source edits require developer even for
+  admin; mixed ownership/metadata patches require both permissions.
+- Registration validates only HTTPS github.com owner/repository references and
+  conservative relative bundle paths. Optional `.git` suffix normalizes away.
+  No network verification occurs: `repository_verified_at=null`, visibly
+  unverified in UI. No platform role grants GitHub/Databricks/data permissions.
+- Application services own commit/rollback; audit helpers flush only. Creation,
+  initial roles and success audit are atomic. Metadata updates use a database
+  version predicate and increment; stale edits return 409 without a success event.
+  UUID request IDs correlate API headers/error envelopes and mutation audit.
+  Validation/server errors omit submitted values and raw database diagnostics.
+- Streamlit uses authenticated HTTP/timeouts for paginated registration,
+  detail/metadata/ownership, roles/history, team membership and admin audit.
+  Account IDs are visible on profiles and entered explicitly for accountability.
+  Forms retain the displayed version across submit reruns to reject stale edits.
+- CI now checks all changed/new T02 modules with Ruff, and mypy covers 18 platform
+  files. No dependency added; `uv.lock` unchanged. Tests include offline SQLite
+  API behavior, Streamlit workflows through the in-process API, and isolated
+  PostgreSQL migration/API/concurrency checks.
 
 ## Verification performed
 
-Run from the repository root, actually executed in the implementing sandbox:
+Actually run locally:
 
-```bash
-uv sync --locked --all-packages --group dev
-uv run --locked pytest -q
-uv run --locked mypy
-uv run --locked ruff check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit tests/integration
-uv run --locked ruff format --check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit tests/integration
-```
+- `uv sync --locked --all-packages --group dev --offline`: passed using existing
+  locked packages (uv 0.12.11, Python 3.11.16).
+- `uv run --locked pytest -q`: **67 passed**. Includes 27 registry API cases and
+  3 Streamlit workflows, plus the existing 37 tests. Offline network guard stayed
+  enabled. TestClient stalls within this execution sandbox; tests passed outside
+  that restriction. Coverage includes permission-filtered lists/detail/audit,
+  creator roles, invalid references/paths/privilege fields, optimistic updates,
+  role/team revocation, inactive tokens, bootstrap/login and injected rollback.
+- `uv run --locked mypy`: passed, 18 source files.
+- Ruff lint and formatting passed over the current explicit scope in root README
+  and `.github/workflows/ci.yml` (all changed/new runtime files, new migration,
+  frontend and tests; historical migration versions left untouched).
+- `uv run --locked pytest tests/integration -q -rs`: **6 skipped** locally with
+  the documented reason because `TEST_DATABASE_URL` is unset. No local PostgreSQL
+  migration, locking or constraint verification is claimed from these skips.
+- `docker version`: launcher reports Docker unavailable in this WSL distro and
+  asks for WSL integration. No image builds or live container checks were run.
 
-Results: Python 3.11.16, uv 0.12.11 (already installed in the sandbox), pytest
-9.1.1, Ruff 0.16.7, mypy 2.3.1. **37 tests passed** (up from T01a's 17 plus PR
-#4's handoff-checker tests; the increase is the 2 new `tests/unit` files —
-`test_conftest_network_guard.py` — plus network-guard scoping; `tests/integration`
-is not in default `testpaths`). Ruff lint and format both clean over the listed
-scope, including the two new files. Mypy reports no issues (scope unchanged:
-`backend/core/config.py`, `backend/main.py`).
-
-`uv sync --locked --package backend --no-dev` and `uv sync --locked --package
-frontend --no-dev` were each run directly (not inside Docker, since Docker was
-unavailable) to confirm the workspace-scoped sync the Dockerfiles rely on
-actually resolves to the right dependency subset before committing to that
-design — confirmed for both, then the full dev environment (`--all-packages
---group dev`) was restored.
-
-`uv run --locked pytest tests/integration -q -rs` was run **without**
-`TEST_DATABASE_URL`: 3 tests skipped, each with the intended visible reason.
-
-**Hosted CI confirmed the fixes, and PR #5 is now merged into `main`.** All
-reported checks passed for PR head `a50795c1d4740aaa079343627e3d21d856a5e31d`:
-[Platform CI run 34608464924](https://github.com/Niilop/data-app-control-plane/actions/runs/34608464924)
-passed both jobs. The actual
-[`postgres-migration` log](https://github.com/Niilop/data-app-control-plane/actions/runs/34608464924/job/103292661662)
-reports **3 passed in 1.47s**, no skips, against `pgvector/pgvector:pg16`.
-This confirms both Alembic fixes through the real migration tests, including
-repeated upgrades and preservation of an existing row. The lint/type/offline
-test job and the agent-handoff check also passed. PR #5 was then merged into
-`main` as merge commit `07e90c5` (confirmed directly: `main` now contains
-`a50795c` as an ancestor). **T01 (T01a + T01b) is complete and merged.**
-
-This follow-up inspected hosted job metadata and actual migration logs; no
-additional code fix was needed. Application tests were not rerun locally.
-Docker image builds, container startup, and local PostgreSQL/devstack checks
-remain unverified — see below.
+T01b's prior hosted evidence remains PR #5, Platform CI run 34608464924 at
+`a50795c`: three migration tests passed against pgvector/PostgreSQL. That validates
+T01b only. T02 hosted CI results must be checked for the actual PR revision; they
+are not yet recorded here. Handoff mechanical checks do not prove these claims.
 
 ## Remaining work and limitations
 
-**Not run, and not claimed as passing:**
-
-- Docker image builds (`docker compose build` / `docker build`) for either
-  service. The implementing sandbox is WSL2 without Docker Desktop's WSL
-  integration enabled — the `docker` CLI is not on `PATH` at all (only a
-  Windows-side binary that isn't wired in), so this is a full absence, not a
-  daemon-connectivity error to retry around.
-- `docker compose up` and any live startup/health smoke check through the
-  containers, for the same reason.
-- Local PostgreSQL migration execution: no local PostgreSQL or devstack
-  exists in this environment. Hosted execution passed as recorded above.
-- `docker compose config` / Compose and workflow YAML validation — the `docker`
-  CLI is absent and PyYAML is not installed in this project's offline venv, so
-  `docker-compose.yaml`, `ci.yml`, and the Dockerfiles were reviewed manually
-  (twice) rather than machine-validated.
-- Devstack integration specifically (the `host.docker.internal` path, and
-  whether devstack's actual Postgres port/credentials match what's documented)
-  — there is no devstack checkout to verify against in this environment.
-
-**Known gaps to note explicitly, not silently treat as done:**
-
-- The `local-db` Compose profile's healthcheck and default port were chosen to
-  avoid a *likely* collision with devstack (port `5432`), but the real devstack
-  Postgres port was not confirmed here. If devstack uses a different port, only
-  the `.env.example` comment needs adjusting, not the Compose file.
-- `backend/requirements.txt` and `frontend/requirements.txt` are now unused by
-  the Dockerfiles (uv/`uv.lock` is the sole source of truth for images) but were
-  left in place rather than deleted, since removing them is unrelated cleanup
-  outside this task's scope; a future task can drop them once confirmed nothing
-  else reads them.
-- `backend/.dockerignore` and `frontend/.dockerignore` predate this change and
-  were not touched. Since both Dockerfiles build with `context: .` (the
-  repository root), Docker only honors a root-level `.dockerignore` (or a
-  `Dockerfile.dockerignore` colocated with the Dockerfile) for that build — the
-  per-directory files were never actually in effect. The new root
-  `.dockerignore` is what actually governs build-context exclusions now.
+- Review this PR, including identity/policy changes, and confirm hosted T02 CI
+  before merge. Do not infer merge or PostgreSQL success from this file.
+- T02's six PostgreSQL tests include fresh-chain/old-head upgrades, legacy user
+  preservation/default flags, new ORM/schema parity, direct database constraints,
+  API/audit rollback and simultaneous versioned updates. Local SQLite tests are
+  not evidence for PostgreSQL semantics.
+- Docker builds, `docker compose up`/health and real devstack integration remain
+  unverified. No devstack checkout or configured disposable test DB was available.
+- Bootstrap is direct local DB administration, not a production identity system.
+  No users were bootstrapped into a real database during this implementation.
+- Repository verification is deferred to T08. Environment bindings, operations,
+  deployments, approvals, access requests and archive endpoints remain later tasks.
+  Audit has no write/delete API but is not tamper-proof against database admins.
+- No cloud resources, external permissions, provider credentials or paid workloads
+  were used. Legacy dependency deprecation warnings remain; no broad upgrade made.
 
 ## Next task
 
-PR #5 is confirmed merged into `main` at `07e90c5` (verified directly via
-`git merge-base --is-ancestor a50795c origin/main` and `gh pr view`, not
-assumed). Still re-verify this yourself against current `main` before building
-on it — this file is a static snapshot and can go stale. Then implement
-**T02 — Register an owned application** on a new branch from updated `main`;
-do not begin the entire roadmap from this handoff.
+Verify T02 is merged into updated main and inspect current checks. Then implement
+**T03 — Register a sandbox environment binding** only, on its own task branch.
+T03 adds admin environment/binding models, migration, API/UI, explicit simulated
+sandbox configuration and self-approval policy, versioned safe binding config,
+and startup rejection of unsupported organization/profile combinations. No
+workspace creation, Terraform, connectivity validation or deployment.
 
-T02 adds user-active/admin support, teams/memberships, applications,
-application-role assignments, a centralized actor/policy dependency,
-transactional audit, and a new migration; an application register/list/detail
-UI and minimal admin team/role controls; permission-filtered pagination,
-optimistic metadata updates, request IDs, and platform error envelopes.
-Excludes repository network verification, environments, worker, approvals, and
-external identity/groups/permissions. See the full T02 contract (read/implement/
-exclude/acceptance) in `mdfiles/development-plan.md`.
-
-Before starting T02's domain work, a reviewer with Docker/PostgreSQL access
-should actually run the checks this handoff could not: `docker compose build`,
-`docker compose up` plus a health check, and retain the passing hosted migration evidence above.
-None of that blocks starting T02's own implementation, but T01 should not be
-called fully verified until it happens.
+If T02 is not merged, finish its review/corrections first. Preserve unrelated
+changes and create the task branch only after inspecting Git status/prerequisites.
+Do not carry temporary checkout state from this handoff into the next task.
 
 ## Files to read first
 
 | Purpose | Files |
 |---|---|
-| T02 task contract | T02 section in [development-plan.md](development-plan.md) |
-| Domain/API contracts for T02 | [domain-contracts.md](domain-contracts.md), T02 rows in [api-contracts.md](api-contracts.md) |
-| T01b container/CI change itself | `backend/Dockerfile`, `frontend/Dockerfile`, `.dockerignore`, `docker-compose.yaml`, `.env.example`, `.github/workflows/ci.yml` |
-| T01b test change itself | `tests/conftest.py`, `tests/integration/test_migrations.py`, `tests/unit/test_conftest_network_guard.py`, `pyproject.toml` (`markers`) |
-| Current auth/router/model files T02 extends | `backend/main.py`, `backend/api/endpoints/auth.py`, `backend/services/auth_service.py`, `backend/models/database.py`, `backend/models/schemas.py` |
-| Test/build baseline and commands | [testing-and-operation.md](testing-and-operation.md), root `README.md` |
-| Migrations | `backend/alembic/env.py`, `legacy_models.py`, `versions/001_initial.py` through `004_add_background_jobs.py` |
+| Entry/task | `AGENTS.md`, `mdfiles/README.md`, T03 in `mdfiles/development-plan.md` |
+| Binding/profile contracts | `mdfiles/architecture.md`, `mdfiles/domain-contracts.md`, T03 rows in `mdfiles/api-contracts.md` |
+| Registry model/migration patterns | `backend/models/platform.py`, `platform_schemas.py`, `backend/alembic/versions/005_owned_applications.py`, `backend/alembic/env.py` |
+| Authorization/transactions | `backend/api/dependencies.py`, `backend/services/policy_service.py`, `application_service.py`, `audit_service.py`, `pagination.py` |
+| API/config/error assembly | `backend/main.py`, `backend/core/config.py`, `backend/api/platform_errors.py`, `backend/api/endpoints/applications.py`, `teams.py` |
+| UI | `frontend/app.py`, `api_client.py`, `registry.py` |
+| Checks | `tests/conftest.py`, `tests/unit/test_registry.py`, `test_registry_ui.py`, `tests/integration/test_migrations.py`, root README, CI workflow |
 
-Do not read `.env` into tool output. The [repository map](repository-map.md) covers
-additional paths if needed; a full repository crawl is unnecessary.
+Do not read `.env` into tool output. Local PostgreSQL/Redis, when available, belong
+to `~/code/devstack`; use isolated app/test databases and do not change shared
+configuration or other databases. Redis is not needed by this platform.
 
 ## Suggested agent prompt
 
-> Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Inspect Git
-> status and verify this T01b PR is merged into updated main. Implement T02
-> only on its own branch. Preserve unrelated changes, explain the plan, run
-> the acceptance checks, update the handoff and affected docs in the same PR,
-> and open a draft PR against main. Do not merge, start T03, or deploy cloud
-> resources. PostgreSQL migration CI passed at the revision linked above;
-> inspect current CI before relying on later revisions. Docker image builds
-> and container startup remain unverified; inspect any newer evidence.
+> Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Inspect Git status
+> and verify T02 is merged into updated main, including current CI evidence.
+> Implement T03 only on its own branch, preserving unrelated changes. Explain
+> the plan, run the acceptance checks, update this handoff and affected docs in
+> the same PR, and open a draft PR against main. Do not merge, start T04, create
+> cloud resources or deploy infrastructure. Keep simulation explicit. Docker
+> builds/startup remain unverified unless newer evidence establishes otherwise.

@@ -1,6 +1,6 @@
 # Development plan and agent task ledger
 
-Status: **T01 in progress**; subsequent tasks not started. This plan is implementation-ready guidance,
+Status: **T01 merged; T02 implemented, pending PR review/merge**; T03 onward not started. This plan is implementation-ready guidance,
 not a claim of implemented capabilities. Task order follows dependencies rather
 than estimated calendar dates. Do not implement the entire roadmap in one turn.
 
@@ -174,7 +174,29 @@ Preserve any new unrelated local edits when committing this task.
 
 ## T02 — Register an owned application
 
-**Status:** not started. **Depends on:** T01.
+**Status:** implemented; pending PR review/merge. **Depends on:** T01 (confirmed
+merged at `07e90c5`, matching current GitHub main at implementation start).
+
+**Implemented:** migration `005_owned_applications`; active/admin user flags with
+safe defaults for legacy users; new teams, memberships, applications, direct/team
+roles and audit tables. Central current-actor/policy checks; API create/list/detail,
+versioned metadata/ownership updates, membership/role management and paginated
+history. Explicit local account bootstrap prompts for passwords and audits admin
+intent; public registration rejects privilege fields. Streamlit supports the full
+registration/detail/history flow and minimal team/role administration. GitHub
+references remain unverified. No external permissions or infrastructure changed.
+
+**Verification:** 67 offline tests passed, including API policy/rollback cases and
+Streamlit workflows through the in-process API. Mypy passed for 18 platform files.
+The PostgreSQL suite was exercised locally only for its skip path: 6 skipped with
+`TEST_DATABASE_URL` unset. It now covers old-head user preservation/defaults,
+new-model/schema parity, constraints, API rollback, and simultaneous versioned
+updates in addition to the original chain tests. Hosted results and final lint
+commands are recorded in [next-agent.md](next-agent.md); do not infer success from
+CI configuration. Docker's launcher reports WSL integration unavailable.
+
+**Next:** review/merge T02 after its checks, then T03 only. Existing T01b Docker
+build/startup verification remains outstanding.
 
 **Read:** [domain contracts](domain-contracts.md), T02 rows in
 [API contracts](api-contracts.md), current auth/router/model files.

@@ -1,12 +1,16 @@
 # backend/services/auth_service.py
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from passlib.context import CryptContext
-from jose import JWTError, jwt
-from sqlalchemy.orm import Session
+from uuid import uuid4
+
 from core.config import get_settings
+from jose import JWTError, jwt
 from models.database import User
 from models.schemas import UserCreate
+from passlib.context import CryptContext
+from services.application_service import transaction
+from services.audit_service import record_audit
+from sqlalchemy.orm import Session
 
 settings = get_settings()
 
@@ -27,18 +31,18 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a JWT access token."""
     to_encode = data.copy()
-    
+
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
-    
+        expire = datetime.now(timezone.utc) + timedelta(
+            minutes=settings.access_token_expire_minutes
+        )
+
     to_encode.update({"exp": expire})
-    
+
     encoded_jwt = jwt.encode(
-        to_encode,
-        settings.secret_key.get_secret_value(),
-        algorithm=settings.algorithm
+        to_encode, settings.secret_key.get_secret_value(), algorithm=settings.algorithm
     )
     return encoded_jwt
 
@@ -49,7 +53,7 @@ def decode_token(token: str) -> Optional[dict]:
         payload = jwt.decode(
             token,
             settings.secret_key.get_secret_value(),
-            algorithms=[settings.algorithm]
+            algorithms=[settings.algorithm],
         )
         email: str = payload.get("sub")
         if email is None:
@@ -59,36 +63,52 @@ def decode_token(token: str) -> Optional[dict]:
         return None
 
 
-def create_user(db: Session, user_create: UserCreate) -> User:
+def create_user(
+    db: Session, user_create: UserCreate, request_id: str | None = None
+) -> User:
     """Create a new user in the database."""
-    # Check if user already exists
-    existing_user = db.query(User).filter(
-        (User.email == user_create.email) | (User.username == user_create.username)
-    ).first()
-    
-    if existing_user:
-        raise ValueError("User with this email or username already exists")
-    
-    # Create new user
-    db_user = User(
-        email=user_create.email,
-        username=user_create.username,
-        password_hash=hash_password(user_create.password)
-    )
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
+    with transaction(db):
+        existing_user = (
+            db.query(User)
+            .filter(
+                (User.email == user_create.email)
+                | (User.username == user_create.username)
+            )
+            .first()
+        )
+        if existing_user:
+            raise ValueError("User with this email or username already exists")
+        db_user = User(
+            email=user_create.email,
+            username=user_create.username,
+            password_hash=hash_password(user_create.password),
+            is_active=True,
+            is_platform_admin=False,
+        )
+        db.add(db_user)
+        db.flush()
+        record_audit(
+            db,
+            db_user,
+            request_id or str(uuid4()),
+            "user.registered",
+            "user",
+            db_user.id,
+            {},
+        )
     return db_user
 
 
 def authenticate_user(db: Session, identifier: str, password: str) -> Optional[User]:
     """Authenticate a user by email OR username."""
     # Search for a match in either the email or username column
-    user = db.query(User).filter(
-        (User.email == identifier) | (User.username == identifier)
-    ).first()
-    
-    if not user:
+    user = (
+        db.query(User)
+        .filter((User.email == identifier) | (User.username == identifier))
+        .first()
+    )
+
+    if not user or not user.is_active:
         return None
     if not verify_password(password, user.password_hash):
         return None

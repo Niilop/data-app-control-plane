@@ -1,11 +1,10 @@
 # Data application control plane: agent entry point
 
-Documentation baseline: 2026-09-11. Implementation status: **T01 (T01a + T01b)
-complete and merged into `main` (T01b via PR #5, merge commit `07e90c5`).
-Hosted CI confirmed the isolated PostgreSQL migration tests pass for real at
-`a50795c`. Docker image builds and a live `docker compose up` check remain
-unverified — no environment involved in T01 had a working Docker daemon; see
-[next-agent.md](next-agent.md). The next platform block is T02.**
+Documentation baseline: 2026-09-11. Implementation status: **T01 merged; T02 owned
+application registry implemented, pending PR review/merge.** T02 includes
+registration, team/application roles, transactional history, and the corresponding
+UI. Docker image builds and live container startup remain unverified. Consult
+[next-agent.md](next-agent.md) for exact verification and merge prerequisites.
 
 **Resume here:** [next-agent.md](next-agent.md). Verify prerequisite changes
 on updated `main` before creating or continuing any task branch; the handoff
@@ -60,13 +59,10 @@ Use this prompt (see [next-agent.md](next-agent.md) for the current, more
 specific version):
 
 > Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Inspect Git
-> status and verify the T01b PR is merged into updated main. Implement T02 only
-> on its own branch. Preserve unrelated changes, explain the plan, run the
-> acceptance checks, update the handoff and affected docs in the same PR, and
-> open a draft PR against main. Do not merge, start T03, or deploy cloud
-> resources.
+> status and verify T02 is merged into updated main. Implement T03 only on its
+> own branch, preserving unrelated changes. Explain the plan, run its checks,
+> update the handoff and affected docs, and open a draft PR against main. Do not
+> merge, begin T04, or deploy cloud resources.
 
-The general assignment/handoff templates are in the development plan. Read the
-T01 handoff for completed code and verification, including which T01b checks
-are still unverified. Infrastructure activation and later task completion are
-not implied by the plan.
+The handoff separates implemented behavior from verification and merge status.
+Infrastructure activation and later task completion are not implied by this plan.

@@ -7,6 +7,27 @@ profile, isolated PostgreSQL migration integration tests, and platform CI; see
 Historical auth/example scripts are under `tests/manual/` with names outside
 pytest discovery; obsolete RAG tests were removed.
 
+## T02 verification
+
+The current checks are the commands in root README and `.github/workflows/ci.yml`.
+T02 expands Ruff to every changed/new runtime module, new migration, frontend and
+test files, and mypy to 18 platform modules. No dependency was added.
+
+Locally: `uv run --locked pytest -q` passed **67 tests**, including 27 registry
+API cases and three Streamlit workflows through the in-process API. Tests retain
+the outbound-network guard; TestClient requires execution outside this sandbox's
+thread restriction. `uv run --locked mypy` passed. PostgreSQL tests run separately:
+`uv run --locked pytest tests/integration -q -rs` reported **6 skipped** without
+`TEST_DATABASE_URL`. They cover fresh/old-head migration, legacy users and flags,
+new ORM/schema parity, real constraints, API rollback and competing metadata writes.
+Hosted evidence is recorded in `next-agent.md` when available; local skips are not
+migration verification. Docker's Windows launcher reports unavailable WSL
+integration; image builds and live startup remain unrun.
+
+Local account/bootstrap and the registration demonstration are documented in root
+README. Bootstrap prompts for new passwords, refuses existing accounts, and audits
+explicit admin creation. It does not deploy or contact an external provider.
+
 ## Development environment
 
 - Linux/WSL2; use `uv` for all Python execution and project-local tools.

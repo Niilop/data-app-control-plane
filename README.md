@@ -4,9 +4,9 @@ A local-first, self-service platform for managing Databricks data applications
 backed by GitHub repositories. See [the development plan](mdfiles/README.md) for
 scope, architecture, contracts, and bounded agent tasks.
 
-The first implementation block provides FastAPI startup, development login, a
-Streamlit account/status page, and an offline test baseline. Application registry,
-workers, GitHub Actions integration, and Databricks deployment are planned work.
+The platform provides development login, an owned application registry, team and
+role administration, transactional audit, and Streamlit registration/detail/history
+screens. Workers, GitHub integration, and Databricks deployment remain planned work.
 The old AI chat, RAG, LLM, and model-inference features have been removed.
 
 ## Local setup
@@ -40,6 +40,42 @@ uv run --locked streamlit run app.py
 The UI defaults to `http://localhost:8000`; set `API_URL` in the environment or
 root `.env` to override it. Container Compose sets the internal frontend URL to
 `http://backend:8000`.
+
+## Local accounts and application registration
+
+After migrating the dedicated local database, create an explicit administrator
+from `backend/` (password is prompted twice, never supplied as a command argument):
+
+```bash
+uv run --locked python -m bootstrap --email your-admin@example.com --username local-admin --admin
+```
+
+This administrative command creates only new accounts, refuses to overwrite
+existing users, and records `user.bootstrapped` with actor kind `local_bootstrap`.
+It has direct database authority and is for local administration. Do not activate
+identity changes outside local development before human review. No account or
+password is seeded automatically. For separate demo users, repeat with their own
+email/username and omit `--admin`, or use the UI's public registration form.
+Public registration always creates an active nonadmin account.
+
+1. Sign in as the administrator. In **Teams**, create a team and add the intended
+   developer's user ID (shown on their profile). Add the admin too if registering
+   an application as that account: admins also require owning-team membership.
+2. Sign in as the team member and select **Register application**. Supply the
+   accountable owner/data-owner IDs, an HTTPS GitHub repository URL and relative
+   bundle root. The creator receives developer and viewer roles.
+3. In **Applications**, inspect the persistent ID, ownership, initial roles and
+   history. Repository references are visibly **unverified**; registration makes
+   no GitHub call. Developers can edit metadata with an optimistic version check.
+4. The recorded owner or administrator can manage ownership and assign/revoke
+   user/team application roles. Data ownership confers read access only. Team
+   membership alone does not grant application visibility; an explicit team role
+   does. No platform role grants GitHub, Databricks, or data permissions.
+
+The UI uses paginated lists with First/Next controls. If another edit makes a form
+stale, reload its version and review fields before resubmitting. Administrative
+history includes team/membership and local-bootstrap events; application history
+is visible only to actors who can currently read that application.
 
 ## Containers
 
@@ -90,22 +126,25 @@ with `docker compose config`.
 | GET | `/docs` | OpenAPI UI |
 
 AI routes and placeholder metrics are absent. CSV/example modules remain dormant
-and are not mounted by the platform API. Authorization roles arrive in T02.
+and are not mounted by the platform API. The registry is under `/api/v1`; see
+[API contracts](mdfiles/api-contracts.md) and `/docs` for payloads and permissions.
 
 ## Verification
 
 ```bash
 uv run --locked pytest -q
 uv run --locked mypy
-uv run --locked ruff check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit tests/integration
-uv run --locked ruff format --check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit tests/integration
+uv run --locked ruff check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py frontend tests/conftest.py tests/unit tests/integration
+uv run --locked ruff format --check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py frontend tests/conftest.py tests/unit tests/integration
 ```
 
 Unit tests (`tests/unit`, the default `testpaths`) block network calls. Startup and
 migration-rendering tests use an isolated process with controlled configuration; no
 running database or provider is required. UI tests use Streamlit's test runner and
-mocked HTTP responses. Mypy is initially scoped to the new settings and API
-assembly; unrelated legacy modules are not yet under strict checking.
+in-process API calls for registry workflows. Offline registry tests use SQLite
+with foreign keys enabled; PostgreSQL tests establish real migration, constraint,
+transaction and concurrent-update behavior. Mypy covers 18 new/affected platform
+modules; unrelated legacy modules remain outside its scope.
 
 Isolated PostgreSQL migration integration tests (`tests/integration`, marked
 `integration`) are not part of the default `testpaths` and need a dedicated,
@@ -125,6 +164,6 @@ service container.
 Historical migration files and database contents are preserved. Removed feature
 metadata lives in `backend/alembic/legacy_models.py` and is loaded only by Alembic,
 so future autogeneration does not propose dropping retained tables. Offline SQL
-rendering is not proof of a successful migration on a live database; T01b adds that
-check. Legacy auth/example HTTP scripts are kept under `tests/manual/` and are not
+rendering is not proof of a successful migration on a live database; the isolated
+PostgreSQL CI job supplies that check. Legacy auth/example HTTP scripts are kept under `tests/manual/` and are not
 collected by pytest; the example endpoint is not mounted in the platform API.

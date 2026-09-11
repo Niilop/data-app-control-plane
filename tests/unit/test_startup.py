@@ -93,4 +93,6 @@ command.upgrade(config, "head", sql=True)
     assert "CREATE TABLE users" in output
     assert "CREATE TABLE document_chunks" in output
     assert "004_add_background_jobs" in output
+    assert "CREATE TABLE applications" in output
+    assert "005_owned_applications" in output
     assert "DROP TABLE" not in output

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 # ============= Example Schemas =============
@@ -16,9 +16,17 @@ class ExampleResponse(BaseModel):
 
 # ============= Auth Schemas =============
 class UserCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     email: EmailStr
-    username: str
-    password: str
+    username: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=1, max_length=72)
+
+    @field_validator("password")
+    @classmethod
+    def bcrypt_password_length(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("Password must fit within 72 UTF-8 bytes")
+        return value
 
 
 class UserLogin(BaseModel):
@@ -41,6 +49,8 @@ class UserResponse(BaseModel):
     username: str
     created_at: datetime
     settings: dict = {}
+    is_active: bool
+    is_platform_admin: bool
 
     class Config:
         from_attributes = True

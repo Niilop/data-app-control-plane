@@ -28,11 +28,23 @@ select = ["E4", "E7", "E9", "F", "I"]
 
 [tool.mypy]
 python_version = "3.11"
-files = ["backend/core/config.py", "backend/main.py"]
-mypy_path = "backend"
+files = [
+    "backend/core/config.py", "backend/core/database.py", "backend/main.py",
+    "backend/models/platform.py", "backend/models/platform_schemas.py",
+    "backend/api/dependencies.py", "backend/api/platform_errors.py",
+    "backend/api/endpoints/auth.py", "backend/api/endpoints/applications.py", "backend/api/endpoints/teams.py",
+    "backend/services/auth_service.py", "backend/services/application_service.py",
+    "backend/services/policy_service.py", "backend/services/audit_service.py", "backend/services/pagination.py",
+    "backend/bootstrap.py", "frontend/api_client.py", "frontend/registry.py",
+]
+mypy_path = ["backend", "frontend"]
 explicit_package_bases = true
 follow_imports = "silent"
 check_untyped_defs = true
 disallow_untyped_defs = true
 warn_unused_ignores = true
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["jose.*", "passlib.*"]
+ignore_missing_imports = true
