@@ -145,3 +145,19 @@ attempts/retries, stale leases, and last observation time. Archived applications
 retain revision/deployment/audit history and external data. Reject archive while a
 conflicting operation is unresolved; require explicit separate retirement work for
 external resources in a future phase.
+
+### T04 implemented worker slice
+
+`worker.py` is a separate PostgreSQL polling process, also included in Compose.
+`services/queue_service.py` owns claims, short lease/heartbeat/result transactions
+and fencing; `services/operation_service.py` owns user commands, authorization,
+reservation and idempotency/audit transactions. The worker has explicit typed
+probe dispatch and no provider or arbitrary-code execution path. Worker loss
+enters reconciliation; a fixed probe can establish safe repeat execution because
+it has no external side effects. An unknown probe retains its reservation.
+
+API liveness is independent from readiness. Readiness requires queue access and
+recent worker presence; admin telemetry describes queue age/counts/expired leases.
+Neither heartbeat freshness nor local simulation asserts provider readiness.
+Future T05 handlers must extend the closed dispatch/schema and fenced related
+result transaction without executing adopted repository code in this worker.

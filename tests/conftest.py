@@ -75,6 +75,12 @@ def registry(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple]:
             "audit_events",
             "environments",
             "environment_bindings",
+            "operations",
+            "operation_attempts",
+            "operation_reservations",
+            "queue_probes",
+            "operation_commands",
+            "worker_heartbeats",
         }
     ]
     Base.metadata.create_all(engine, tables=tables)

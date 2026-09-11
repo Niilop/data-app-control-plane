@@ -1,6 +1,6 @@
 # API contracts
 
-Status: T02/T03 `/api/v1` registry endpoints are implemented; later task rows remain planned. Existing `/auth/*` remains the development login
+Status: T02/T03 registry and T04 operation endpoints are implemented; later task rows remain planned. Existing `/auth/*` remains the development login
 surface initially. Implement endpoints with their tasks; this document does not
 claim they exist. Keep services usable by API and worker without importing routers.
 
@@ -189,3 +189,41 @@ deployment credentials. Each task includes its corresponding screen rather than
 leaving all UI work to the end. Show source revision, approval scope, target,
 execution mode, external run links, freshness, and pending cancellation accurately.
 Hiding buttons helps usability but never replaces server authorization.
+
+## T04 implemented details
+
+All T04 operation rows are implemented. Reads are filtered through current
+application visibility; mutation requires an explicit direct/team operator role
+(no owner/admin execution override). Recovery responses are 202 with `Location`
+and the accepted operation/current status. Retry returns a new linked operation.
+Cancel/retry take no command fields. Reconcile accepts only a nonblank `evidence`
+reason of at most 500 characters; the reason is hashed, never echoed or retained
+as plaintext. This schedules an observation, not manual force-success.
+
+All three actions require `Idempotency-Key` (1–128 ASCII letters, digits, `_ . : -`).
+Accepted command keys/hashes are retained for actor + action + target. Replay
+requires current authorization, returns original/current state even after terminal
+completion, and returns 409 for a different canonical payload. Failed commands
+are rolled back, including their key. Different commands on a reserved binding
+return 409 identifying the readable conflicting operation.
+
+Only `queue_probe` is implemented. Submission is an internal local service/CLI,
+not an HTTP endpoint. Payload schema 1 is closed and contains no commands, URLs
+or credentials. API views expose kind, explicit simulated mode, state, execution
+attempt count/limit, cancellation intent, safe diagnostic code, original requester,
+binding version, retry link, timestamps/heartbeat/lease expiry. Attempts expose
+phase, correlation UUID, start/end, safe outcome/code, without lease tokens,
+worker identity, handler payload or exception text. Standard pagination applies.
+
+Queued/retry-wait cancellation releases the reservation and records the cancelled
+probe result atomically. Running/uncertain cancellation only sets intent; observed
+success can win. Failed/cancelled operations can be retried after renewed policy
+checks, but unknown/needs-attention operations cannot. Reconciliation cannot
+release an uncertain reservation without an established terminal observation.
+
+`GET /health` is public API liveness. `GET /ready` returns 200 only when the queue
+schema is accessible and at least one worker heartbeat is less than 60 seconds
+old; otherwise 503 with no database diagnostics. It is not per-operation progress
+or external-provider readiness. `GET /api/v1/queue/telemetry` is admin-only:
+counts by state, oldest eligible age, live-worker count, expired leases and
+observation timestamp. Ordinary readers cannot obtain global queue counts.

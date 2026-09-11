@@ -7,7 +7,7 @@ affected files before editing; avoid a full repository crawl for each task.
 
 | Path | Responsibility / relevant limitation |
 |---|---|
-| `backend/main.py` | FastAPI assembly; auth/system and T02/T03 registry routes, request IDs and safe error handlers; no AI routes |
+| `backend/main.py` | FastAPI assembly; auth/system and T02/T03 registry and T04 operation routes, request IDs and safe error handlers; no AI routes |
 | `backend/core/config.py` | Cached settings; explicit simulated executor, local-only profile gate, DB/auth settings, sanitized validation errors and SQL debug off |
 | `backend/core/database.py` | Synchronous engine/session and typed DeclarativeBase; settings constructed on import |
 | `backend/core/logging.py` | Basic Python logging, no structured audit/correlation |
@@ -79,10 +79,9 @@ Keep the existing import layout initially; a package-wide rename is outside T01.
 
 | Path | Planned content |
 |---|---|
-| `backend/api/endpoints/revisions.py`, `operations.py`, `access.py` | Workflow endpoints |
-| `backend/services/operation_service.py`, `deployment_service.py`, `access_service.py` | Workflow logic |
-| `backend/worker.py` | Independently runnable worker entry point |
-| `backend/workers/` | Claims, handlers, retry/reconciliation code |
+| `backend/api/endpoints/revisions.py`, `access.py` | Workflow endpoints |
+| `backend/services/deployment_service.py`, `access_service.py` | Workflow logic |
+| `backend/workers/` | Split handlers here when future tasks need them |
 | `backend/integrations/` | Only implemented simulation, artifact, GitHub, Databricks adapters |
 | `templates/python-batch/` | Versioned generated-project assets and tests |
 | `frontend/pages/` | Split platform screens here as later tasks need them |
@@ -96,3 +95,16 @@ Do not create empty architectural scaffolding for all proposed paths upfront.
 `uv.lock`, `AGENTS.md`, and `mdfiles/` are deliberately tracked. The user clarified
 that agent instructions should remain in source control; the context handoff on
 main resolves the earlier local-only instruction and ignore-file uncertainty.
+
+### T04 implementation modules
+
+| Path | Responsibility |
+|---|---|
+| `backend/models/operations.py`, `operation_schemas.py` | Durable operation/attempt/reservation/command/probe/worker ORM, closed input and safe views |
+| `backend/alembic/versions/007_durable_operations.py` | Add queue tables; preserve migration history and existing registry |
+| `backend/services/operation_service.py` | Operator commands, transactional probe submission/audit, idempotency and reservations |
+| `backend/services/queue_service.py` | PostgreSQL atomic claims, leases, heartbeat, fencing, backoff and related-result writes |
+| `backend/worker.py`, `backend/queue_probe.py` | Separate polling process, fixed deterministic simulated handler and local success-probe CLI |
+| `backend/api/endpoints/operations.py`, `backend/main.py` | Authorized operation/history/recovery and admin telemetry; liveness/readiness |
+| `frontend/operation_ui.py`, `frontend/api_client.py` | Per-app operation/attempt display, freshness and keyed recovery commands |
+| `tests/unit/test_operations.py`, `tests/integration/test_operations.py` | Offline API/UI/state/failure cases; real PostgreSQL process contention/restart/heartbeat, fencing and rollback |

@@ -22,12 +22,16 @@ class APIClient:
         *,
         data: dict | None = None,
         params: dict | None = None,
+        idempotency_key: str | None = None,
     ) -> Any:
         try:
             response = requests.request(
                 method,
                 self.base_url + path,
-                headers=self.headers,
+                headers={
+                    **self.headers,
+                    **({"Idempotency-Key": idempotency_key} if idempotency_key else {}),
+                },
                 json=data,
                 params=params,
                 timeout=self.timeout,

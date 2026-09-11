@@ -3,6 +3,7 @@
 import streamlit as st
 from api_client import APIClient, APIError
 from environment_ui import render_bindings, render_environments
+from operation_ui import render_operations
 from registry_widgets import changed, page
 
 
@@ -121,6 +122,7 @@ def application_detail(client: APIClient, application_id: str, profile: dict) ->
                     "Assignment revoked. Other direct or team assignments may still grant access."
                 )
     render_bindings(client, application_id, profile)
+    render_operations(client, application_id)
     st.subheader("Application history")
     st.json(page(client, path + "/audit-events", f"audit_{application_id}"))
 

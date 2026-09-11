@@ -1,6 +1,6 @@
 # Development plan and agent task ledger
 
-Status: **T01 and T02 complete and merged; T03 implemented, pending review/merge**; T04 onward not started. This plan is implementation-ready guidance,
+Status: **T01–T03 complete and merged; T04 implemented, pending review/merge**; T05 onward not started. This plan is implementation-ready guidance,
 not a claim of implemented capabilities. Task order follows dependencies rather
 than estimated calendar dates. Do not implement the entire roadmap in one turn.
 
@@ -228,7 +228,7 @@ rights. Keep existing login compatible for local development.
 
 ## T03 — Register a sandbox environment binding
 
-**Status:** implemented in draft PR #8; pending review/merge. **Depends on:** T02 (merged).
+**Status:** complete and merged (PR #8, `46a9cd9`). **Depends on:** T02 (merged).
 Started from updated main `928f2f7`, including the merged T02 handoff PR #7.
 
 **Implemented:** migration 006 adds versioned environments and unique application/
@@ -251,7 +251,7 @@ at `974c16e` passed: actual logs report **10 PostgreSQL tests passed**, no skips
 Exact evidence is in `next-agent.md`; local skips alone prove no database behavior. Docker builds/live startup remain unverified. No real environment was
 seeded and no provider or paid workload was run.
 
-**Next:** review/merge T03 with hosted PostgreSQL checks, then T04 only.
+**Merge confirmed:** T03 PR #8 merged at `46a9cd9`. T04 proceeds from that updated main.
 
 **Read:** profile section in [architecture](architecture.md), binding/policy
 invariants in [domain contracts](domain-contracts.md), T03 API rows.
@@ -270,7 +270,23 @@ configuration changes increment binding version and are audited.
 
 ## T04 — Durable operations with a separate worker
 
-**Status:** not started. **Depends on:** T03.
+**Status:** implemented, pending review/merge. **Depends on:** T03 (merged).
+
+**Delivered:** migration 007 queue/attempt/reservation/probe/command/heartbeat tables;
+transactional enqueue/audit and scoped idempotency; PostgreSQL claims, leases,
+heartbeats, fencing and separate worker/Compose service; fixed simulated handler;
+bounded retry, cancellation and operator recovery; authorized API/UI history and
+freshness; API liveness/readiness and admin queue telemetry. No generic task API.
+
+**Verification:** 126 offline tests passed, Ruff clean (53 files), mypy clean
+(32 files). Local integration collection reports 15 explicit skips. Hosted
+PostgreSQL evidence is pending; exact results are recorded in `next-agent.md`.
+PostgreSQL tests cover separate competing processes, API/worker restart recovery,
+stale fencing, concurrent submissions, heartbeat/cancel, migration round trip and
+transaction rollback. Do not treat local SQLite checks or integration skips as
+proof of PostgreSQL behavior. Docker builds/live startup remain unverified.
+
+**Next:** review/merge T04, then implement T05 only.
 
 **Read:** worker/failure protocol in [architecture](architecture.md), operation
 state/idempotency contracts, T04 API rows; the operation contract; the old RAG job runner has been removed.

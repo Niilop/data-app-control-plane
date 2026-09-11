@@ -166,3 +166,33 @@ constraint/atomic reservation, not a read-then-insert check. A second conflictin
 request returns `409` with the existing operation ID if the actor can read it.
 Do not release on worker loss or unknown provider outcome. Idempotency keys do
 not by themselves deduplicate GitHub or Databricks actions.
+
+## T04 concrete queue contract
+
+Operation payload schema 1 currently supports only the internal simulated probe.
+`OperationCommand` holds the idempotency scope/hash and references the resulting
+operation. `OperationReservation` has a primary key on binding ID and unique
+operation ID. `QueueProbe` is the related request/result record used to exercise
+transactional enqueue and fenced completion. `WorkerHeartbeat` records polling/
+lease-renewal freshness. These are separate from historical BackgroundJob/Pipeline.
+
+Each claim increments a fencing token and creates a unique operation/token
+attempt with a persisted correlation UUID and execute/reconcile phase. Execution
+attempts, not reconciliation observations, consume the maximum three-execution
+budget. Leases last 30 seconds and renew every 10 seconds; timestamps for lease
+checks use PostgreSQL `clock_timestamp()` after row locking. Result writes and
+reservation release are part of the fenced transaction, including a final expiry
+check after flush. Handlers do not hold a database transaction.
+
+The probe has no external side effects. After lease loss its reconciler can
+establish that repeat execution is safe and schedules `retry_wait` before the
+next execution. Deterministic unknown scenarios intentionally cannot establish an
+outcome: observation changes them to `needs_attention`, retaining reservations.
+Operator evidence is a reason for another observation, not a way to override
+results. Future handlers must implement their own provider reconciliation; never
+infer safe resubmission from lease expiry or loss of requester authorization.
+
+Worker observations retain the original requester as audit actor, plus operation
+ID, worker UUID and fencing token in safe details. Recovery actions record the
+acting operator. The initial probe does not implement external workspace limits,
+provider cancellation or exactly-once external execution.

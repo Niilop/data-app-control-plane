@@ -193,6 +193,31 @@ simulated environment, and refuses to overwrite changed policy. The identical
 repeat does nothing. It is a direct-DB local administration helper, not a provider
 adapter. No actual simulation execution is introduced before its owning task.
 
+## ADR-014 — T04 durable queue with a fixed simulated probe
+
+**Accepted implementation direction (T04), 2026-09-11.** Use PostgreSQL queue rows,
+short synchronous transactions, `FOR UPDATE SKIP LOCKED`, renewable leases and
+monotonic fencing. No broker or FastAPI background execution. Fencing covers
+related probe results, attempts, reservation release and audit in one transaction.
+Use database wall time after locks and recheck after flush; stale workers discard
+results. Preserve requester identity while recording worker identity separately.
+
+Keep an explicit typed, side-effect-free probe to exercise infrastructure without
+an arbitrary task API. Its success path is available only via local CLI/service.
+Closed deterministic failure scenarios support tests. Expiry first reconciles;
+only established safe outcomes may retry. Unknown work retains the binding
+reservation. An operator reason schedules observation and cannot force success;
+retain only its digest to avoid pasted credentials in audit/history.
+
+Store idempotency in command records so recovery endpoints have the same replay
+contract as initial submission. Retries create linked operations after current
+policy checks. Admin/owner status does not imply operator rights. API and worker
+both enforce current grants, lifecycle and environment/binding eligibility.
+
+Public readiness reports database/worker availability without diagnostics;
+global queue telemetry is admin-only. No provider readiness, exactly-once external
+execution, workspace capacity management or organization identity is implied.
+
 ## Questions reserved for their implementation gates
 
 | Question | Needed by | Default until resolved |

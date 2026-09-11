@@ -38,8 +38,14 @@ EXPECTED_HEAD_TABLES = {
     "audit_events",
     "environments",
     "environment_bindings",
+    "operations",
+    "operation_attempts",
+    "operation_reservations",
+    "queue_probes",
+    "operation_commands",
+    "worker_heartbeats",
 }
-HEAD_REVISION = "006_environment_bindings"
+HEAD_REVISION = "007_durable_operations"
 
 
 def _scoped_database_url(schema: str) -> str:
@@ -197,6 +203,12 @@ def test_upgrade_from_old_head_preserves_user_and_safe_flags(
             "audit_events",
             "environments",
             "environment_bindings",
+            "operations",
+            "operation_attempts",
+            "operation_reservations",
+            "queue_probes",
+            "operation_commands",
+            "worker_heartbeats",
         }
         with engine.connect() as connection:
             context = MigrationContext.configure(

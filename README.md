@@ -7,7 +7,9 @@ scope, architecture, contracts, and bounded agent tasks.
 The platform provides development login, an owned application registry, team and
 role administration, transactional audit, and Streamlit registration/detail/history
 screens, plus admin-managed simulated environments and application bindings.
-Workers, GitHub integration, and Databricks deployment remain planned work.
+A separate durable worker runs explicit simulated probes with operation history
+and recovery controls. Bundle generation, GitHub integration and Databricks
+deployment remain planned work.
 The old AI chat, RAG, LLM, and model-inference features have been removed.
 
 ## Local setup
@@ -32,6 +34,12 @@ From `backend/`:
 ```bash
 uv run --locked alembic upgrade head
 uv run --locked uvicorn main:app --reload
+```
+
+From `backend/` in a second terminal, start the queue worker:
+
+```bash
+uv run --locked python -m worker
 ```
 
 From `frontend/` in another terminal:
@@ -167,7 +175,9 @@ with `docker compose config`.
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/` | Application identity |
-| GET | `/health` | Process liveness only, not database readiness |
+| GET | `/health` | API process liveness |
+| GET | `/ready` | Queue schema accessible and worker heartbeat within 60 seconds |
+| GET | `/api/v1/queue/telemetry` | Admin-only queue counts, age and worker freshness |
 | POST | `/auth/register` | Create a development account |
 | POST | `/auth/login` | Email/username and password as form data |
 | GET | `/auth/me` | Current user; requires bearer token |
@@ -182,8 +192,8 @@ and are not mounted by the platform API. The registry is under `/api/v1`; see
 ```bash
 uv run --locked pytest -q
 uv run --locked mypy
-uv run --locked ruff check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py frontend tests/conftest.py tests/unit tests/integration
-uv run --locked ruff format --check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py frontend tests/conftest.py tests/unit tests/integration
+uv run --locked ruff check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py frontend tests/conftest.py tests/unit tests/integration
+uv run --locked ruff format --check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py frontend tests/conftest.py tests/unit tests/integration
 ```
 
 Unit tests (`tests/unit`, the default `testpaths`) block network calls. Startup and
@@ -215,3 +225,26 @@ so future autogeneration does not propose dropping retained tables. Offline SQL
 rendering is not proof of a successful migration on a live database; the isolated
 PostgreSQL CI job supplies that check. Legacy auth/example HTTP scripts are kept under `tests/manual/` and are not
 collected by pytest; the example endpoint is not mounted in the platform API.
+
+## Durable simulated operations (T04)
+
+Migrate to head 007, start the API and worker, and register an application plus a
+usable binding. The owner/admin must explicitly grant the submitting user an
+**operator** role. From `backend/`, queue the fixed internal success probe:
+
+```bash
+uv run --locked python -m queue_probe --actor-id <operator-user-id> --application-id <application-uuid> --binding-id <binding-uuid> --idempotency-key <unique-key>
+```
+
+This direct-database local command uses the named operator's current policy.
+It makes no GitHub/Databricks calls. An identical key repeats the original result;
+use a new key to request another probe after the previous reservation is resolved.
+There is no HTTP arbitrary task-execution endpoint. Compose starts the same
+worker; `python -m worker --once` performs one queue cycle for diagnostics/tests.
+
+In **Applications → Operations**, refresh to see status, attempts, observation
+and heartbeat timestamps. Operator controls cancel, create a linked retry for a
+resolved failure/cancellation, or request reconciliation with a reason. Running
+cancellation is intent until observed. Unknown outcomes retain their reservation;
+no force-success or blind reservation-release control exists. The probe alone is
+not a generated application, deployment, or proof of external connectivity.
