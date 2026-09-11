@@ -1,15 +1,16 @@
 # Data application control plane: agent entry point
 
-Documentation baseline: 2026-09-11. Implementation status: **T01a merged; T01b
-implemented on `build/t01b-containers-ci`, opened as a draft PR against `main`
-(not merged) — Docker image builds, a live `docker compose up` check, and the
-isolated PostgreSQL migration tests are unverified locally; see
-[next-agent.md](next-agent.md). Platform workflows (T02+) remain planned.**
+Documentation baseline: 2026-09-11. Implementation status: **T01 (T01a + T01b)
+complete and merged into `main` (T01b via PR #5, merge commit `07e90c5`).
+Hosted CI confirmed the isolated PostgreSQL migration tests pass for real at
+`a50795c`. Docker image builds and a live `docker compose up` check remain
+unverified — no environment involved in T01 had a working Docker daemon; see
+[next-agent.md](next-agent.md). The next platform block is T02.**
 
-**Resume here:** [next-agent.md](next-agent.md). Once the T01b PR is merged,
-the next platform block is T02. Verify prerequisite changes on updated `main`
-before creating or continuing any task branch; the handoff describes code
-state, not merge status.
+**Resume here:** [next-agent.md](next-agent.md). Verify prerequisite changes
+on updated `main` before creating or continuing any task branch; the handoff
+describes code state, not merge status, so re-confirm rather than trusting
+this line indefinitely.
 
 Build a self-service platform where a team requests onboarding of a Git repository
 as a governed Databricks data application. The platform manages ownership, access

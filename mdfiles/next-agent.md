@@ -129,66 +129,22 @@ design — confirmed for both, then the full dev environment (`--all-packages
 `uv run --locked pytest tests/integration -q -rs` was run **without**
 `TEST_DATABASE_URL`: 3 tests skipped, each with the intended visible reason.
 
-**Two rounds of real CI evidence changed this design; both are recorded here
-because the second round revealed the first round's fix was in the wrong
-place.** Neither Docker nor a local PostgreSQL exists in the implementing
-sandbox, so every finding below came only from reading the PR's actual
-`postgres-migration` CI logs (real `pgvector/pgvector` service container),
-not from local execution.
+**Hosted CI confirmed the fixes, and PR #5 is now merged into `main`.** All
+reported checks passed for PR head `a50795c1d4740aaa079343627e3d21d856a5e31d`:
+[Platform CI run 34608464924](https://github.com/Niilop/data-app-control-plane/actions/runs/34608464924)
+passed both jobs. The actual
+[`postgres-migration` log](https://github.com/Niilop/data-app-control-plane/actions/runs/34608464924/job/103292661662)
+reports **3 passed in 1.47s**, no skips, against `pgvector/pgvector:pg16`.
+This confirms both Alembic fixes through the real migration tests, including
+repeated upgrades and preservation of an existing row. The lint/type/offline
+test job and the agent-handoff check also passed. PR #5 was then merged into
+`main` as merge commit `07e90c5` (confirmed directly: `main` now contains
+`a50795c` as an ancestor). **T01 (T01a + T01b) is complete and merged.**
 
-- **Round 1:** 1 passed, 2 failed. `test_pgvector_extension_is_available`
-  passed — confirms the schema-isolation and pgvector-relocatability approach
-  in ADR-011 works against real PostgreSQL. The two Alembic-driven tests
-  failed with `ValueError: invalid interpolation syntax`: `Config` stores the
-  URL through `configparser`, whose interpolation rejects the raw `%`
-  characters produced by percent-encoding the `search_path` query value (e.g.
-  `%3D`, `%2C`). First fix attempt: escape `%` as `%%` before calling
-  `config.set_main_option` in the test file's own `_alembic_config` helper.
-- **Round 2** (after pushing that fix): both Alembic-driven tests still
-  failed, now with `pydantic ValidationError: database_url/secret_key Field
-  required`. This exposed that the round-1 fix was set on the wrong object:
-  `backend/alembic/env.py` unconditionally overwrites
-  `config`'s `sqlalchemy.url` from `get_settings().database_url` — so setting
-  it directly on the `Config` object in the test was always a no-op, and in
-  CI neither `DATABASE_URL` nor `SECRET_KEY` is set as an environment
-  variable (no `.env` file exists there, correctly, since it's gitignored),
-  so `Settings()` failed validation outright.
-  - Fixed the test by driving the real inputs instead: `isolated_schema` now
-    sets `DATABASE_URL`/`SECRET_KEY` via `monkeypatch.setenv` and clears
-    `core.config.get_settings`'s `lru_cache` before each test, so
-    `env.py`'s own `get_settings()` call picks up the scoped URL.
-  - Moved the `%` → `%%` escaping into `backend/alembic/env.py` itself,
-    at the line that actually sets `sqlalchemy.url` — this is where the raw
-    percent-encoded value actually flows through `configparser`, and fixing
-    it there benefits any real `DATABASE_URL` containing a literal `%` (e.g.
-    a percent-encoded password), not just these tests.
-  - While tracing this, found and fixed a second, independent, real bug the
-    same way: `env.py` reloads and re-executes itself fresh on **every**
-    migration command (`alembic/util/pyfiles.py:load_module_py` has no
-    module caching), so its ad hoc `legacy_models.py` loader
-    (`spec_from_file_location` + `exec_module`, previously with no
-    `sys.modules` registration) re-declares the same SQLAlchemy declarative
-    classes against the shared `Base.metadata` on any second
-    `command.upgrade()` call in one process, raising `InvalidRequestError:
-    Table '...' is already defined for this MetaData instance`. This was
-    latent and never triggered before T01b: the real `alembic` CLI and
-    `test_startup.py`'s subprocess-isolated tests each only ever call it once
-    per process; `tests/integration` is the first in-process, multi-call
-    caller (one test alone calls `command.upgrade` twice). Reproduced
-    directly offline (not just theorized): running the loader twice in one
-    process raises; guarding it with `if "platform_legacy_models" not in
-    sys.modules` and registering the loaded module there, then rerunning
-    three times, succeeds with all 8 expected tables present.
-
-Offline checks (ruff, mypy, `pytest -q` — 37 passed) were re-run after each
-round and stayed clean throughout; the `sys.modules` guard fix was verified
-directly by reproducing and then resolving the exact `InvalidRequestError`
-offline (no Postgres needed for that particular bug). **Neither fix has yet
-been confirmed by an actual passing CI run against real PostgreSQL** — that is
-the first thing the next agent/reviewer should check (re-run or inspect the
-`postgres-migration` job on this PR) before treating `tests/integration`, or
-these `env.py` changes, as verified rather than "offline-consistent and
-logically sound."
+This follow-up inspected hosted job metadata and actual migration logs; no
+additional code fix was needed. Application tests were not rerun locally.
+Docker image builds, container startup, and local PostgreSQL/devstack checks
+remain unverified — see below.
 
 ## Remaining work and limitations
 
@@ -201,13 +157,8 @@ logically sound."
   daemon-connectivity error to retry around.
 - `docker compose up` and any live startup/health smoke check through the
   containers, for the same reason.
-- `tests/integration` against a real PostgreSQL/pgvector server — no local
-  PostgreSQL and no `~/code/devstack` checkout existed in the sandbox (`ls
-  ~/code` showed no `devstack` directory). The PR's first `postgres-migration`
-  CI run did exercise these for real (see above): it found and this PR fixes a
-  genuine `configparser` percent-escaping bug, but the fix itself has not yet
-  been confirmed by a passing CI run. Treat the *next* `postgres-migration`
-  result on this PR as the evidence, not this handoff.
+- Local PostgreSQL migration execution: no local PostgreSQL or devstack
+  exists in this environment. Hosted execution passed as recorded above.
 - `docker compose config` / Compose and workflow YAML validation — the `docker`
   CLI is absent and PyYAML is not installed in this project's offline venv, so
   `docker-compose.yaml`, `ci.yml`, and the Dockerfiles were reviewed manually
@@ -236,11 +187,12 @@ logically sound."
 
 ## Next task
 
-Verify this PR is merged into updated `main` before building on it (repeat the
-"Source of truth"/prerequisite-check step this task itself started with — do
-not assume it from this file). Then implement **T02 — Register an owned
-application** on a new branch from updated `main`; do not begin the entire
-roadmap from this handoff.
+PR #5 is confirmed merged into `main` at `07e90c5` (verified directly via
+`git merge-base --is-ancestor a50795c origin/main` and `gh pr view`, not
+assumed). Still re-verify this yourself against current `main` before building
+on it — this file is a static snapshot and can go stale. Then implement
+**T02 — Register an owned application** on a new branch from updated `main`;
+do not begin the entire roadmap from this handoff.
 
 T02 adds user-active/admin support, teams/memberships, applications,
 application-role assignments, a centralized actor/policy dependency,
@@ -253,8 +205,7 @@ exclude/acceptance) in `mdfiles/development-plan.md`.
 
 Before starting T02's domain work, a reviewer with Docker/PostgreSQL access
 should actually run the checks this handoff could not: `docker compose build`,
-`docker compose up` plus a health check, and `tests/integration` against a real
-pgvector database (or rely on the `postgres-migration` CI job's hosted result).
+`docker compose up` plus a health check, and retain the passing hosted migration evidence above.
 None of that blocks starting T02's own implementation, but T01 should not be
 called fully verified until it happens.
 
@@ -280,7 +231,6 @@ additional paths if needed; a full repository crawl is unnecessary.
 > only on its own branch. Preserve unrelated changes, explain the plan, run
 > the acceptance checks, update the handoff and affected docs in the same PR,
 > and open a draft PR against main. Do not merge, start T03, or deploy cloud
-> resources. Before relying on T01b's container/CI claims, confirm with the
-> user whether `docker compose build`/`up` and the isolated PostgreSQL
-> migration tests have actually been run since — this handoff explicitly
-> could not run them.
+> resources. PostgreSQL migration CI passed at the revision linked above;
+> inspect current CI before relying on later revisions. Docker image builds
+> and container startup remain unverified; inspect any newer evidence.

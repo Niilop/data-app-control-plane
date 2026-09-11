@@ -69,18 +69,22 @@ TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/disposable_test_db \
 
 The isolated migration tests were first exercised only for their skip path (no
 `TEST_DATABASE_URL` set: 3 tests skip cleanly with a visible reason) locally.
-Two rounds of the PR's `postgres-migration` CI run (real `pgvector/pgvector`
-service container) then found and fixed two genuine bugs in
-`backend/alembic/env.py` — a `configparser` percent-escaping issue on
-`sqlalchemy.url`, and a `Base.metadata` duplicate-table registration when the
-same process calls `command.upgrade()` more than once, because Alembic
-reloads and re-executes `env.py` fresh on every call. See
-`mdfiles/next-agent.md` for the full, chronological account (round 1 vs.
-round 2 findings). `test_pgvector_extension_is_available` passed on the first
-real run, confirming the schema-isolation approach works against real
-PostgreSQL. **Neither fix has yet been confirmed by a passing CI run** — treat
-the next `postgres-migration` result on the PR, not this description, as that
-evidence.
+**Hosted CI then confirmed them for real, and PR #5 was merged into `main`**
+(merge commit `07e90c5`). All reported checks passed for PR head
+`a50795c1d4740aaa079343627e3d21d856a5e31d`:
+[Platform CI run 34608464924](https://github.com/Niilop/data-app-control-plane/actions/runs/34608464924)
+passed both jobs. The actual
+[`postgres-migration` log](https://github.com/Niilop/data-app-control-plane/actions/runs/34608464924/job/103292661662)
+reports **3 passed in 1.47s**, no skips, against `pgvector/pgvector:pg16`.
+This confirms both `backend/alembic/env.py` fixes through the real migration
+tests, including repeated upgrades and preservation of an existing row. The
+lint/type/offline-test job and the agent-handoff check also passed.
+
+This follow-up inspected hosted job metadata and actual migration logs; no
+additional code fix was needed. Application tests were not rerun locally.
+Docker image builds, container startup, and local PostgreSQL/devstack checks
+remain unverified.
+
 
 The following startup/migration commands remain documented but a live DB
 migration and real account login are still not verified end to end.
