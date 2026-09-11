@@ -141,10 +141,41 @@ Backend and frontend images build from the locked workspace with uv (pinned to
 virtual environment plus the member's source — no `.env`, credentials, local
 `data/`, or host `.venv` are copied in.
 
+For a first start using the bundled database, create `.env` from `.env.example`
+if it does not exist. Set a generated `SECRET_KEY`, matching `POSTGRES_PASSWORD`
+and database-URL password, and `DATABASE_URL` with host **`db`**, port **5432**.
+Keep `RUNTIME_PROFILE=local` and `DEPLOYMENT_EXECUTOR=simulated`. The database
+user/name must match `POSTGRES_USER`/`POSTGRES_DB`. Do not overwrite an existing
+`.env` or change a populated database's password by editing only that file.
+
+From the repository root in your regular WSL terminal:
+
 ```bash
-docker compose build
-docker compose up
+docker compose --profile local-db config --quiet
+docker compose --profile local-db build
+docker compose --profile local-db up -d --wait db
+docker compose --profile local-db run --rm --no-deps backend alembic upgrade head
+docker compose --profile local-db up -d --wait
+curl --fail http://localhost:8000/ready
 ```
+
+Migrations must run before the API/worker's first use; `compose up` does not apply
+them automatically. The UI is at <http://localhost:8501>, API docs at
+<http://localhost:8000/docs>, and the bundled database is published on localhost
+port 5433. Containers reach that database at `db:5432`, not `localhost:5433`.
+`--wait` checks container startup; `/ready` additionally checks the queue schema
+and recent worker heartbeat.
+
+Create your first administrator interactively (replace the email):
+
+```bash
+docker compose exec backend python -m bootstrap --email you@example.com --username local-admin --admin
+```
+
+The password is prompted, not put in command history. Sign in with that account
+to create teams and register applications. No application account is seeded.
+To stop services while retaining the database, use
+`docker compose --profile local-db stop`; use `up -d --wait` to start them again.
 
 `DATABASE_URL` (from `.env`) decides which PostgreSQL the containerized backend
 uses:
@@ -165,10 +196,12 @@ container `API_URL` is fixed to `http://backend:8000` by Compose; running the
 frontend image standalone (outside Compose) requires setting `API_URL` to
 wherever the backend is actually reachable from that container.
 
-Image builds and a live `docker compose up` smoke check have not been run as
-part of this change — no Docker daemon was available in the environment that
-implemented it. Compose/Dockerfile syntax was reviewed manually, not validated
-with `docker compose config`.
+Local Docker verification passed on 2026-09-11: quiet Compose validation,
+backend/frontend/worker image builds, fresh bundled PostgreSQL migration through
+007, API liveness/readiness and Streamlit health. Docker Desktop was reachable
+from regular Ubuntu; an earlier agent-session CLI mount returned an I/O error.
+That session error did not indicate a broken Docker daemon. Devstack integration
+and external providers remain unverified.
 
 ## Available endpoints
 

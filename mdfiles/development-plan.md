@@ -45,10 +45,9 @@ Use linked contracts for details; scope exclusions below prevent unrelated work.
 
 **Status:** complete. T01a and T01b are both merged into `main` (T01b via PR #5,
 merge commit `07e90c5`). Hosted CI confirmed the isolated PostgreSQL migration
-tests pass for real at `a50795c` (3 passed, no skips). Docker image builds and
-a live `docker compose up` smoke check remain unverified — no environment that
-implemented or reviewed T01 had a working Docker daemon; see the T01b handoff
-below and `mdfiles/next-agent.md`. **Depends on:** none.
+tests pass for real at `a50795c` (3 passed, no skips). Docker builds and bundled
+Compose startup were subsequently verified during the T04 follow-up; see
+`mdfiles/next-agent.md`. The T01b notes below retain their original test scope. **Depends on:** none.
 
 Deliver T01 as two reviewable branches, in order:
 
@@ -286,7 +285,12 @@ at `d1c417d` passed: actual logs confirm **15 PostgreSQL tests passed**, no skip
 PostgreSQL tests cover separate competing processes, API/worker restart recovery,
 stale fencing, concurrent submissions, heartbeat/cancel, migration round trip and
 transaction rollback. Do not treat local SQLite checks or integration skips as
-proof of PostgreSQL behavior. Docker builds/live startup remain unverified.
+proof of PostgreSQL behavior. A subsequent local Docker follow-up passed all
+image builds, quiet Compose validation, bundled database startup, fresh migration
+through 007, API liveness/readiness and Streamlit health. The earlier I/O error
+was confined to the agent session's Docker CLI mount; regular Ubuntu could reach
+Docker Desktop. First-start migration/configuration steps are documented in root
+README. Devstack integration and the interactive account journey remain unverified.
 
 **Next:** review/merge T04, then implement T05 only.
 

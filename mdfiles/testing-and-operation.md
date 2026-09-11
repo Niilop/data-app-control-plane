@@ -20,9 +20,14 @@ The migrated schema head is now 007, including new ORM/schema parity checks.
 
 Run the commands in root README/CI. Integration tests require a dedicated
 `TEST_DATABASE_URL`; missing configuration produces explicit skips, not success.
-Local devstack is absent and Docker fails in this WSL environment; hosted
-PostgreSQL CI is the verification route. No image build/live Compose result is
-claimed. Migration 001–006 is preserved and no dependency was added.
+The later local Docker follow-up passed quiet Compose validation, all three image
+builds, fresh bundled PostgreSQL migration through 007, API `/health` and `/ready`,
+and Streamlit health. Regular Ubuntu could access Docker Desktop; the I/O error
+was limited to the agent session's CLI mount. No reset or new global installation
+was needed. Root README documents `.env`, database startup, migration, then service
+startup. No application account was seeded or interactive user journey exercised.
+Devstack is absent and remains unverified. Migration 001–006 is preserved and no
+dependency was added. Historical task notes below describe their original checks.
 
 ## T03 verification
 

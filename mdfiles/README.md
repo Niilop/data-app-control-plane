@@ -3,7 +3,7 @@
 Documentation baseline: 2026-09-11. Implementation status: **T01–T03 merged;
 T04 durable operations implemented, pending PR review/merge.** The platform
 includes an owned application registry and admin-managed simulated environments,
-versioned bindings, a simulated durable worker and operation history. Docker builds/live startup remain unverified.
+versioned bindings, a simulated durable worker and operation history. Docker builds and bundled-database startup are verified; devstack integration remains unverified.
 Existing local configuration now requires `DEPLOYMENT_EXECUTOR=simulated`.
 Consult [next-agent.md](next-agent.md) for exact verification and prerequisites.
 

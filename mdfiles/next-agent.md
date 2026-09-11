@@ -17,7 +17,7 @@ teams/memberships, owned applications, direct/team roles, versioned metadata and
 simulated environment bindings, filtered paginated reads and transactional audit.
 Local configuration requires `RUNTIME_PROFILE=local` and explicit
 `DEPLOYMENT_EXECUTOR=simulated`. Organization and real sandbox execution fail at
-startup. The user’s `.env` was not changed.
+startup. Local secrets remain in ignored `.env`, outside versioned context.
 
 T04 adds:
 
@@ -81,12 +81,27 @@ T04 adds:
   implementation tests were not rerun locally for documentation changes.
   Recheck CI on subsequent revisions. This PR is not claimed merged.
 
+Local Docker follow-up on 2026-09-11 also passed: `compose config --quiet`, all
+three image builds from uv.lock, bundled pgvector/pg16 startup, fresh Alembic
+upgrade with the database reporting `007_durable_operations`, API `/health` and
+`/ready`, and Streamlit `/_stcore/health`. Four services were running. A missing
+`.env` was created from the example with generated local secrets and `db:5432`;
+its values were neither printed nor committed. No application account was seeded.
+The first-start/migration/admin-bootstrap sequence is now in root README.
+
+Docker Desktop 4.90.0 / Engine 29.7.2 / Compose 5.5.1 worked directly in Ubuntu.
+The earlier I/O error persisted only through this agent session's Docker CLI
+mount. Verification used explicitly approved `wsl.exe -d Ubuntu -- ...` commands;
+no Docker/WSL reset or global installation was needed. Inspect current availability
+rather than assuming that an agent-session CLI failure means Docker is stopped.
+
 ## Remaining work and limitations
 
 - Review draft PR #9 and current CI before merge. Hosted PostgreSQL checks passed;
   local SQLite tests alone cannot establish concurrent claim/process behavior.
-- No local devstack exists at `~/code/devstack`; the Docker executable fails with
-  an input/output error. Live Compose startup and image builds are unverified.
+- Devstack integration is still unverified; `~/code/devstack` was absent.
+  The bundled PostgreSQL path and container health are verified. The startup smoke
+  did not create an application account or run the full interactive user journey.
 - The probe only exercises infrastructure. No generated bundle, artifact store,
   revision, approval, deployment, GitHub or Databricks adapter exists yet. No real
   provider, paid workload or infrastructure activation was attempted.
