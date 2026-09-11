@@ -69,15 +69,18 @@ TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/disposable_test_db \
 
 The isolated migration tests were first exercised only for their skip path (no
 `TEST_DATABASE_URL` set: 3 tests skip cleanly with a visible reason) locally.
-The PR's first `postgres-migration` CI run (real `pgvector/pgvector` service
-container) then found a genuine bug: `Config.set_main_option` stores the URL
-through `configparser`, whose interpolation rejects the raw `%` from
-percent-encoding the `search_path` query value. Fixed by escaping `%` as `%%`
-before `set_main_option` (`configparser` un-escapes it back on read). The
-pgvector-availability test passed on that run, confirming the schema-isolation
-approach works against real PostgreSQL; the fix for the other two has not yet
-been confirmed by a subsequent CI run. Treat the next `postgres-migration`
-result on the PR — not this description — as that evidence.
+Two rounds of the PR's `postgres-migration` CI run (real `pgvector/pgvector`
+service container) then found and fixed two genuine bugs in
+`backend/alembic/env.py` — a `configparser` percent-escaping issue on
+`sqlalchemy.url`, and a `Base.metadata` duplicate-table registration when the
+same process calls `command.upgrade()` more than once, because Alembic
+reloads and re-executes `env.py` fresh on every call. See
+`mdfiles/next-agent.md` for the full, chronological account (round 1 vs.
+round 2 findings). `test_pgvector_extension_is_available` passed on the first
+real run, confirming the schema-isolation approach works against real
+PostgreSQL. **Neither fix has yet been confirmed by a passing CI run** — treat
+the next `postgres-migration` result on the PR, not this description, as that
+evidence.
 
 The following startup/migration commands remain documented but a live DB
 migration and real account login are still not verified end to end.

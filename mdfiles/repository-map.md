@@ -18,7 +18,7 @@ affected files before editing; avoid a full repository crawl for each task.
 | `backend/alembic/legacy_models.py` | Migration-only metadata for removed AI/model/job tables; prevents destructive autogeneration |
 | Former `chat`, `rag`, `llm`, `jobs` routers/services | Removed in T01a, including RAG-only background execution |
 | `backend/services/data_service.py` | Dormant CSV support; not a platform domain service |
-| `backend/alembic/env.py` | Imports runtime plus historical metadata; local package marker removed to avoid shadowing installed Alembic |
+| `backend/alembic/env.py` | Imports runtime plus historical metadata; local package marker removed to avoid shadowing installed Alembic; T01b: escapes `%` in `sqlalchemy.url` for `configparser`, and caches the `legacy_models` load in `sys.modules` so re-running migrations in one process doesn't re-register `Base.metadata` tables |
 | `backend/alembic/versions/001_initial.py` … `004_add_background_jobs.py` | Existing migration chain; preserve it |
 | `frontend/app.py` | Development account/status page; API_URL configurable; no AI UI |
 | `pyproject.toml` | uv workspace containing backend and frontend |

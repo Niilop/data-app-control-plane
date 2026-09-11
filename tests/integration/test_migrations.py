@@ -8,6 +8,7 @@ with a visible reason when TEST_DATABASE_URL is unset.
 
 import os
 import uuid
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -34,7 +35,7 @@ EXPECTED_HEAD_TABLES = {
 HEAD_REVISION = "004_add_background_jobs"
 
 
-def _scoped_url(schema: str) -> str:
+def _scoped_database_url(schema: str) -> str:
     """Same database as TEST_DATABASE_URL, scoped to an isolated schema."""
     assert TEST_DATABASE_URL is not None
     url = make_url(TEST_DATABASE_URL)
@@ -42,19 +43,22 @@ def _scoped_url(schema: str) -> str:
     return url.set(query=query).render_as_string(hide_password=False)
 
 
-def _alembic_config(scoped_url: str) -> Config:
+def _alembic_config() -> Config:
+    """backend/alembic/env.py derives sqlalchemy.url from Settings.database_url,
+    which reads the DATABASE_URL environment variable set by isolated_schema."""
     config = Config(str(BACKEND / "alembic.ini"))
     config.set_main_option("script_location", str(BACKEND / "alembic"))
-    # Config uses configparser with interpolation: a literal "%" (from the
-    # percent-encoded query string) must be escaped as "%%" going in so it
-    # reads back correctly, or ConfigParser raises on the raw "%".
-    config.set_main_option("sqlalchemy.url", scoped_url.replace("%", "%%"))
     return config
 
 
 @pytest.fixture
-def isolated_schema() -> str:
-    """A uniquely named, disposable schema; dropped after the test regardless."""
+def isolated_schema(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
+    """A uniquely named, disposable schema; dropped after the test regardless.
+
+    Also points the application's DATABASE_URL/SECRET_KEY settings at it, since
+    backend/alembic/env.py derives the migration URL from Settings rather than
+    from the Alembic Config object directly.
+    """
     if not TEST_DATABASE_URL:
         pytest.skip(
             "TEST_DATABASE_URL is not set; isolated PostgreSQL migration "
@@ -66,15 +70,28 @@ def isolated_schema() -> str:
     try:
         with engine.begin() as conn:
             conn.execute(sa.text(f'CREATE SCHEMA "{schema}"'))
+
+        from core.config import get_settings
+
+        monkeypatch.setenv("DATABASE_URL", _scoped_database_url(schema))
+        monkeypatch.setenv("SECRET_KEY", "integration-test-secret-key-only")
+        get_settings.cache_clear()
+
         yield schema
     finally:
+        try:
+            from core.config import get_settings as _get_settings
+
+            _get_settings.cache_clear()
+        except ImportError:
+            pass
         with engine.begin() as conn:
             conn.execute(sa.text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
         engine.dispose()
 
 
 def test_pgvector_extension_is_available(isolated_schema: str) -> None:
-    engine = sa.create_engine(_scoped_url(isolated_schema))
+    engine = sa.create_engine(_scoped_database_url(isolated_schema))
     try:
         with engine.connect() as conn:
             available = conn.execute(
@@ -89,10 +106,9 @@ def test_pgvector_extension_is_available(isolated_schema: str) -> None:
 
 
 def test_migrations_reach_head_with_expected_tables(isolated_schema: str) -> None:
-    scoped_url = _scoped_url(isolated_schema)
-    command.upgrade(_alembic_config(scoped_url), "head")
+    command.upgrade(_alembic_config(), "head")
 
-    engine = sa.create_engine(scoped_url)
+    engine = sa.create_engine(_scoped_database_url(isolated_schema))
     try:
         inspector = sa.inspect(engine)
         tables = set(inspector.get_table_names(schema=isolated_schema))
@@ -107,11 +123,10 @@ def test_migrations_reach_head_with_expected_tables(isolated_schema: str) -> Non
 
 
 def test_upgrade_preserves_data_from_an_earlier_revision(isolated_schema: str) -> None:
-    scoped_url = _scoped_url(isolated_schema)
-    config = _alembic_config(scoped_url)
+    config = _alembic_config()
     command.upgrade(config, "001_initial")
 
-    engine = sa.create_engine(scoped_url)
+    engine = sa.create_engine(_scoped_database_url(isolated_schema))
     try:
         with engine.begin() as conn:
             conn.execute(

@@ -71,10 +71,33 @@ this repository's own GitHub Actions CI. No Databricks account is needed.
   run/not-run split), `mdfiles/repository-map.md`, `mdfiles/decisions.md`
   (ADR-011), and `mdfiles/development-plan.md` (T01 status, T01b handoff
   summary) updated in this PR alongside this file.
-- **Preserved:** existing migrations, `backend/alembic/legacy_models.py`, the
-  handoff-check workflow/script/PR template from PR #4, and the T01a
-  offline-test baseline (all still pass; see below). No domain models, worker,
-  or identity changes; no dormant CSV/example cleanup.
+- **Preserved:** existing migrations, `backend/alembic/legacy_models.py`'s
+  content, the handoff-check workflow/script/PR template from PR #4, and the
+  T01a offline-test baseline (all still pass; see below). No domain models,
+  worker, or identity changes; no dormant CSV/example cleanup.
+- **`backend/alembic/env.py` (two real bug fixes, both found via the PR's CI
+  runs against real PostgreSQL, not by inspection):**
+  1. `config.set_main_option("sqlalchemy.url", settings.database_url)` now
+     escapes `%` as `%%` first. `Config` stores this through `configparser`,
+     whose interpolation rejects a raw `%` (e.g. from a percent-encoded
+     password or query string) with `ValueError: invalid interpolation
+     syntax`; escaping and letting `configparser` un-escape it back on read
+     fixes any `DATABASE_URL` containing a literal `%`, not just this PR's
+     tests.
+  2. The `legacy_models.py` loader is now guarded with a `sys.modules` check
+     before executing. Alembic reloads and re-executes all of `env.py` fresh
+     on every migration command (`alembic/util/pyfiles.py:load_module_py` has
+     no caching) — so calling `command.upgrade()` more than once in the same
+     process re-declares the legacy ORM classes against the same shared
+     `Base.metadata` and raises `InvalidRequestError: Table '...' is already
+     defined for this MetaData instance`. Reproduced directly (not just
+     theorized): running the exact loader code twice in one process raises;
+     adding the `sys.modules["platform_legacy_models"]` guard and rerunning
+     three times succeeds with all 8 expected tables in metadata. This was
+     latent and untriggered before T01b because every prior exerciser (the
+     real `alembic` CLI, `test_startup.py`'s subprocess-isolated tests) only
+     ever called it once per process; `tests/integration` is the first
+     in-process, multi-invocation caller.
 
 ## Verification performed
 
@@ -106,22 +129,66 @@ design — confirmed for both, then the full dev environment (`--all-packages
 `uv run --locked pytest tests/integration -q -rs` was run **without**
 `TEST_DATABASE_URL`: 3 tests skipped, each with the intended visible reason.
 
-**Update after the PR's first `postgres-migration` CI run:** it ran against a
-real `pgvector/pgvector` service container and reported 1 passed, 2 failed.
-`test_pgvector_extension_is_available` passed — the schema-isolation and
-pgvector-relocatability approach in ADR-011 does work against real PostgreSQL.
-The two Alembic-driven tests failed with a real bug: `Config.set_main_option`
-stores the URL through `configparser`, whose interpolation rejects the raw `%`
-characters produced by percent-encoding the `search_path` query value (e.g.
-`%3D`, `%2C`) — `ValueError: invalid interpolation syntax`. Fixed by escaping
-`%` as `%%` before calling `set_main_option` in `_alembic_config`
-(`tests/integration/test_migrations.py`); `configparser` un-escapes `%%` back
-to `%` on read, verified directly against `configparser.ConfigParser` offline.
-Offline checks (ruff/mypy/pytest -q, 37 passed) were re-run after this fix and
-stayed clean. **This fix has not yet been re-verified by an actual CI run
-against real PostgreSQL** — that is the first thing the next agent/reviewer
-should check (re-run or inspect the `postgres-migration` job on this PR) before
-treating `tests/integration` as passing.
+**Two rounds of real CI evidence changed this design; both are recorded here
+because the second round revealed the first round's fix was in the wrong
+place.** Neither Docker nor a local PostgreSQL exists in the implementing
+sandbox, so every finding below came only from reading the PR's actual
+`postgres-migration` CI logs (real `pgvector/pgvector` service container),
+not from local execution.
+
+- **Round 1:** 1 passed, 2 failed. `test_pgvector_extension_is_available`
+  passed — confirms the schema-isolation and pgvector-relocatability approach
+  in ADR-011 works against real PostgreSQL. The two Alembic-driven tests
+  failed with `ValueError: invalid interpolation syntax`: `Config` stores the
+  URL through `configparser`, whose interpolation rejects the raw `%`
+  characters produced by percent-encoding the `search_path` query value (e.g.
+  `%3D`, `%2C`). First fix attempt: escape `%` as `%%` before calling
+  `config.set_main_option` in the test file's own `_alembic_config` helper.
+- **Round 2** (after pushing that fix): both Alembic-driven tests still
+  failed, now with `pydantic ValidationError: database_url/secret_key Field
+  required`. This exposed that the round-1 fix was set on the wrong object:
+  `backend/alembic/env.py` unconditionally overwrites
+  `config`'s `sqlalchemy.url` from `get_settings().database_url` — so setting
+  it directly on the `Config` object in the test was always a no-op, and in
+  CI neither `DATABASE_URL` nor `SECRET_KEY` is set as an environment
+  variable (no `.env` file exists there, correctly, since it's gitignored),
+  so `Settings()` failed validation outright.
+  - Fixed the test by driving the real inputs instead: `isolated_schema` now
+    sets `DATABASE_URL`/`SECRET_KEY` via `monkeypatch.setenv` and clears
+    `core.config.get_settings`'s `lru_cache` before each test, so
+    `env.py`'s own `get_settings()` call picks up the scoped URL.
+  - Moved the `%` → `%%` escaping into `backend/alembic/env.py` itself,
+    at the line that actually sets `sqlalchemy.url` — this is where the raw
+    percent-encoded value actually flows through `configparser`, and fixing
+    it there benefits any real `DATABASE_URL` containing a literal `%` (e.g.
+    a percent-encoded password), not just these tests.
+  - While tracing this, found and fixed a second, independent, real bug the
+    same way: `env.py` reloads and re-executes itself fresh on **every**
+    migration command (`alembic/util/pyfiles.py:load_module_py` has no
+    module caching), so its ad hoc `legacy_models.py` loader
+    (`spec_from_file_location` + `exec_module`, previously with no
+    `sys.modules` registration) re-declares the same SQLAlchemy declarative
+    classes against the shared `Base.metadata` on any second
+    `command.upgrade()` call in one process, raising `InvalidRequestError:
+    Table '...' is already defined for this MetaData instance`. This was
+    latent and never triggered before T01b: the real `alembic` CLI and
+    `test_startup.py`'s subprocess-isolated tests each only ever call it once
+    per process; `tests/integration` is the first in-process, multi-call
+    caller (one test alone calls `command.upgrade` twice). Reproduced
+    directly offline (not just theorized): running the loader twice in one
+    process raises; guarding it with `if "platform_legacy_models" not in
+    sys.modules` and registering the loaded module there, then rerunning
+    three times, succeeds with all 8 expected tables present.
+
+Offline checks (ruff, mypy, `pytest -q` — 37 passed) were re-run after each
+round and stayed clean throughout; the `sys.modules` guard fix was verified
+directly by reproducing and then resolving the exact `InvalidRequestError`
+offline (no Postgres needed for that particular bug). **Neither fix has yet
+been confirmed by an actual passing CI run against real PostgreSQL** — that is
+the first thing the next agent/reviewer should check (re-run or inspect the
+`postgres-migration` job on this PR) before treating `tests/integration`, or
+these `env.py` changes, as verified rather than "offline-consistent and
+logically sound."
 
 ## Remaining work and limitations
 

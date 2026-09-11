@@ -15,13 +15,22 @@ from core.config import get_settings
 from models import database as runtime_models
 
 # Retain historical AI table metadata without importing it into the application.
-# This also avoids a name collision with the installed Alembic package.
-legacy_spec = spec_from_file_location(
-    "platform_legacy_models",
-    os.path.join(os.path.dirname(__file__), "legacy_models.py"),
-)
-assert legacy_spec is not None and legacy_spec.loader is not None
-legacy_spec.loader.exec_module(module_from_spec(legacy_spec))
+# This also avoids a name collision with the installed Alembic package. Alembic
+# reloads and re-executes this whole env.py fresh on every migration command
+# (no sys.modules caching), so guard this load explicitly: without it, running
+# more than one migration command in the same process (e.g. an in-process test
+# calling command.upgrade() more than once) re-declares these ORM classes
+# against the same shared Base.metadata and raises
+# "Table '...' is already defined for this MetaData instance".
+if "platform_legacy_models" not in sys.modules:
+    legacy_spec = spec_from_file_location(
+        "platform_legacy_models",
+        os.path.join(os.path.dirname(__file__), "legacy_models.py"),
+    )
+    assert legacy_spec is not None and legacy_spec.loader is not None
+    legacy_module = module_from_spec(legacy_spec)
+    sys.modules["platform_legacy_models"] = legacy_module
+    legacy_spec.loader.exec_module(legacy_module)
 
 # this is the Alembic Config object
 config = context.config
@@ -30,9 +39,12 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set the SQLAlchemy URL from environment
+# Set the SQLAlchemy URL from environment. Config stores this through
+# configparser, whose interpolation rejects a raw "%" (e.g. from a
+# percent-encoded password or query string); escape it as "%%" so it reads
+# back correctly instead of raising on any URL containing one.
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.database_url)
+config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 
 # Model's MetaData object for 'autogenerate' support
 target_metadata = runtime_models.Base.metadata
