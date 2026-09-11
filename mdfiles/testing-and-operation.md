@@ -55,6 +55,35 @@ credential injection. Migrations run once as an explicit step, not from every re
 
 ## Test layers
 
+### PR handoff check
+
+Every implementation PR must update `mdfiles/next-agent.md` in the same PR. The
+`Agent handoff` workflow compares the head commit to the merge base, so a change
+only on the base branch cannot satisfy the rule. Markdown/reStructuredText and
+LICENSE/NOTICE changes alone are exempt; all other file types conservatively
+require an update. Deleting the handoff, omitting its six sections, or making a
+whitespace-only update fails. CI cannot verify that the written claims are true.
+
+To check committed changes locally (working-tree edits are not included):
+
+```bash
+uv run --no-project --python 3.11 scripts/check_agent_handoff.py --base origin/main --head HEAD
+uv run --locked pytest tests/unit/test_agent_handoff.py -q
+```
+
+Fetch current base history first. The workflow has no path filter and reports a
+result for documentation-only PRs too. It uses read-only contents permission,
+no saved checkout credential, pinned action revisions, and uv 0.12.11; it does
+not install the application dependencies or run provider workloads. Setup follows
+the official [uv integration guide](https://docs.astral.sh/uv/guides/integration/github/)
+and [checkout configuration](https://github.com/actions/checkout/blob/main/README.md).
+
+To require this check before merging, select **Check agent handoff** in the
+repository's required-status rules after the workflow is available. No such rule
+is configured by this change. Reviewers still verify the handoff's accuracy.
+
+### Application checks
+
 | Layer | What it establishes |
 |---|---|
 | Unit | Policy decisions, state transitions, canonical hashes, parameter validation, error classification |
