@@ -148,6 +148,7 @@ def test_concurrent_generations_share_one_stored_artifact(
 ) -> None:
     """Identical content is deduplicated by the unique (application, digest) key."""
     from models.delivery import Artifact
+    from models.operations import Operation
 
     app_id, binding_id = prepare(registry_engine)
     for index in range(3):
@@ -166,9 +167,23 @@ def test_concurrent_generations_share_one_stored_artifact(
         for future in [pool.submit(run) for _ in range(3)]:
             future.result(timeout=120)
     with Session(registry_engine) as db:
-        artifacts = list(db.scalars(sa.select(Artifact)))
-        assert len(artifacts) == 1
+        # One row wins the unique key, and every operation still succeeds:
+        # deterministic generation means the surviving row describes its bytes too.
         assert db.scalar(sa.select(sa.func.count()).select_from(Artifact)) == 1
+        statuses = sorted(
+            db.scalars(
+                sa.select(Operation.status).where(Operation.kind == "bundle_generation")
+            )
+        )
+        assert statuses == ["succeeded"] * 3, statuses
+        assert not list(
+            db.scalars(
+                sa.select(Operation.diagnostic_code).where(
+                    Operation.kind == "bundle_generation",
+                    Operation.diagnostic_code.is_not(None),
+                )
+            )
+        )
 
 
 def test_revision_and_offline_validation_round_trip(

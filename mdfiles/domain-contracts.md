@@ -210,6 +210,9 @@ version instead of editing a released one.
 Artifact content is immutable and content-addressed. Rows are unique on
 (application, digest), so identical content generated for two applications is
 stored once on disk while each application keeps its own authorization boundary.
+That unique key, not a read-then-insert check, settles concurrent operations that
+deterministically produce the same bytes: the insert tolerates the conflict and
+reads the surviving row, so every such operation succeeds against identical content.
 `storage_key` is derived from the digest and never encodes an actor. Reads
 re-hash the stored bytes and refuse a mismatch. Provenance records the template
 identity, content digest, the full parameter set and a parameter digest; it holds

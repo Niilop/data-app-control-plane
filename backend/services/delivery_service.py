@@ -41,6 +41,8 @@ from services.template_service import (
     load_catalogue,
 )
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 # Bumped when the fields bound into an approval scope change; recorded per revision.
@@ -345,6 +347,57 @@ def load_generation_context(db: Session, operation_id: UUID) -> dict[str, Any]:
     }
 
 
+def store_artifact(
+    session: Session,
+    operation: Operation,
+    *,
+    digest: str,
+    size: int,
+    media_type: str,
+    kind: str,
+    provenance: dict,
+) -> Artifact:
+    """Record an artifact row, tolerating a concurrent identical one.
+
+    Two operations can legitimately produce identical bytes at the same time,
+    because generation is deterministic. The unique (application, digest) key
+    decides the winner in the database rather than a read-then-insert check,
+    which would race. Artifact content is immutable, so whichever row exists
+    afterwards describes exactly the same bytes.
+    """
+    insert = (
+        pg_insert if session.get_bind().dialect.name == "postgresql" else sqlite_insert
+    )
+    session.execute(
+        insert(Artifact)
+        .values(
+            id=uuid4(),
+            created_at=now(),
+            application_id=operation.application_id,
+            digest=digest,
+            storage_key=artifact_store.storage_key(digest),
+            size_bytes=size,
+            media_type=media_type,
+            kind=kind,
+            provenance=provenance,
+            created_by=operation.requested_by,
+            operation_id=operation.id,
+        )
+        .on_conflict_do_nothing(index_elements=["application_id", "digest"])
+    )
+    artifact = session.scalar(
+        select(Artifact).where(
+            Artifact.application_id == operation.application_id,
+            Artifact.digest == digest,
+        )
+    )
+    if artifact is None:
+        raise PolicyError(
+            500, "artifact_unavailable", "Artifact record could not be stored"
+        )
+    return artifact
+
+
 def run_generation(db: Session, operation_id: UUID) -> Handled:
     """Render, archive and store deterministically; no network, no user code."""
     context = load_generation_context(db, operation_id)
@@ -362,28 +415,15 @@ def run_generation(db: Session, operation_id: UUID) -> Handled:
     }
 
     def apply(session: Session, operation: Operation) -> None:
-        existing = session.scalar(
-            select(Artifact).where(
-                Artifact.application_id == operation.application_id,
-                Artifact.digest == digest,
-            )
+        store_artifact(
+            session,
+            operation,
+            digest=digest,
+            size=size,
+            media_type=ARCHIVE_MEDIA_TYPE,
+            kind="generated_bundle",
+            provenance=provenance,
         )
-        if existing is None:
-            session.add(
-                Artifact(
-                    id=uuid4(),
-                    application_id=operation.application_id,
-                    digest=digest,
-                    storage_key=artifact_store.storage_key(digest),
-                    size_bytes=size,
-                    media_type=ARCHIVE_MEDIA_TYPE,
-                    kind="generated_bundle",
-                    provenance=provenance,
-                    created_by=operation.requested_by,
-                    operation_id=operation.id,
-                )
-            )
-            session.flush()
 
     return "succeeded", None, apply
 
@@ -436,32 +476,20 @@ def run_validation(db: Session, operation_id: UUID) -> Handled:
     summary = summarise(report)
 
     def apply(session: Session, operation: Operation) -> None:
-        artifact = session.scalar(
-            select(Artifact).where(
-                Artifact.application_id == operation.application_id,
-                Artifact.digest == report_digest,
-            )
+        artifact = store_artifact(
+            session,
+            operation,
+            digest=report_digest,
+            size=report_size,
+            media_type=REPORT_MEDIA_TYPE,
+            kind="validation_report",
+            provenance={
+                "scope": "offline",
+                "revision_id": context["revision_id"],
+                "validator": report["validator"],
+                "validator_version": report["validator_version"],
+            },
         )
-        if artifact is None:
-            artifact = Artifact(
-                id=uuid4(),
-                application_id=operation.application_id,
-                digest=report_digest,
-                storage_key=artifact_store.storage_key(report_digest),
-                size_bytes=report_size,
-                media_type=REPORT_MEDIA_TYPE,
-                kind="validation_report",
-                provenance={
-                    "scope": "offline",
-                    "revision_id": context["revision_id"],
-                    "validator": report["validator"],
-                    "validator_version": report["validator_version"],
-                },
-                created_by=operation.requested_by,
-                operation_id=operation.id,
-            )
-            session.add(artifact)
-            session.flush()
         session.add(
             ValidationResult(
                 id=uuid4(),
@@ -516,6 +544,7 @@ __all__ = [
     "create_validation",
     "get_revision",
     "run_generation",
+    "store_artifact",
     "run_validation",
     "sync_template",
     "templates",

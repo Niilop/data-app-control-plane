@@ -36,6 +36,10 @@ explicitly offline validation:
   comes from the registry, bundle target from the binding, and row count/timeout
   from the T03 binding configuration. The payload has no credential, command, URL,
   target or template-path field, and unknown fields are rejected.
+- Concurrent operations that deterministically produce the same bytes are settled
+  by the unique (application, digest) key with a conflict-tolerant insert, not a
+  read-then-insert check. The first CI run caught exactly that race; see
+  "Verification performed".
 - `integrations/artifact_store.py` stores content at `sha256/<aa>/<bb>/<digest>`
   under the absolute `ARTIFACT_DIR` (default `<DATA_DIR>/artifacts`), writes
   atomically, deduplicates identical content, and re-hashes on every read so a
@@ -124,6 +128,14 @@ On 2026-09-12, from branch `feat/t05-bundle-generation`:
   `/app/data/artifacts` and load the same template content digest.
   `GET /api/v1/templates` and `GET /api/v1/artifacts/...` return 401 unauthenticated.
 
+- The **first** hosted CI run failed one PostgreSQL test with a unique-constraint
+  violation on `artifacts`. That was a real race in the generation handler's
+  result write — a read-then-insert check — not a flaky test. It is fixed with a
+  conflict-tolerant insert on the unique key. The racy version was confirmed to
+  fail roughly one run in five locally, and the fixed version passed **30
+  consecutive runs** of that test plus the full suites. The assertion was also
+  strengthened to require every competing operation to reach `succeeded` with no
+  diagnostic, not merely that one artifact row exists.
 - Hosted [Platform CI run 34656350744](https://github.com/Niilop/data-app-control-plane/actions/runs/34656350744)
   passed at implementation commit `5893851`. Actual logs were inspected and
   confirm **188 offline tests** (20.99s), **23 PostgreSQL tests** (20.11s, no

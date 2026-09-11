@@ -347,6 +347,14 @@ authority the queue requires, while generation and validation are **developer**
 actions. Submitting a new generation is the supported path and is equivalent,
 because generation is deterministic. The worker rechecks the role each kind needs.
 
+*Concurrent identical results are settled by the database.* Because generation is
+deterministic, two operations can legitimately produce the same bytes at the same
+moment. The artifact row is written with an `ON CONFLICT DO NOTHING` insert on the
+unique (application, digest) key and then read back, rather than a read-then-insert
+check, which raced and failed one of the operations. Artifact content is immutable,
+so whichever row survives describes exactly the same bytes and every operation can
+legitimately succeed.
+
 *Offline validation is never workspace validation.* `ValidationResult.scope` is
 constrained to `offline` in the database, and the stored JSON report states in
 every copy that no workspace, cluster, credential or network was contacted, that
