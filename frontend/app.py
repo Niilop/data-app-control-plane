@@ -6,6 +6,7 @@ from pathlib import Path
 import requests
 import streamlit as st
 from dotenv import load_dotenv
+from registry import render_registry
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 API_URL = os.environ.get("API_URL", "http://localhost:8000").rstrip("/")
@@ -69,6 +70,9 @@ with st.sidebar:
         st.success("Signed in")
         if st.button("Logout"):
             st.session_state.access_token = None
+            for key in list(st.session_state):
+                if str(key).startswith("registry_"):
+                    del st.session_state[key]
             st.rerun()
 
 st.header("Service status")
@@ -84,6 +88,7 @@ if st.button("Check API health"):
         st.error("API is unavailable.")
 
 if st.session_state.access_token:
+    render_registry(API_URL, st.session_state.access_token)
     if st.button("View my profile"):
         try:
             response = requests.get(

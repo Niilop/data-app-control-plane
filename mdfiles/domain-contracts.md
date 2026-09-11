@@ -1,6 +1,6 @@
 # Domain and workflow contracts
 
-Status: proposed implementation contract. Introduce entities in their owning task,
+Status: T02 registry entities and permissions implemented; later task entities remain proposed. Introduce entities in their owning task,
 not all at once. New entities use UUIDs, timezone-aware UTC timestamps, explicit
 foreign keys, and database constraints for uniqueness. Historical AI tables remain migration-only metadata after T01a; no runtime AI
 features are retained. Existing user IDs may remain
@@ -68,6 +68,16 @@ permissions. Revoking a role immediately affects API decisions and queued work.
 Before deployment submission, recheck requester roles and that the approving actor
 remains authorized. Role changes after external submission cannot promise to undo
 the action; record them and request cancellation when policy requires it.
+
+T02 clarification: owning-team membership is required even for administrator
+registration and grants no implicit read access afterward. The creator receives
+direct developer/viewer roles; recorded owner/data owner receive read access by
+relationship. Accountable users must exist and be active but need not belong to
+the owning team. Platform admin has explicit read/management rights only;
+metadata/source editing still requires a developer assignment. Bootstrap creates
+new local users with explicit admin intent and an audit event; no public route
+can grant global admin. Account deactivation has no management UI/API in T02,
+but authentication and every platform policy enforce the current active flag.
 
 ## State contracts
 

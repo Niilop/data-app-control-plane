@@ -7,6 +7,30 @@ profile, isolated PostgreSQL migration integration tests, and platform CI; see
 Historical auth/example scripts are under `tests/manual/` with names outside
 pytest discovery; obsolete RAG tests were removed.
 
+## T02 verification
+
+The current checks are the commands in root README and `.github/workflows/ci.yml`.
+T02 expands Ruff to every changed/new runtime module, new migration, frontend and
+test files, and mypy to 18 platform modules. No dependency was added.
+
+Locally: `uv run --locked pytest -q` passed **67 tests**, including 27 registry
+API cases and three Streamlit workflows through the in-process API. Tests retain
+the outbound-network guard; TestClient requires execution outside this sandbox's
+thread restriction. `uv run --locked mypy` passed. PostgreSQL tests run separately:
+`uv run --locked pytest tests/integration -q -rs` reported **6 skipped** without
+`TEST_DATABASE_URL`. They cover fresh/old-head migration, legacy users and flags,
+new ORM/schema parity, real constraints, API rollback and competing metadata writes.
+Hosted [Platform CI run 34615449895](https://github.com/Niilop/data-app-control-plane/actions/runs/34615449895)
+at `77a9a03` confirmed **6 PostgreSQL tests passed**, no skips, **67 offline tests
+passed**, Ruff clean and mypy clean. Actual logs were inspected; see
+`next-agent.md`. The handoff check also passed. Local skips alone are not migration
+verification. Docker's Windows launcher reports unavailable WSL
+integration; image builds and live startup remain unrun.
+
+Local account/bootstrap and the registration demonstration are documented in root
+README. Bootstrap prompts for new passwords, refuses existing accounts, and audits
+explicit admin creation. It does not deploy or contact an external provider.
+
 ## Development environment
 
 - Linux/WSL2; use `uv` for all Python execution and project-local tools.
@@ -69,18 +93,22 @@ TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/disposable_test_db \
 
 The isolated migration tests were first exercised only for their skip path (no
 `TEST_DATABASE_URL` set: 3 tests skip cleanly with a visible reason) locally.
-Two rounds of the PR's `postgres-migration` CI run (real `pgvector/pgvector`
-service container) then found and fixed two genuine bugs in
-`backend/alembic/env.py` — a `configparser` percent-escaping issue on
-`sqlalchemy.url`, and a `Base.metadata` duplicate-table registration when the
-same process calls `command.upgrade()` more than once, because Alembic
-reloads and re-executes `env.py` fresh on every call. See
-`mdfiles/next-agent.md` for the full, chronological account (round 1 vs.
-round 2 findings). `test_pgvector_extension_is_available` passed on the first
-real run, confirming the schema-isolation approach works against real
-PostgreSQL. **Neither fix has yet been confirmed by a passing CI run** — treat
-the next `postgres-migration` result on the PR, not this description, as that
-evidence.
+**Hosted CI then confirmed them for real, and PR #5 was merged into `main`**
+(merge commit `07e90c5`). All reported checks passed for PR head
+`a50795c1d4740aaa079343627e3d21d856a5e31d`:
+[Platform CI run 34608464924](https://github.com/Niilop/data-app-control-plane/actions/runs/34608464924)
+passed both jobs. The actual
+[`postgres-migration` log](https://github.com/Niilop/data-app-control-plane/actions/runs/34608464924/job/103292661662)
+reports **3 passed in 1.47s**, no skips, against `pgvector/pgvector:pg16`.
+This confirms both `backend/alembic/env.py` fixes through the real migration
+tests, including repeated upgrades and preservation of an existing row. The
+lint/type/offline-test job and the agent-handoff check also passed.
+
+This follow-up inspected hosted job metadata and actual migration logs; no
+additional code fix was needed. Application tests were not rerun locally.
+Docker image builds, container startup, and local PostgreSQL/devstack checks
+remain unverified.
+
 
 The following startup/migration commands remain documented but a live DB
 migration and real account login are still not verified end to end.

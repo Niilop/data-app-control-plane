@@ -1,6 +1,6 @@
 # Development plan and agent task ledger
 
-Status: **T01 in progress**; subsequent tasks not started. This plan is implementation-ready guidance,
+Status: **T01 merged; T02 implemented, pending PR review/merge**; T03 onward not started. This plan is implementation-ready guidance,
 not a claim of implemented capabilities. Task order follows dependencies rather
 than estimated calendar dates. Do not implement the entire roadmap in one turn.
 
@@ -43,12 +43,12 @@ Use linked contracts for details; scope exclusions below prevent unrelated work.
 
 ## T01 — Reproducible local platform foundation
 
-**Status:** in progress (T01a complete and merged; T01b implemented on
-`build/t01b-containers-ci`, opened as a draft PR against `main` — offline
-checks passed locally, but Docker image builds, a live `docker compose up`
-smoke check, and the isolated PostgreSQL migration tests are unverified
-locally; see the T01b handoff below and `mdfiles/next-agent.md`). **Depends
-on:** none.
+**Status:** complete. T01a and T01b are both merged into `main` (T01b via PR #5,
+merge commit `07e90c5`). Hosted CI confirmed the isolated PostgreSQL migration
+tests pass for real at `a50795c` (3 passed, no skips). Docker image builds and
+a live `docker compose up` smoke check remain unverified — no environment that
+implemented or reviewed T01 had a working Docker daemon; see the T01b handoff
+below and `mdfiles/next-agent.md`. **Depends on:** none.
 
 Deliver T01 as two reviewable branches, in order:
 
@@ -135,8 +135,9 @@ Preserve any new unrelated local edits when committing this task.
 ### T01b handoff — 2026-09-11
 
 - **Status:** implemented on `build/t01b-containers-ci` (fast-forwarded from
-  merged main at `f4ab415`, which includes PR #4). Opened as a draft PR against
-  `main`. Not merged; T02 not started; no cloud resources touched.
+  merged main at `f4ab415`, which includes PR #4), opened as PR #5, and
+  **merged into `main`** as merge commit `07e90c5`. T02 not started; no cloud
+  resources touched.
 - **Implemented:** uv-locked, pinned (`0.12.11`) multi-stage backend/frontend
   Dockerfiles (venv at `/opt/venv`, outside the Compose dev bind mount); a root
   `.dockerignore`; the bundled Compose `db` service moved behind an opt-in
@@ -147,25 +148,56 @@ Preserve any new unrelated local edits when committing this task.
   gated on `TEST_DATABASE_URL`, skipped with a visible reason when unset); the
   offline network guard in `tests/conftest.py` scoped to skip `integration`-marked
   tests; a new `.github/workflows/ci.yml` with a locked lint/type/offline-test job
-  and an isolated migration job backed by a `pgvector/pgvector` service container.
-  `.github/workflows/agent-handoff.yml` is unchanged.
-- **Verified:** `uv sync --locked --all-packages --group dev`, `uv run --locked
-  pytest -q` (**37 passed**, up from T01a's 17), `uv run --locked mypy` (clean),
-  `uv run --locked ruff check`/`ruff format --check` over the documented scope
-  plus `tests/integration` (clean). `pytest tests/integration -q` exercised only
-  its skip path (`TEST_DATABASE_URL` unset): 3 skipped with a visible reason.
-- **Not verified:** Docker image builds, `docker compose up`, and a live
-  PostgreSQL/pgvector run of `tests/integration` — no Docker daemon, no local
-  PostgreSQL, and no `~/code/devstack` checkout existed in the implementing
-  sandbox. Compose/workflow YAML was reviewed manually, not validated with
-  `docker compose config` (no PyYAML available offline either). The
-  `postgres-migration` CI job is the first real exercise of the migration tests
-  against pgvector; its hosted result on the PR is the evidence, not this note.
+  and an isolated migration job backed by a `pgvector/pgvector` service container;
+  two real bug fixes in `backend/alembic/env.py` found via hosted CI (a
+  `configparser` percent-escaping issue on `sqlalchemy.url`, and a
+  `Base.metadata` duplicate-table registration when a process calls
+  `command.upgrade()` more than once). `.github/workflows/agent-handoff.yml` is
+  unchanged.
+- **Verified locally:** `uv sync --locked --all-packages --group dev`, `uv run
+  --locked pytest -q` (**37 passed**, up from T01a's 17), `uv run --locked
+  mypy` (clean), `uv run --locked ruff check`/`ruff format --check` over the
+  documented scope plus `tests/integration` (clean).
+- **Verified by hosted CI:** [Platform CI run 34608464924](https://github.com/Niilop/data-app-control-plane/actions/runs/34608464924)
+  passed both jobs at PR head `a50795c`. The
+  [`postgres-migration` log](https://github.com/Niilop/data-app-control-plane/actions/runs/34608464924/job/103292661662)
+  reports **3 passed in 1.47s** against `pgvector/pgvector:pg16` — no skips —
+  confirming both `env.py` fixes for real, including repeated upgrades and
+  data preservation across a revision. The `lint-type-offline-tests` job and
+  the `agent-handoff` check also passed.
+- **Not verified:** Docker image builds, `docker compose up`, and any live
+  startup/health smoke check through the containers — no environment involved
+  in T01b (implementation or CI) had a working Docker daemon. Devstack
+  integration specifically (whether its actual Postgres port/credentials match
+  what's documented) is also unverified — no devstack checkout was available.
 - **Full details:** see `mdfiles/next-agent.md`.
 
 ## T02 — Register an owned application
 
-**Status:** not started. **Depends on:** T01.
+**Status:** implemented in draft PR #6; pending review/merge. **Depends on:** T01 (confirmed
+merged at `07e90c5`, matching current GitHub main at implementation start).
+
+**Implemented:** migration `005_owned_applications`; active/admin user flags with
+safe defaults for legacy users; new teams, memberships, applications, direct/team
+roles and audit tables. Central current-actor/policy checks; API create/list/detail,
+versioned metadata/ownership updates, membership/role management and paginated
+history. Explicit local account bootstrap prompts for passwords and audits admin
+intent; public registration rejects privilege fields. Streamlit supports the full
+registration/detail/history flow and minimal team/role administration. GitHub
+references remain unverified. No external permissions or infrastructure changed.
+
+**Verification:** 67 offline tests passed, including API policy/rollback cases and
+Streamlit workflows through the in-process API. Mypy passed for 18 platform files.
+The PostgreSQL suite was exercised locally only for its skip path: 6 skipped with
+`TEST_DATABASE_URL` unset. It now covers old-head user preservation/defaults,
+new-model/schema parity, constraints, API rollback, and simultaneous versioned
+updates in addition to the original chain tests. [Hosted Platform CI run 34615449895](https://github.com/Niilop/data-app-control-plane/actions/runs/34615449895)
+passed at `77a9a03`: actual logs report **6 PostgreSQL tests passed**, no skips,
+**67 offline tests passed**, Ruff and mypy clean. The handoff check also passed.
+Exact evidence and limitations are recorded in [next-agent.md](next-agent.md). Docker's launcher reports WSL integration unavailable.
+
+**Next:** review/merge T02 after its checks, then T03 only. Existing T01b Docker
+build/startup verification remains outstanding.
 
 **Read:** [domain contracts](domain-contracts.md), T02 rows in
 [API contracts](api-contracts.md), current auth/router/model files.

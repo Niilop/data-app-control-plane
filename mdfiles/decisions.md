@@ -128,6 +128,39 @@ local Postgres/Docker); CI's `pgvector/pgvector` service container is the first
 real exercise of it — treat that job's actual result as the evidence, not this
 description.
 
+## ADR-012 — T02 registry and local authorization
+
+**Accepted implementation direction (T02), 2026-09-11.** Add separate UUID
+registry tables and extend historical integer users with active/admin booleans.
+Migration 005 retains users and grants no admin privileges by default. Adopt
+SQLAlchemy's typed declarative base for new mapped models without changing the
+synchronous engine/session or dormant table contracts.
+
+Resolve actor and role membership from the database on every request. Team
+ownership itself does not grant access: creators get direct developer/viewer,
+accountable users get read access, and explicit direct/team assignments union.
+Admins must join the owning team before registering; metadata editing requires
+developer, while ownership/role administration requires owner/admin. No external
+permission grant follows from these local roles.
+
+Application services commit each command and audit once, rolling back failures.
+Optimistic updates use a database version predicate, not just an in-memory check.
+History, roles, teams and applications use scoped validated keyset cursors with
+permission filtering before the limit. Server-generated request UUIDs correlate
+responses and audit; errors omit request values and database diagnostics.
+
+Local bootstrap creates new accounts with prompted passwords and explicit admin
+intent, recording actor kind `local_bootstrap`; it never promotes or overwrites
+an existing account. It is a direct-DB local administration tool, not an external
+identity system. Public registration rejects privilege fields. No credentials
+are seeded or recorded in audit. Identity changes require review before merge or
+external activation.
+
+T02 validates only HTTPS github.com references and conservative relative bundle
+paths. References remain visibly unverified until T08. SQLite supports fast offline
+API/UI checks; only isolated PostgreSQL tests establish migration, constraints and
+concurrent-update behavior. This distinction is retained in verification reports.
+
 ## Questions reserved for their implementation gates
 
 | Question | Needed by | Default until resolved |
