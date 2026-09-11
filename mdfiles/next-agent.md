@@ -1,16 +1,16 @@
 # Agent handoff
 
-This describes implemented code, not merge status. Inspect Git status, preserve
-unrelated changes, verify prerequisites on updated main, and read AGENTS.md before
-starting the next bounded task. Do not assume this implementation PR is merged.
+This records the confirmed T02 merge and implemented code. Inspect Git status,
+preserve unrelated changes, verify prerequisites on updated main, and read
+AGENTS.md before starting the next bounded task; this snapshot can become stale.
 
 ## Implemented state
 
-T01 is merged via PR #5 at `07e90c5`. At T02 start, GitHub CLI confirmed that same
-commit was current main and this task branch contained it. The existing handoff
-reconciliation commit was retained. **T02 — Register an owned application is
-implemented in draft PR #6 and awaiting review/merge.** No T03/environment/worker/provider
-features were added. AI/chat/RAG/LLM/inference remain removed.
+T01 is merged via PR #5 at `07e90c5`. **T02 — Register an owned application is
+complete and merged via PR #6 at `712aa256cf09339290da1140570548f772b93abc`
+on 2026-09-11.** GitHub reports PR #6 as merged, and T02 head `fa8b7f4` is an
+ancestor of updated `origin/main`. No T03/environment/worker/provider features
+were added. AI/chat/RAG/LLM/inference remain removed.
 
 - Migration `005_owned_applications` extends users with `is_active=true` and
   `is_platform_admin=false`, preserving existing users and migrations 001–004.
@@ -79,7 +79,7 @@ Actually run locally:
 
 **Hosted T02 verification passed** at implementation commit
 `77a9a035f5eddec37e6897b1cf206f310259d270` in
-[draft PR #6](https://github.com/Niilop/data-app-control-plane/pull/6).
+[PR #6](https://github.com/Niilop/data-app-control-plane/pull/6).
 [Platform CI run 34615449895](https://github.com/Niilop/data-app-control-plane/actions/runs/34615449895)
 passed both jobs. The actual
 [PostgreSQL job log](https://github.com/Niilop/data-app-control-plane/actions/runs/34615449895/job/103316109297)
@@ -90,12 +90,13 @@ were inspected directly; this follow-up records evidence without changing code.
 
 `uv run --no-project --python 3.11 scripts/check_agent_handoff.py --base 07e90c5
 --head HEAD` also passed locally for the implementation commit. Recheck CI for
-later revisions. Neither passing checks nor this handoff imply the PR is merged.
+later revisions. The subsequent merge was verified independently through GitHub
+PR metadata and `git merge-base --is-ancestor fa8b7f4 origin/main`. This
+documentation follow-up changes no application code; application tests were not
+rerun for it.
 
 ## Remaining work and limitations
 
-- Review draft PR #6, including identity/policy changes, and confirm current CI
-  before merge. Do not infer merge or PostgreSQL success from this file.
 - T02's six PostgreSQL tests include fresh-chain/old-head upgrades, legacy user
   preservation/default flags, new ORM/schema parity, direct database constraints,
   API/audit rollback and simultaneous versioned updates. Local SQLite tests are
@@ -112,15 +113,16 @@ later revisions. Neither passing checks nor this handoff imply the PR is merged.
 
 ## Next task
 
-Verify T02 is merged into updated main and inspect current checks. Then implement
-**T03 — Register a sandbox environment binding** only, on its own task branch.
+T02 is confirmed merged. When assigned, verify its prerequisites on updated main
+and implement **T03 — Register a sandbox environment binding** only, on its own
+task branch.
 T03 adds admin environment/binding models, migration, API/UI, explicit simulated
 sandbox configuration and self-approval policy, versioned safe binding config,
 and startup rejection of unsupported organization/profile combinations. No
 workspace creation, Terraform, connectivity validation or deployment.
 
-If T02 is not merged, finish its review/corrections first. Preserve unrelated
-changes and create the task branch only after inspecting Git status/prerequisites.
+Preserve unrelated changes and create the task branch only after inspecting Git
+status and prerequisites on updated main.
 Do not carry temporary checkout state from this handoff into the next task.
 
 ## Files to read first

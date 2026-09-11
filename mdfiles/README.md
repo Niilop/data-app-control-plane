@@ -1,7 +1,7 @@
 # Data application control plane: agent entry point
 
-Documentation baseline: 2026-09-11. Implementation status: **T01 merged; T02 owned
-application registry implemented, pending PR review/merge.** T02 includes
+Documentation baseline: 2026-09-11. Implementation status: **T01 and T02 merged. T02 owned
+application registry merged via PR #6 at `712aa25`; T03 is next.** T02 includes
 registration, team/application roles, transactional history, and the corresponding
 UI. Docker image builds and live container startup remain unverified. Consult
 [next-agent.md](next-agent.md) for exact verification and merge prerequisites.
