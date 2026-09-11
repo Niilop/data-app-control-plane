@@ -9,7 +9,7 @@ starting the next bounded task. Do not assume this implementation PR is merged.
 T01 is merged via PR #5 at `07e90c5`. At T02 start, GitHub CLI confirmed that same
 commit was current main and this task branch contained it. The existing handoff
 reconciliation commit was retained. **T02 — Register an owned application is
-implemented and awaiting PR review/merge.** No T03/environment/worker/provider
+implemented in draft PR #6 and awaiting review/merge.** No T03/environment/worker/provider
 features were added. AI/chat/RAG/LLM/inference remain removed.
 
 - Migration `005_owned_applications` extends users with `is_active=true` and
@@ -77,14 +77,24 @@ Actually run locally:
 - `docker version`: launcher reports Docker unavailable in this WSL distro and
   asks for WSL integration. No image builds or live container checks were run.
 
-T01b's prior hosted evidence remains PR #5, Platform CI run 34608464924 at
-`a50795c`: three migration tests passed against pgvector/PostgreSQL. That validates
-T01b only. T02 hosted CI results must be checked for the actual PR revision; they
-are not yet recorded here. Handoff mechanical checks do not prove these claims.
+**Hosted T02 verification passed** at implementation commit
+`77a9a035f5eddec37e6897b1cf206f310259d270` in
+[draft PR #6](https://github.com/Niilop/data-app-control-plane/pull/6).
+[Platform CI run 34615449895](https://github.com/Niilop/data-app-control-plane/actions/runs/34615449895)
+passed both jobs. The actual
+[PostgreSQL job log](https://github.com/Niilop/data-app-control-plane/actions/runs/34615449895/job/103316109297)
+reports **6 passed in 2.09s**, no skips, against `pgvector/pgvector:pg16`.
+The offline job reports **67 passed in 9.38s**, Ruff clean/33 files formatted,
+and mypy clean/18 files. Agent handoff run 34615449548 also passed. These logs
+were inspected directly; this follow-up records evidence without changing code.
+
+`uv run --no-project --python 3.11 scripts/check_agent_handoff.py --base 07e90c5
+--head HEAD` also passed locally for the implementation commit. Recheck CI for
+later revisions. Neither passing checks nor this handoff imply the PR is merged.
 
 ## Remaining work and limitations
 
-- Review this PR, including identity/policy changes, and confirm hosted T02 CI
+- Review draft PR #6, including identity/policy changes, and confirm current CI
   before merge. Do not infer merge or PostgreSQL success from this file.
 - T02's six PostgreSQL tests include fresh-chain/old-head upgrades, legacy user
   preservation/default flags, new ORM/schema parity, direct database constraints,

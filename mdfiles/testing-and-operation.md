@@ -20,8 +20,11 @@ thread restriction. `uv run --locked mypy` passed. PostgreSQL tests run separate
 `uv run --locked pytest tests/integration -q -rs` reported **6 skipped** without
 `TEST_DATABASE_URL`. They cover fresh/old-head migration, legacy users and flags,
 new ORM/schema parity, real constraints, API rollback and competing metadata writes.
-Hosted evidence is recorded in `next-agent.md` when available; local skips are not
-migration verification. Docker's Windows launcher reports unavailable WSL
+Hosted [Platform CI run 34615449895](https://github.com/Niilop/data-app-control-plane/actions/runs/34615449895)
+at `77a9a03` confirmed **6 PostgreSQL tests passed**, no skips, **67 offline tests
+passed**, Ruff clean and mypy clean. Actual logs were inspected; see
+`next-agent.md`. The handoff check also passed. Local skips alone are not migration
+verification. Docker's Windows launcher reports unavailable WSL
 integration; image builds and live startup remain unrun.
 
 Local account/bootstrap and the registration demonstration are documented in root

@@ -174,7 +174,7 @@ Preserve any new unrelated local edits when committing this task.
 
 ## T02 — Register an owned application
 
-**Status:** implemented; pending PR review/merge. **Depends on:** T01 (confirmed
+**Status:** implemented in draft PR #6; pending review/merge. **Depends on:** T01 (confirmed
 merged at `07e90c5`, matching current GitHub main at implementation start).
 
 **Implemented:** migration `005_owned_applications`; active/admin user flags with
@@ -191,9 +191,10 @@ Streamlit workflows through the in-process API. Mypy passed for 18 platform file
 The PostgreSQL suite was exercised locally only for its skip path: 6 skipped with
 `TEST_DATABASE_URL` unset. It now covers old-head user preservation/defaults,
 new-model/schema parity, constraints, API rollback, and simultaneous versioned
-updates in addition to the original chain tests. Hosted results and final lint
-commands are recorded in [next-agent.md](next-agent.md); do not infer success from
-CI configuration. Docker's launcher reports WSL integration unavailable.
+updates in addition to the original chain tests. [Hosted Platform CI run 34615449895](https://github.com/Niilop/data-app-control-plane/actions/runs/34615449895)
+passed at `77a9a03`: actual logs report **6 PostgreSQL tests passed**, no skips,
+**67 offline tests passed**, Ruff and mypy clean. The handoff check also passed.
+Exact evidence and limitations are recorded in [next-agent.md](next-agent.md). Docker's launcher reports WSL integration unavailable.
 
 **Next:** review/merge T02 after its checks, then T03 only. Existing T01b Docker
 build/startup verification remains outstanding.
