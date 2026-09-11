@@ -24,3 +24,10 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 app.db
+
+# React frontend
+node_modules/
+dist/
+playwright-report/
+test-results/
+*.tsbuildinfo

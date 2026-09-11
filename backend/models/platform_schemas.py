@@ -170,6 +170,15 @@ class AuditResponse(Record):
     details: dict
 
 
+class ApplicationCapabilities(BaseModel):
+    """Current UI affordances; never a substitute for mutation authorization."""
+
+    edit_metadata: bool
+    manage_access: bool
+    manage_bindings: bool
+    operate: bool
+
+
 T = TypeVar("T")
 
 

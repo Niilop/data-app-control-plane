@@ -221,7 +221,7 @@ execution, workspace capacity management or organization identity is implied.
 
 ## ADR-015 — Replace Streamlit before T05
 
-**Accepted user direction, 2026-09-11; implementation planned as T04a.** After T04
+**Accepted user direction, 2026-09-11; implemented in T04a, pending review/merge.** After T04
 merges, replace Streamlit with React + TypeScript built using Vite before starting
 T05. The backend now provides enough real workflows to support a useful UI;
 migrating while the UI is small avoids implementing future feature screens twice.
@@ -243,7 +243,7 @@ visibility and receive their own contract/behavior checks.
 Introduce a locked, project-local frontend toolchain and browser tests while
 preserving Python/uv backend verification. Supporting component/routing/data
 libraries and their versions are implementation choices; no packages are installed
-by this decision. Current Streamlit remains operational until T04a cuts over.
+by this decision. T04a has now cut over after browser parity passed; see ADR-016.
 No T05 features, speculative dashboards, provider activation or organization
 identity redesign are part of the migration. T05 depends on T04a completion.
 
@@ -259,3 +259,46 @@ identity redesign are part of the migration. T05 depends on T04a completion.
 
 These questions are deliberately not prerequisites for T01–T07/T11. Agents should
 progress through local work rather than repeatedly asking for unavailable accounts.
+
+## ADR-016 — Local browser sessions and a static React runtime
+
+**T04a implementation, 2026-09-11; pending human review/merge.** Use React,
+TypeScript and Vite with Node 24.21.0 / npm 11.19.0, exact direct dependency
+versions and `frontend/package-lock.json`. Python remains managed by uv.
+The selected visual direction is a clean light interface with a compact sidebar.
+
+Serve built assets through nginx and proxy `/auth`, `/api`, `/health` and `/ready`
+to FastAPI on the same browser origin. Keep host port 8501 for Docker users;
+Vite development uses 5173 with an equivalent server-side proxy. Neither frontend
+runtime nor build receives root `.env`. Vite disables env-file discovery. The
+frontend has no database or provider access; FastAPI and the worker retain policy,
+transactions, version checks, audit and durable work.
+
+Browser login uses a separate `/auth/session` endpoint returning the current user
+and an HTTP-only, SameSite=Strict, host-only cookie containing the existing expiring
+JWT. No bearer token is exposed to JavaScript, localStorage or sessionStorage.
+The cookie is Secure for direct HTTPS requests; supported Compose development
+is loopback HTTP. A TLS termination/proxy-trust design is a separate activation
+review, not an organization deployment claim. Existing `/auth/login` bearer
+clients and existing account hashes remain compatible; no migration is needed.
+Cookie-authenticated writes and browser login/logout require `X-Control-Plane:
+browser` plus an Origin matching the request origin or explicit CORS allowlist.
+Proxies preserve the original Host. Login/logout responses are not cacheable.
+Logout clears the browser cookie; it does not revoke a copied JWT before expiry,
+matching the existing development bearer-token limitation. Active account and
+current grants are checked on every request. Organization SSO and global session
+revocation remain out of scope.
+
+`GET /api/v1/applications/{id}/capabilities` returns current UI affordances derived
+from existing policy; services still authorize every mutation. Forms capture the
+version displayed when opened. Operation commands retain an idempotency key per
+operation/action/payload in workspace memory across retries and dialog reopen;
+logout/full reload clears that memory. After a full reload, inspect operation
+history before repeating uncertain work. The API remains the durable deduplication
+boundary. No new command-submission endpoint is introduced.
+
+Playwright exercises the real FastAPI and worker services using disposable SQLite
+fixtures; PostgreSQL migration/concurrency tests remain separate and mandatory in
+CI. A Docker test image packages Chromium's OS libraries for hosts without them.
+This avoids requiring a host-global browser dependency installation. Browser tests
+cover UI behavior rather than reimplementing backend policy in mocks.

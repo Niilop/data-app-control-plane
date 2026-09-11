@@ -184,7 +184,7 @@ cannot inject a command, workspace URL, executor identity, or approval actor.
 
 ## UI requirements
 
-Streamlit uses authenticated HTTP calls with timeouts; no direct DB access or
+React uses same-origin authenticated HTTP calls with a 10-second timeout; no direct DB access or
 deployment credentials. Each task includes its corresponding screen rather than
 leaving all UI work to the end. Show source revision, approval scope, target,
 execution mode, external run links, freshness, and pending cancellation accurately.
@@ -227,3 +227,27 @@ old; otherwise 503 with no database diagnostics. It is not per-operation progres
 or external-provider readiness. `GET /api/v1/queue/telemetry` is admin-only:
 counts by state, oldest eligible age, live-worker count, expired leases and
 observation timestamp. Ordinary readers cannot obtain global queue counts.
+
+## T04a browser sessions and capabilities
+
+Existing `POST /auth/login` form login still returns a bearer token for API/CLI
+clients. `POST /auth/session` accepts the same credentials, returns `UserResponse`
+(no token field), and sets `control_plane_session`: host-only, Path=/, HttpOnly,
+SameSite=Strict, Max-Age equal to the configured token lifetime, Secure on direct
+HTTPS. `DELETE /auth/session` returns 204 and clears the cookie, including when
+expired. Login/logout use Cache-Control: no-store. Both endpoints require
+`X-Control-Plane: browser` and an exact trusted Origin: the current request origin
+or configured CORS origin. Cookie-authenticated unsafe requests use the same
+check. Bearer-authenticated requests retain their existing contract and take
+precedence when both credentials are supplied. `/auth/me` supports either.
+Expired/invalid sessions return 401; inactive identity returns `inactive_actor`.
+The React client clears local user state and prompts for sign-in on these errors.
+Logout does not revoke copied development JWTs before expiry; see ADR-016.
+
+`GET /api/v1/applications/{id}/capabilities` requires current application visibility
+(404 otherwise) and returns four booleans: `edit_metadata` for an explicit current
+direct/team developer grant; `manage_access` for the owner or administrator;
+`manage_bindings` for administrators; `operate` for an explicit current operator
+grant. These describe controls, not transferable authorization. Mutation services
+and sensitive worker actions continue to check current policy independently.
+There are no new user-directory or arbitrary operation-submission endpoints.

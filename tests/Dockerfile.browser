@@ -1,0 +1,17 @@
+# Isolated browser verification when the host lacks Chromium's OS dependencies.
+FROM node:24.21.0-bookworm-slim AS node
+FROM mcr.microsoft.com/playwright:v1.63.0-noble
+COPY --from=node /usr/local/ /usr/local/
+COPY --from=ghcr.io/astral-sh/uv:0.12.11 /uv /usr/local/bin/uv
+ENV UV_LINK_MODE=copy
+WORKDIR /workspace
+COPY pyproject.toml uv.lock .python-version ./
+COPY backend/pyproject.toml backend/pyproject.toml
+RUN uv sync --locked --all-packages --group dev
+COPY frontend/package.json frontend/package-lock.json frontend/.npmrc frontend/
+RUN cd frontend && npm ci
+COPY backend backend
+COPY tests tests
+COPY frontend frontend
+WORKDIR /workspace/frontend
+CMD ["npm", "run", "test:e2e"]

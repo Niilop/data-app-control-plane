@@ -12,7 +12,6 @@ WORKDIR /src
 # stay cached across source-only changes.
 COPY pyproject.toml uv.lock .python-version ./
 COPY backend/pyproject.toml backend/pyproject.toml
-COPY frontend/pyproject.toml frontend/pyproject.toml
 RUN uv sync --locked --package backend --no-dev
 
 FROM python:3.11-slim

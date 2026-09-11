@@ -1,156 +1,138 @@
 # Agent handoff
 
 Inspect Git status, preserve unrelated changes, verify prerequisites on updated
-main, and read AGENTS.md before creating the next task branch. This handoff
-records implementation; it does not imply that its PR has merged.
+main, and read AGENTS.md before creating the next task branch. This handoff records
+implementation; it does not imply that its PR has merged.
 
 ## Implemented state
 
-T01–T03 are merged. T03 PR #8 was confirmed merged at
-`46a9cd9194ea4384d281c956b61eca493cac830a`. T04 is implemented on its own branch
-from that updated main in [PR #9](https://github.com/Niilop/data-app-control-plane/pull/9)
-and awaits review/merge. T04a and T05 have not started. The agreed next milestone
-is T04a: migrate current workflows to React + TypeScript + Vite before T05.
-AI/chat/RAG/LLM/inference remain removed; historical tables/migrations are retained.
+T01–T04 are merged. T04 PR #9 was confirmed merged at
+`9a36e56aac10a3b8c87cafbdc0f75f85b7752ff1`. T04a is implemented from that main and
+awaits review/merge. T05 has not started. AI/chat/RAG/LLM/inference remain removed;
+historical tables and all migrations through `007_durable_operations` are retained.
 
-The platform has development accounts, explicit local admin bootstrap,
-teams/memberships, owned applications, direct/team roles, versioned metadata and
-simulated environment bindings, filtered paginated reads and transactional audit.
-Local configuration requires `RUNTIME_PROFILE=local` and explicit
-`DEPLOYMENT_EXECUTOR=simulated`. Organization and real sandbox execution fail at
-startup. Local secrets remain in ignored `.env`, outside versioned context.
+The platform provides development accounts/admin bootstrap, teams/memberships,
+owned applications, direct/team roles, versioned metadata, simulated environment
+bindings, filtered paginated reads and transactional audit. Its separate PostgreSQL
+worker uses durable operations, reservations, idempotent commands, leases/fencing,
+current authorization, heartbeats, safe bounded retry, cancellation and reconciliation.
+Only the fixed simulated queue probe runs; no arbitrary task HTTP endpoint exists.
 
-T04 adds:
+T04a replaces Streamlit with React + TypeScript + Vite:
 
-- Migration `007_durable_operations`: operations, attempts, binding reservations,
-  idempotency command history, internal queue probe request/results, and worker
-  heartbeats. UUID/UTC metadata and noncascading references preserve existing data.
-- Synchronous command transactions atomically create request, operation,
-  reservation, command hash and audit. Idempotency scope is actor/action/target/key;
-  identical repeats return the original operation/current state, mismatches 409.
-  Reads require current application visibility. Cancel/retry/reconcile and probe
-  submission require an explicit current operator role, including for admins.
-- `python -m worker` is independent of FastAPI; Compose includes a worker service.
-  Short PostgreSQL `FOR UPDATE SKIP LOCKED` claims persist attempt/correlation,
-  worker UUID, monotonic fencing token and 30-second lease. Separate-session
-  heartbeats renew every 10 seconds. Idle polling publishes worker freshness.
-- Worker authorization rechecks the requester’s active account, direct/team
-  operator grant, application lifecycle, current binding version, environment
-  enablement/executor and approved target before handling. Handlers hold no DB
-  transaction. All operation/attempt/result/reservation/audit writes are fenced,
-  including rollback if the lease expires during result flush.
-- Only the typed `queue_probe` handler exists. It is explicitly simulated and
-  has no external side effects. Closed payload schema 1 has deterministic success,
-  transient, terminal and unknown scenarios for tests. The local CLI exposes only
-  the success probe; no HTTP arbitrary task execution endpoint exists.
-- Known safe failures retry at most three executions, with jittered exponential
-  delay (2-second base, 60-second cap). Lease expiry always enters reconciliation;
-  the probe establishes no external effects before scheduling a safe retry.
-  Unknown outcomes become `needs_attention` and retain the binding reservation.
-- Cancellation before claim immediately prevents execution; running cancellation
-  is intent until observed, and observed success may win. Retry creates a new
-  linked operation after renewed policy checks. Reconcile requires an operator
-  reason, schedules observation, and never forces an outcome. Only its hash is
-  retained, avoiding pasted secret text in history.
-- Status/list/attempt and cancel/retry/reconcile APIs, Streamlit operation history,
-  refresh/freshness and recovery controls. Responses omit payloads, worker tokens
-  and raw exception messages. `/health` is API liveness; `/ready` requires queue
-  access plus a worker pulse within 60 seconds. Admin-only `/api/v1/queue/telemetry`
-  exposes state counts, oldest eligible age, expired leases and live worker count.
+- Clean light sidebar layout, accounts/profile, application list/register/detail/
+  edit, ownership and role controls, teams/memberships, environment policy/bindings,
+  audit history and operation/attempt recovery. Paginated reads, error/loading/empty
+  states, simulation labels, responsive navigation and keyboard dialog/tab controls.
+- Edit forms retain the version captured when opened. Recovery keys persist per
+  operation/action/payload in workspace memory across transport retries/dialog
+  reopen. API policy/version/idempotency and worker policy remain authoritative.
+- Browser `POST/DELETE /auth/session` uses an HTTP-only, SameSite=Strict cookie
+  holding the existing expiring JWT. Login/logout and cookie-authenticated writes
+  require a custom header and trusted Origin. Existing bearer login remains.
+  No browser localStorage/sessionStorage tokens; no account/password reset.
+- `GET /api/v1/applications/{id}/capabilities` exposes four current affordances;
+  services still authorize mutations. Direct/team revocation remains immediate.
+- Node 24.21.0 / npm 11.19.0, exact direct dependencies and package-lock.json.
+  Python stays on uv. Streamlit runtime/dependencies/workspace/UI-only tests are
+  retired after equivalent browser workflows passed.
+- Docker frontend uses Node build then nginx static serving and same-origin API
+  proxy on localhost:8501. Vite development uses 127.0.0.1:5173. Frontend does not
+  receive root `.env`; Vite disables env-file discovery. `API_URL` is retired;
+  `API_PROXY_TARGET` is a Vite server-only override. Existing `.env` is untouched.
+- CI includes frontend lint/format/build/browser tests and production nginx smoke,
+  alongside Python and isolated PostgreSQL jobs. See ADR-016 for session choices.
 
 ## Verification performed
 
-- `uv run --locked pytest -q`: **126 passed**, including queue state/API/UI,
-  current authorization, transaction failures, stale leases before and during
-  result flush, bounded retries, sanitized diagnostics and prior T01–T03 coverage.
-  Network blocking remained enabled; TestClient ran outside this sandbox's thread
-  restriction. The UI workflow asserts the actual attempt outcome column.
-- `uv run --locked mypy`: **32 source files passed**.
-- Ruff lint and format: clean over the complete README/CI scope, **53 files**.
-- `uv run --locked pytest tests/integration -q -rs`: **15 skipped** locally because
-  `TEST_DATABASE_URL` is unset. These skips do not establish PostgreSQL behavior.
-- Hosted [Platform CI run 34632237191](https://github.com/Niilop/data-app-control-plane/actions/runs/34632237191)
-  passed at implementation commit `d1c417d4b26304628dd556147901097a5f4185e1`.
-  The actual [PostgreSQL job log](https://github.com/Niilop/data-app-control-plane/actions/runs/34632237191/job/103371592921)
-  reports **15 passed in 12.12s**, no skips, against the isolated pgvector/pg16
-  service. This covers separate-process contention/restart, heartbeat/cancel,
-  migration preservation/schema parity, concurrent submissions and atomic rollback.
-  The offline job reports **126 passed in 18.33s**, Ruff clean (53 files) and
-  mypy clean (32 source files). Actual logs were inspected.
-- Agent handoff CI run 34632237152 and the local handoff checker against
-  `origin/main` passed. The frontend roadmap follow-up changes documentation only;
-  its diff and task/dependency consistency were reviewed, and `git diff --check`
-  passed. Application tests were not rerun locally for this documentation update.
-  Recheck CI on subsequent revisions. This PR is not claimed merged.
+On 2026-09-11/12:
 
-Local Docker follow-up on 2026-09-11 also passed: `compose config --quiet`, all
-three image builds from uv.lock, bundled pgvector/pg16 startup, fresh Alembic
-upgrade with the database reporting `007_durable_operations`, API `/health` and
-`/ready`, and Streamlit `/_stcore/health`. Four services were running. A missing
-`.env` was created from the example with generated local secrets and `db:5432`;
-its values were neither printed nor committed. No application account was seeded.
-The first-start/migration/admin-bootstrap sequence is now in root README.
-
-Docker Desktop 4.90.0 / Engine 29.7.2 / Compose 5.5.1 worked directly in Ubuntu.
-The earlier I/O error persisted only through this agent session's Docker CLI
-mount. Verification used explicitly approved `wsl.exe -d Ubuntu -- ...` commands;
-no Docker/WSL reset or global installation was needed. Inspect current availability
-rather than assuming that an agent-session CLI failure means Docker is stopped.
+- `uv sync --locked --all-packages --group dev` passed after lock cleanup.
+- `uv run --locked pytest -q`: **125 passed** with network blocking enabled.
+  TestClient ran outside the sandbox thread restriction. The total replaces nine
+  Streamlit-specific cases with eight cookie/capability API cases; browser coverage
+  is separate. Existing backend assertions and migration history are preserved.
+- Ruff lint/format passed across the complete README/CI scope: **48 files**.
+  `uv run --locked mypy`: **28 source files passed**.
+- `npm ci`, frontend lint/format/type checks and Vite production build passed.
+  **9 Chromium browser workflows passed** against a disposable real FastAPI/SQLite
+  API with simulated worker fixtures. Coverage includes login/register/reload/logout,
+  application edits/ownership/audit, teams, roles/revocation, environments/bindings,
+  stale versions, validation, viewer denial, pagination, connection/session failure,
+  cancel/retry/reconcile and lost-response idempotency. Desktop and 390px mobile
+  screenshots were inspected; keyboard Escape restores focus.
+- All Compose images built, quiet config validation passed, and existing local
+  backend/worker/frontend services started while preserving the database volume.
+  `/ready` via localhost:8501 returned ready. The four application services remain
+  running. A read-only check confirmed the existing active administrator and
+  migration head 007 remain present. No migration or reset was needed.
+- An isolated production nginx/browser smoke passed routing, CSP, cookie login/
+  reload, authenticated team creation, worker readiness and logout. Its fixtures
+  use a separate temporary SQLite DB, with no root `.env` or application DB volume.
+- Generated browser assets were checked against configured server secret values
+  without printing them; no configured secrets or fixture credentials were found.
+- Chromium could not run natively because WSL lacks its OS libraries; sudo requires
+  interactive authentication. No host-global packages were installed. Tests instead
+  used `tests/Dockerfile.browser`. Docker worked through regular Ubuntu via
+  `wsl.exe`; this agent session's direct Docker CLI mount still returned I/O errors.
+- Local PostgreSQL integration tests were not rerun for T04a. T04's historical CI
+  run 34632237191 had 15 PostgreSQL passes, but that is not evidence for this head.
+  Inspect T04a's current CI before merge; hosted checks are not yet claimed here.
 
 ## Remaining work and limitations
 
-- Review PR #9 and current CI before merge. Hosted PostgreSQL checks passed;
-  local SQLite tests alone cannot establish concurrent claim/process behavior.
-- Devstack integration is still unverified; `~/code/devstack` was absent.
-  The bundled PostgreSQL path and container health are verified. The startup smoke
-  did not create an application account or run the full interactive user journey.
-- The probe only exercises infrastructure. No generated bundle, artifact store,
-  revision, approval, deployment, GitHub or Databricks adapter exists yet. No real
-  provider, paid workload or infrastructure activation was attempted.
-- Unknown probe scenarios intentionally remain unresolved after reconciliation.
-  There is no force-success/reservation-release API. Future real handlers need
-  provider-specific correlation, reconciliation and outcome evidence.
-- Binding reservations are implemented; future provider workspace concurrency
-  limits and provider submission deduplication are not applicable to this probe.
-  No exactly-once external execution claim is made.
-- Worker heartbeat rows and operation/idempotency history are retained. Retention,
-  richer metrics/exporters and organization identity remain later work.
+- Review T04a and current CI before merge, particularly browser identity/session
+  changes. It is not claimed merged. T05 must wait for that merge.
+- Development logout clears the cookie but does not revoke copied JWTs before
+  expiry. TLS termination/proxy trust, organization SSO and global revocation remain
+  later work. Supported Compose development is loopback HTTP; direct HTTPS cookies
+  are Secure. Current activity/grants are still checked for every authenticated call.
+- Recovery keys survive dialog reopen and transport retry within the signed-in
+  workspace, but full reload/logout clears them. Inspect operation history before
+  repeating uncertain work after a full reload. The API is the durable boundary.
+- User ownership/membership controls still use user IDs; teams/environments have
+  paginated selectors. Application filtering applies to the displayed page only.
+- Chromium is the browser tested. Firefox/WebKit and organization deployment are
+  not verified. Browser SQLite tests do not establish PostgreSQL concurrency.
+- Devstack integration remains unverified; `~/code/devstack` was absent. Existing
+  local Compose uses the bundled pgvector/pg16 database. Preserve `.env`/volumes.
+- No template generation, artifacts, revisions, approvals, provider adapters or
+  deployments exist. Unknown probes retain reservations until a supported outcome;
+  no force-success API or exactly-once external execution claim exists.
 
 ## Next task
 
-Verify T04 is merged on updated main, then implement **T04a — Replace Streamlit
-with React**, on its own branch. Read its full scope and acceptance criteria in
-`development-plan.md` and ADR-015. Establish the React + TypeScript + Vite frontend,
-migrate current T01–T04 workflows, verify browser behavior and Docker startup, then
-retire Streamlit. Preserve existing accounts/data and API/worker authorization,
-versioning, audit and idempotency. Review browser session handling and keep all
-server secrets out of browser assets. Do not add new Streamlit feature screens.
-
-T05 waits until T04a is reviewed and merged. No generation, revision, approval,
-deployment or provider features belong in this migration.
+After confirming T04a is merged on updated main, implement **T05 — Generate a
+bundle and capture a revision** on its own branch. Read the complete task and
+contracts first. Add one versioned Python batch template, deterministic safe archive
+creation, digest-checked local artifacts, generation/download React UI, immutable
+revision snapshots and offline validation through the durable worker. Generation
+requires no network; lock and test the generated project in isolation. Do not begin
+T06, publish repositories, deploy real bundles, execute adopted arbitrary repository
+code, or activate providers. Preserve current policy/audit/version/idempotency rules.
 
 ## Files to read first
 
-- `AGENTS.md`, `mdfiles/README.md`, T04a in `mdfiles/development-plan.md`, ADR-015
+- `AGENTS.md`, `mdfiles/README.md`, T05 in `mdfiles/development-plan.md`, ADR-015/016
   in `mdfiles/decisions.md`.
-- `mdfiles/product-scope.md`, `mdfiles/architecture.md`, `mdfiles/api-contracts.md`,
-  `mdfiles/domain-contracts.md`, `mdfiles/repository-map.md`.
-- `frontend/app.py`, `api_client.py`, `registry.py`, `registry_widgets.py`,
-  `environment_ui.py`, `operation_ui.py`.
-- `backend/api/dependencies.py`, `backend/api/endpoints/auth.py`, `applications.py`,
-  `teams.py`, `environments.py`, `operations.py`; affected schemas/services.
-- `tests/unit/test_registry_ui.py`, `test_operations.py`, `tests/conftest.py`,
-  and the PostgreSQL integration tests for behavior to preserve.
-- Root README, `docker-compose.yaml`, both Dockerfiles, root/frontend/backend
-  `pyproject.toml`, `uv.lock` and `.github/workflows/ci.yml`.
+- `mdfiles/integrations.md`, artifact/revision/validation rules in
+  `mdfiles/domain-contracts.md`, T05 API rows, `mdfiles/architecture.md` and
+  `mdfiles/repository-map.md`.
+- `backend/services/operation_service.py`, `queue_service.py`, `backend/worker.py`,
+  operation/platform schemas and affected auth/policy services.
+- `frontend/src/App.tsx`, `api.ts`, `state.tsx`, `components.tsx`, and `src/pages/`.
+- `frontend/e2e/workflows.spec.ts`, `e2e/nginx-smoke.mjs`, `playwright.config.ts`,
+  `tests/browser_server.py`, Python unit/integration suites.
+- Root README, Compose/Dockerfiles, `tests/compose.browser.yaml`, Python metadata/
+  lock, frontend package metadata/lock and `.github/workflows/ci.yml`.
 
 ## Suggested agent prompt
 
 Read AGENTS.md, mdfiles/README.md and mdfiles/next-agent.md. Inspect Git status,
-preserve unrelated changes, and verify T04 is merged into updated main. Create a
-new task branch if needed and implement T04a only: React + TypeScript + Vite,
-current workflow migration, browser/session behavior, frontend checks and Docker
-cutover, followed by Streamlit retirement after parity passes. Preserve accounts,
-data, API/worker policy, versioning and idempotency. Explain the plan, run checks,
-update the handoff/contracts/map and open a draft PR. Do not merge, begin T05,
-expand Streamlit feature scope, or activate external providers.
+preserve unrelated work, verify T04a is merged into updated main, and create the
+next task branch if needed. Implement T05 only: safe deterministic template/archive
+generation, local artifacts/digests/downloads, immutable revisions and explicitly
+offline validation, with React UI and the existing durable worker. Preserve accounts,
+data and policy/version/audit/idempotency contracts. Explain the plan, run checks,
+update handoff/contracts/map, and open a draft PR. Do not merge, start T06, publish
+repositories, activate providers or execute arbitrary adopted repository code.

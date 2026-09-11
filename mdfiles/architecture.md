@@ -17,9 +17,10 @@ flowchart LR
     W --> D
 ```
 
-The React UI is the agreed T04a target; Streamlit remains implemented until that
-migration passes. Both use the FastAPI boundary. See ADR-015 for the staged
-replacement, browser session review and Streamlit retirement gate.
+T04a implements React with Vite for development and nginx for static serving.
+The browser uses a same-origin API proxy and HTTP-only cookie sessions; FastAPI
+and the worker retain all authorization and workflow rules. Streamlit is retired
+after browser parity verification. See ADR-015/016 for scope and session choices.
 
 The worker-to-Databricks path supports status observation and permitted run
 commands. Deployment execution belongs to the environment's selected executor:
