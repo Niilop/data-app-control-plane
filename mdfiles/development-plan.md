@@ -1,6 +1,6 @@
 # Development plan and agent task ledger
 
-Status: all tasks **not started**. This plan is implementation-ready guidance,
+Status: **T01 in progress**; subsequent tasks not started. This plan is implementation-ready guidance,
 not a claim of implemented capabilities. Task order follows dependencies rather
 than estimated calendar dates. Do not implement the entire roadmap in one turn.
 
@@ -25,11 +25,11 @@ Use linked contracts for details; scope exclusions below prevent unrelated work.
 
 ## T01 — Reproducible local platform foundation
 
-**Status:** not started. **Depends on:** none.
+**Status:** in progress (T01a complete; T01b not started). **Depends on:** none.
 
 Deliver T01 as two reviewable branches, in order:
 
-- **T01a — `feat/t01a-local-startup`:** optional legacy feature startup, safe local
+- **T01a — `feat/t01a-local-startup`:** removal of AI features, safe local
   settings, configurable frontend API URL, isolated unit-test collection, and
   project-local Ruff/pytest/mypy tooling. Verify startup without LLM credentials.
 - **T01b — `build/t01b-containers-ci`:** locked container builds, devstack/optional
@@ -42,14 +42,18 @@ later work on the merged base; do not combine unrelated roadmap tasks in one PR.
 **Read:** [architecture](architecture.md), current config/main/database, workspace
 pyprojects, Dockerfiles, Compose, frontend API URL, existing tests and migrations.
 
-**Implement:** platform-local settings with legacy features opt-in; API startup
+**Implement:** platform-local settings with AI features removed; API startup
 without LLM credentials; configurable frontend API URL; locked uv workflow for
 local and container dependencies; Ruff, pytest, and a type checker (initial choice:
 mypy) in project-local dev dependencies. Configure isolated test discovery so live
-legacy scripts cannot execute during collection; preserve them as manual examples.
+legacy scripts cannot execute during collection; preserve relevant auth/example
+scripts as manual examples and remove obsolete AI scripts.
 Document devstack database setup and an optional self-contained Compose DB profile
 without colliding with its port. Add this repository's CI with offline unit checks
 and an isolated PostgreSQL migration smoke test. Default SQL debug logging off.
+
+User clarification: remove AI chat, RAG, LLM, and inference code fully instead of
+keeping a legacy-mode toggle. Preserve historical tables and migration metadata.
 
 Do not install globals, upgrade every legacy library, rewrite import paths, drop
 tables, or implement the worker/domain. Keep legacy migrations working, including
@@ -73,9 +77,34 @@ ignoring new errors or requiring unrelated legacy cleanup.
 **Handoff:** exact commands, dependency/tool versions, local DB setup, test baseline,
 files changed, unrun checks. Update the root README to link this plan and describe
 actual startup; preserve legacy usage notes where needed.
-Check the independently edited `uv.lock` ignore rule noted in the repository map;
-resolve lockfile availability for a clean checkout without silently discarding the
-user's concurrent changes.
+The existing `uv.lock` is tracked. Preserve the user's separate staged/unstaged
+`.gitignore` edits when committing this task.
+
+### T01a handoff — 2026-09-11
+
+- **Status:** complete. Branch: `feat/t01a-local-startup`, based on
+  `docs/platform-development-plan`. T01b remains a separate next PR.
+- **Implemented:** AI/chat/RAG/inference services, routes, UI, configuration, and
+  dependencies removed per user clarification; RAG-only job runner removed.
+  Local API exposes auth/system routes with SQL debug off. UI provides account
+  controls and health/profile checks with configured API URL and timeouts.
+- **Persistence:** migration versions unchanged. Historical feature metadata moved
+  to `backend/alembic/legacy_models.py`; no table/data deletion. Retained the
+  `EMBEDDING_DIM` compatibility constant imported by migration 002. Removed local
+  Alembic package marker that shadowed the installed package.
+- **Verification:** `uv sync --locked --all-packages --group dev --offline` passed
+  after initial dependency download. Python 3.11.16, uv 0.12.11, pytest 9.1.1,
+  Ruff 0.16.7, mypy 2.3.1. `uv run --locked pytest -q`: **17 passed**.
+  Collection finds only those 17 offline tests. Ruff lint/format passed for all
+  new/modified nonhistorical implementation files and new tests; mypy passed for
+  settings and API assembly. Exact commands are in the root README.
+- **Environment note:** Starlette TestClient stalled inside the execution sandbox;
+  the suite passed outside it, retaining explicit outbound-network guards.
+- **Not run:** live PostgreSQL migrations, real login against DB, Docker image
+  builds, hosted CI, GitHub/Databricks workload execution. No claim of those gates.
+- **Next:** T01b locked container builds + devstack/optional DB Compose + isolated
+  PostgreSQL migration smoke + CI. CSV/example modules remain dormant; new platform
+  domain features start at T02 after T01b. Keep user `.gitignore` changes separate.
 
 ## T02 — Register an owned application
 
@@ -131,7 +160,7 @@ configuration changes increment binding version and are audited.
 **Status:** not started. **Depends on:** T03.
 
 **Read:** worker/failure protocol in [architecture](architecture.md), operation
-state/idempotency contracts, T04 API rows; legacy job runner for comparison only.
+state/idempotency contracts, T04 API rows; the operation contract; the old RAG job runner has been removed.
 
 **Implement:** operations/attempts/reservations migration; typed dispatch;
 independently runnable worker and Compose service; idempotency, atomic claims,
@@ -139,7 +168,7 @@ leases, heartbeat, fencing, bounded retry, cancellation/recovery APIs and operat
 UI. Use an internal deterministic test handler to exercise infrastructure; do not
 expose an arbitrary task-execution API. Add liveness/readiness and queue telemetry.
 
-**Exclude:** real provider submission, message broker, rewriting legacy RAG jobs.
+**Exclude:** real provider submission, message broker, reintroducing removed RAG jobs.
 
 **Acceptance:**
 

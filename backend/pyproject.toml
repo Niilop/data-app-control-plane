@@ -1,7 +1,7 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "FastAPI backend for the LLM template"
+description = "FastAPI data application control plane"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi",
@@ -10,12 +10,6 @@ dependencies = [
     "pydantic[email]",
     "pydantic-settings",
     "python-dotenv",
-    "langchain",
-    "langchain-google-genai",
-    "google-generativeai",
-    "langchain-openai",
-    "langchain-anthropic",
-    "langchain-text-splitters",
     "pgvector",
     "slowapi",
     "sqlalchemy==2.0.23",

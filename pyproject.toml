@@ -1,5 +1,35 @@
 [tool.uv.workspace]
 members = ["backend", "frontend"]
 
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "mypy>=2.3.1",
+    "pytest>=9.1.1",
+    "ruff>=0.16.7",
+]
+
 [tool.uv]
 package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+pythonpath = ["backend"]
+addopts = "--strict-config --strict-markers"
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["backend/core/config.py", "backend/main.py"]
+mypy_path = "backend"
+explicit_package_bases = true
+follow_imports = "silent"
+check_untyped_defs = true
+disallow_untyped_defs = true
+warn_unused_ignores = true
+plugins = ["pydantic.mypy"]

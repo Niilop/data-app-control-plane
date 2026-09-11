@@ -1,9 +1,9 @@
 # Testing and operation guide
 
-Status: target workflow. T01 must make these commands/configuration real and update
-this guide with verified details. The current repository has no verified isolated
-test baseline. Do not run the legacy test directory blindly: scripts make live
-HTTP requests at import time.
+Status: T01a establishes 17 passing offline tests, project-local dev tools, and
+Python 3.11. Live PostgreSQL/container/CI work remains T01b. Historical auth/example
+scripts are under `tests/manual/` with names outside pytest discovery; obsolete RAG
+tests were removed.
 
 ## Development environment
 
@@ -17,24 +17,27 @@ HTTP requests at import time.
   and descriptions only. Bind local services to loopback by default.
 - No Redis queue is required even if Redis is already running in devstack.
 
-## Commands T01 should establish
+## Verified T01a commands
 
-These are targets, **not commands verified during planning**. Adjust them to the
-implemented import/test layout in T01; keep the guide copy-pastable afterward.
+Run from the repository root:
 
 ```bash
 uv sync --locked --all-packages --group dev
-uv run --locked ruff check <changed-python-paths>
-uv run --locked ruff format --check <changed-python-paths>
-uv run --locked mypy <new-platform-module-paths>
-uv run --locked pytest tests/unit -q
-uv run --locked pytest tests/integration -q
+uv run --locked pytest -q
+uv run --locked mypy
+uv run --locked ruff check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit
+uv run --locked ruff format --check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit
 ```
 
-T01 defines the dev dependency group, mypy scope, pytest markers, import path, and
-DB fixtures; those configurations do not yet exist. Once configured, use targeted
-checks for the slice plus required regression checks. Do not add global type/lint
-exclusions to suppress new errors.
+All passed in T01a. Mypy checks settings/API assembly initially; Ruff covers the
+listed new/modified code. Test collection is limited to `tests/unit`; T01b must add
+isolated integration test discovery/configuration. Do not add global exclusions to
+suppress new errors. In the development sandbox, TestClient's event-loop startup
+stalled; the same tests passed outside the sandbox with outbound-network guards
+still enabled. No providers or live databases were contacted by the suite.
+
+The following startup/migration commands are documented but a live DB migration
+and real account login have not yet been verified; that evidence belongs to T01b.
 
 Current backend import style expects the backend directory on Python's import
 path. The intended initial startup commands, from `backend/`, are:

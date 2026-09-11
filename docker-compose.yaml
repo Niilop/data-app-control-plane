@@ -43,6 +43,8 @@ services:
       - "127.0.0.1:8501:8501"
     env_file:
       - .env
+    environment:
+      API_URL: http://backend:8000
     volumes:
       - ./frontend:/app:ro
     command: >
