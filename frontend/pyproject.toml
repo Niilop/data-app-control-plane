@@ -1,7 +1,7 @@
 [project]
 name = "frontend"
 version = "0.1.0"
-description = "Streamlit UI for the LLM template"
+description = "Streamlit UI for the data application control plane"
 requires-python = ">=3.11"
 dependencies = [
     "streamlit",

@@ -24,7 +24,7 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/ds_playground
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - DATA_DIR=/app/data
     volumes:
       - ./backend:/app
@@ -43,6 +43,8 @@ services:
       - "127.0.0.1:8501:8501"
     env_file:
       - .env
+    environment:
+      API_URL: http://backend:8000
     volumes:
       - ./frontend:/app:ro
     command: >
