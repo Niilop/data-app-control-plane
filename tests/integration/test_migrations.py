@@ -44,8 +44,12 @@ EXPECTED_HEAD_TABLES = {
     "queue_probes",
     "operation_commands",
     "worker_heartbeats",
+    "template_versions",
+    "artifacts",
+    "deployment_revisions",
+    "validation_results",
 }
-HEAD_REVISION = "007_durable_operations"
+HEAD_REVISION = "008_bundle_generation"
 
 
 def _scoped_database_url(schema: str) -> str:

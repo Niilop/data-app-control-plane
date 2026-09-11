@@ -1,14 +1,14 @@
 # Repository map
 
-Inspected 2026-09-11. Paths below are current unless labelled proposed. Recheck
+Inspected 2026-09-12. Paths below are current unless labelled proposed. Recheck
 affected files before editing; avoid a full repository crawl for each task.
 
 ## Current implementation
 
 | Path | Responsibility / relevant limitation |
 |---|---|
-| `backend/main.py` | FastAPI assembly; auth/system and T02/T03 registry and T04 operation routes, request IDs and safe error handlers; no AI routes |
-| `backend/core/config.py` | Cached settings; explicit simulated executor, local-only profile gate, DB/auth settings, sanitized validation errors and SQL debug off |
+| `backend/main.py` | FastAPI assembly; auth/system and T02/T03 registry, T04 operation and T05 delivery routes, request IDs and safe error handlers; no AI routes |
+| `backend/core/config.py` | Cached settings; explicit simulated executor, local-only profile gate, DB/auth settings, absolute `ARTIFACT_DIR`, sanitized validation errors and SQL debug off |
 | `backend/core/database.py` | Synchronous engine/session and typed DeclarativeBase; settings constructed on import |
 | `backend/core/logging.py` | Basic Python logging, no structured audit/correlation |
 | `backend/models/database.py` | User (T02 active/admin flags), dataset, and dormant pipeline tables; historical AI models moved to Alembic |
@@ -19,17 +19,17 @@ affected files before editing; avoid a full repository crawl for each task.
 | Former `chat`, `rag`, `llm`, `jobs` routers/services | Removed in T01a, including RAG-only background execution |
 | `backend/services/data_service.py` | Dormant CSV support; not a platform domain service |
 | `backend/alembic/env.py` | Imports runtime plus historical metadata; local package marker removed to avoid shadowing installed Alembic; T01b: escapes `%` in `sqlalchemy.url` for `configparser`, and caches the `legacy_models` load in `sys.modules` so re-running migrations in one process doesn't re-register `Base.metadata` tables |
-| `backend/alembic/versions/001_initial.py` … `004_add_background_jobs.py` | Existing migration chain; preserve it |
+| `backend/alembic/versions/001_initial.py` … `008_bundle_generation.py` | Existing migration chain through head 008; preserve it |
 | `frontend/src/App.tsx`, `src/state.tsx`, `src/api.ts` | React routing, local account/session state, abortable API reads, safe error feedback and in-memory command keys |
 | `pyproject.toml` | uv workspace containing the backend and Python verification tools |
 | `backend/pyproject.toml`, `uv.lock` | Locked Python runtime and checks; Streamlit workspace/dependencies retired in T04a |
 | `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf` | uv-locked API/worker; npm-locked React build and nginx static assets with same-origin API proxy |
 | `.dockerignore` | T01b: root ignore file for the `context: .` Compose builds (`requirements.txt` files remain but are unused by the Dockerfiles) |
-| `docker-compose.yaml` | T01b: bundled `db` service moved behind the opt-in `local-db` Compose profile with a configurable host port (default 5433); `backend` gets `host.docker.internal` for devstack access and a non-blocking `depends_on: db` |
+| `docker-compose.yaml` | T01b: bundled `db` service moved behind the opt-in `local-db` Compose profile with a configurable host port (default 5433); `backend` gets `host.docker.internal` for devstack access and a non-blocking `depends_on: db`. T05: API and worker share the `./data` artifact mount |
 | `tests/manual/auth_smoke.py`, `tests/manual/request_smoke.py` | Historical manual HTTP examples; not pytest tests |
 | `tests/unit/`, `tests/conftest.py` | Offline settings/startup/migration-rendering and platform API tests; shared SQLite registry fixture and network guard (integration tests exempt) |
 | `tests/integration/test_migrations.py` | Isolated PostgreSQL+pgvector migration, T02 schema parity/legacy user preservation, API rollback/constraints and concurrent version-update tests; gated on `TEST_DATABASE_URL` |
-| `.github/workflows/ci.yml` | Python lint/format/type/offline tests, isolated PostgreSQL tests, and locked React build/browser checks |
+| `.github/workflows/ci.yml` | Python lint/format/type/offline tests, the offline generated-project acceptance check, isolated PostgreSQL tests, and locked React build/browser checks |
 | `README.md` | Current local startup and focused verification commands |
 | `.github/pull_request_template.md` | Same-PR handoff, verification, and related documentation checklist |
 | `.github/workflows/agent-handoff.yml` | Lightweight PR handoff validation, separate from platform CI |
@@ -84,8 +84,7 @@ Keep the existing import layout initially; a package-wide rename is outside T01.
 | `backend/api/endpoints/revisions.py`, `access.py` | Workflow endpoints |
 | `backend/services/deployment_service.py`, `access_service.py` | Workflow logic |
 | `backend/workers/` | Split handlers here when future tasks need them |
-| `backend/integrations/` | Only implemented simulation, artifact, GitHub, Databricks adapters |
-| `templates/python-batch/` | Versioned generated-project assets and tests |
+| `backend/integrations/` | Further adapters (GitHub, Databricks) as they arrive; the local artifact store exists |
 | `tests/unit/`, `tests/integration/`, `tests/contract/`, `tests/e2e/` | Isolated test suites |
 | `scripts/` | Explicit seed/demo/check helpers as needed |
 | `.github/workflows/` | This platform's own CI, distinct from generated application CI |
@@ -124,3 +123,22 @@ main resolves the earlier local-only instruction and ignore-file uncertainty.
 | `tests/browser_server.py` | Disposable SQLite API/worker fixtures; no developer database or fixture endpoints |
 | `tests/Dockerfile.browser`, `tests/Dockerfile.browser.dockerignore` | Isolated Chromium/Node/uv verification image with restricted build context |
 | `tests/compose.browser.yaml`, `frontend/e2e/nginx-smoke.mjs` | Disposable production nginx/API browser smoke; no application DB volume or credentials |
+
+### T05 bundle generation, artifacts, revisions and validation
+
+| Path | Responsibility |
+|---|---|
+| `backend/templates/python-batch/1.0.0/template.json` | Manifest: metadata, pinned tool versions, parameter contract, required files and the source-to-target allowlist |
+| `backend/templates/python-batch/1.0.0/files/` | Reviewed assets with `@@name@@` placeholders; stdlib-only project, bundle/job definitions, workflows and a prepared `uv.lock`. Kept under `backend/` so the existing image and dev bind mount carry it |
+| `backend/services/template_service.py` | Catalogue loading and content digests, placeholder rendering, archive-entry safety, deterministic uncompressed archives and safe archive reads |
+| `backend/integrations/artifact_store.py` | Content-addressed local storage: atomic writes, deduplication, digest verification on every read |
+| `backend/services/delivery_service.py` | Template registration, generation/revision/validation commands with audit, and the two worker handlers |
+| `backend/services/offline_validation.py` | Offline checks (parse-only) and the explicitly scoped JSON report |
+| `backend/models/delivery.py`, `delivery_schemas.py` | Template/artifact/revision/validation ORM; closed generation and revision inputs and explicit responses |
+| `backend/alembic/versions/008_bundle_generation.py` | Add the four tables and widen the operation kind/execution-mode check; 001–007 unchanged |
+| `backend/api/endpoints/delivery.py` | Templates, generation, authorized artifact download, revisions and offline validation |
+| `backend/services/operation_service.py`, `queue_service.py`, `worker.py` | Unreserved local kinds, kind-aware worker authorization, fenced handler result writes and explicit local dispatch |
+| `backend/core/config.py`, `docker-compose.yaml` | `ARTIFACT_DIR` setting and the artifact mount shared by API and worker |
+| `frontend/src/pages/delivery.tsx`, `src/api.ts`, `src/ReferenceSelect.tsx` | Bundles and Revisions tabs, generation and capture dialogs, artifact download and validation reports |
+| `scripts/check_generated_project.py` | Acceptance check: the generated project installs from its own lock and passes its own tests, offline |
+| `tests/unit/test_delivery.py`, `tests/integration/test_delivery.py` | Offline determinism/safety/policy/report cases; real PostgreSQL persistence, concurrency, constraints and revocation |

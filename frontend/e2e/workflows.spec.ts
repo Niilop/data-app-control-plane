@@ -477,3 +477,167 @@ test("pagination, network failure, expired session and narrow keyboard navigatio
     page.getByText("Your session has ended. Sign in to continue."),
   ).toBeVisible();
 });
+
+test("template catalogue, bundle download, revision snapshot and offline validation", async ({
+  page,
+}) => {
+  await login(page, "developer");
+  const app = await existing(page);
+  await page.goto(`/applications/${app.id}`);
+  await page.getByRole("tab", { name: "Bundles", exact: true }).click();
+  await expect(page.getByText("Python batch application 1.0.0")).toBeVisible();
+  const artifacts = (
+    await request(page, `/api/v1/applications/${app.id}/artifacts`)
+  ).items;
+  const bundle = artifacts.find(
+    (item: { kind: string }) => item.kind === "generated_bundle",
+  );
+  const report = artifacts.find(
+    (item: { kind: string }) => item.kind === "validation_report",
+  );
+  expect(bundle.media_type).toBe("application/zip");
+  expect(bundle.provenance.template_name).toBe("python-batch");
+
+  // The download is the stored bytes and matches the recorded digest.
+  const download = await page.request.fetch(
+    `/api/v1/artifacts/${bundle.digest}`,
+    {
+      headers,
+    },
+  );
+  expect(download.ok(), await download.text()).toBeTruthy();
+  expect(download.headers()["x-artifact-digest"]).toBe(bundle.digest);
+  const body = await download.body();
+  const digest = await page.evaluate(
+    async (bytes) => {
+      const hash = await crypto.subtle.digest("SHA-256", new Uint8Array(bytes));
+      return [...new Uint8Array(hash)]
+        .map((value) => value.toString(16).padStart(2, "0"))
+        .join("");
+    },
+    [...body],
+  );
+  expect(digest).toBe(bundle.digest);
+  expect(body.subarray(0, 2).toString()).toBe("PK");
+
+  // Generation is real local work and must never be labelled simulated.
+  const started = await page.request.fetch(
+    `/api/v1/applications/${app.id}/generations`,
+    {
+      method: "POST",
+      headers: { ...headers, "Idempotency-Key": "browser-second-generation" },
+      data: {
+        template_name: "python-batch",
+        template_version: "1.0.0",
+        binding_id: bundle.provenance.parameters.bundle_target
+          ? (
+              await request(page, `/api/v1/applications/${app.id}/bindings`)
+            ).items.find(
+              (item: { bundle_target: string }) =>
+                item.bundle_target ===
+                bundle.provenance.parameters.bundle_target,
+            ).id
+          : undefined,
+        package_name: "second_package",
+      },
+    },
+  );
+  expect(started.status(), await started.text()).toBe(202);
+  const accepted = await started.json();
+  expect(accepted.execution_mode).toBe("local");
+  const queued = await request(
+    page,
+    `/api/v1/operations/${accepted.operation_id}`,
+  );
+  expect(queued.kind).toBe("bundle_generation");
+  expect(queued.execution_mode).toBe("local");
+  await page.getByRole("tab", { name: "Operations", exact: true }).click();
+  await expect(
+    page.getByRole("cell", { name: /bundle generation/i }).first(),
+  ).toBeVisible();
+
+  await page.getByRole("tab", { name: "Revisions", exact: true }).click();
+  const revision = (
+    await request(page, `/api/v1/applications/${app.id}/revisions`)
+  ).items[0];
+  await page
+    .getByRole("button", { name: `View revision ${revision.id}` })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText(revision.scope_digest)).toBeVisible();
+  await expect(dialog.getByText(revision.artifact_digest)).toBeVisible();
+  await expect(dialog.getByText("simulated://browser-dev")).toBeVisible();
+  await expect(
+    dialog.getByText("Offline checks", { exact: true }),
+  ).toBeVisible();
+  await expect(dialog.getByText("passed", { exact: true })).toBeVisible();
+  await expect(
+    dialog.getByText("not evidence of workspace validity"),
+  ).toBeVisible();
+  // The scope is recorded and shown as offline, with an explicit disclaimer.
+  await expect(dialog.getByText("are not workspace validation")).toBeVisible();
+  const validations = (
+    await request(page, `/api/v1/revisions/${revision.id}/validations`)
+  ).items;
+  expect(validations.map((item: { scope: string }) => item.scope)).toEqual([
+    "offline",
+  ]);
+  expect(validations[0].result).toBe("passed");
+
+  // The captured snapshot is immutable: no edit route exists for it.
+  const patch = await page.request.fetch(`/api/v1/revisions/${revision.id}`, {
+    method: "PATCH",
+    headers,
+    data: { bundle_target: "qa" },
+  });
+  expect(patch.status()).toBe(405);
+  expect(report.provenance.scope).toBe("offline");
+  await dialog.getByRole("button", { name: "Close dialog" }).click();
+  await expect(dialog).not.toBeVisible();
+});
+
+test("viewer sees delivery records but cannot generate or capture", async ({
+  page,
+}) => {
+  await login(page, "viewer");
+  const app = await existing(page);
+  await page.goto(`/applications/${app.id}`);
+  await page.getByRole("tab", { name: "Bundles", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Generate bundle" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("cell", { name: /generated bundle/i }),
+  ).toBeVisible();
+  await page.getByRole("tab", { name: "Revisions", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Capture revision" }),
+  ).toHaveCount(0);
+  const revision = (
+    await request(page, `/api/v1/applications/${app.id}/revisions`)
+  ).items[0];
+  // Hidden controls are usability; the API is the authority.
+  const denied = await page.request.fetch(
+    `/api/v1/revisions/${revision.id}/validations`,
+    {
+      method: "POST",
+      headers: { ...headers, "Idempotency-Key": "viewer-validation" },
+      data: { scope: "offline" },
+    },
+  );
+  expect(denied.status()).toBe(403);
+  const outsider = await page.request.fetch(
+    `/api/v1/applications/${app.id}/generations`,
+    {
+      method: "POST",
+      headers: { ...headers, "Idempotency-Key": "viewer-generation" },
+      data: {
+        template_name: "python-batch",
+        template_version: "1.0.0",
+        binding_id: revision.binding_id,
+        package_name: "viewer_attempt",
+      },
+    },
+  );
+  expect(outsider.status()).toBe(403);
+});

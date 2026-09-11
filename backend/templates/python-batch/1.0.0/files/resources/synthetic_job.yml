@@ -1,0 +1,29 @@
+# Synthetic batch job for @@application_slug@@. Small bounded input, one run at
+# a time, and an explicit timeout. No schedule: this job runs only when invoked.
+resources:
+  jobs:
+    @@package_name@@_synthetic_batch:
+      name: @@application_slug@@ synthetic batch
+      max_concurrent_runs: 1
+      timeout_seconds: @@max_runtime_seconds@@
+      job_clusters:
+        - job_cluster_key: @@package_name@@_batch
+          new_cluster:
+            spark_version: ${var.spark_version}
+            node_type_id: ${var.node_type_id}
+            num_workers: 0
+            spark_conf:
+              spark.master: "local[*]"
+              spark.databricks.cluster.profile: singleNode
+            custom_tags:
+              ResourceClass: SingleNode
+      tasks:
+        - task_key: generate_synthetic_output
+          job_cluster_key: @@package_name@@_batch
+          spark_python_task:
+            python_file: ../src/@@package_name@@/main.py
+            parameters:
+              - --rows
+              - "@@synthetic_row_count@@"
+              - --output
+              - "@@synthetic_output_path@@"

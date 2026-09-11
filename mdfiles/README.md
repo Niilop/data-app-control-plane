@@ -1,14 +1,17 @@
 # Data application control plane: agent entry point
 
-Documentation baseline: 2026-09-12. Implementation status: **T01–T04 merged;
-T04a React frontend implemented, pending review/merge.** The platform includes
+Documentation baseline: 2026-09-12. Implementation status: **T01–T04a merged;
+T05 bundle generation implemented, pending review/merge.** The platform includes
 owned applications, team/role administration, simulated environment bindings,
-durable operation history and recovery. React + TypeScript + Vite now replaces
-Streamlit; Docker serves the UI with nginx on localhost:8501. Existing accounts
-and database history are preserved. Local simulation must remain explicit.
-See [next-agent.md](next-agent.md) for verification and current limitations.
-The next bounded task after T04a merges is **T05: Generate a bundle and capture a
-revision**. No generation, provider deployment or organization identity exists yet.
+durable operation history and recovery, and now deterministic template generation,
+digest-verified local artifacts, immutable revisions and explicitly offline
+validation. React + TypeScript + Vite replaces Streamlit; Docker serves the UI
+with nginx on localhost:8501. Existing accounts and database history are preserved.
+Local simulation must remain explicit, and offline validation is never workspace
+validation. See [next-agent.md](next-agent.md) for verification and limitations.
+The next bounded task after T05 merges is **T06: Approve and simulate one
+deployment**. No approval, provider deployment, repository publication or
+organization identity exists yet.
 
 **Resume here:** [next-agent.md](next-agent.md). Verify prerequisite changes
 on updated `main` before creating or continuing any task branch; the handoff
@@ -63,11 +66,12 @@ Use this prompt (see [next-agent.md](next-agent.md) for the current, more
 specific version):
 
 > Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Inspect Git
-> status and verify T04a is merged into updated main. Create the next task branch
-> if needed and implement T05 only, using the React frontend and existing durable
-> worker contracts. Preserve accounts, data and unrelated work. Run the required
-> checks, update the handoff/contracts/map, and open a draft PR. Do not merge,
-> begin T06, publish repositories, or activate external providers.
+> status and verify T05 is merged into updated main. Create the next task branch
+> if needed and implement T06 only, binding approval to the exact recorded scope
+> digest and rechecking it before simulated deployment. Preserve accounts, data
+> and unrelated work. Run the required checks, update the handoff/contracts/map,
+> and open a draft PR. Do not merge, begin T07, publish repositories, or activate
+> external providers.
 
 
 The handoff separates implemented behavior from verification and merge status.

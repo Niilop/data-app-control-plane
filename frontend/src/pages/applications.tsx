@@ -30,6 +30,7 @@ import { ReferenceSelect } from "../ReferenceSelect";
 import { useData, usePage, useResource, useSession } from "../state";
 import type { Application, Capabilities, Role } from "../types";
 import { AuditList, Bindings } from "./administration";
+import { Bundles, Revisions } from "./delivery";
 import { Operations } from "./operations";
 
 function MetadataFields({ application }: { application?: Application }) {
@@ -329,6 +330,15 @@ export function ApplicationDetail() {
   const { id } = useParams();
   return <ApplicationContent key={id} id={id!} />;
 }
+const TABS = [
+  "Overview",
+  "Bundles",
+  "Revisions",
+  "Environments",
+  "Access",
+  "Operations",
+  "Activity",
+];
 function ApplicationContent({ id }: { id: string }) {
   const path = `/api/v1/applications/${id}`;
   const resource = useResource<Application>(path);
@@ -385,46 +395,37 @@ function ApplicationContent({ id }: { id: string }) {
       />
       <ErrorNotice error={permissions.error} />
       <div className="tabs" role="tablist" aria-label="Application sections">
-        {["Overview", "Environments", "Access", "Operations", "Activity"].map(
-          (name) => (
-            <button
-              key={name}
-              role="tab"
-              id={`tab-${name}`}
-              aria-controls="application-panel"
-              tabIndex={tab === name ? 0 : -1}
-              aria-selected={tab === name}
-              onClick={() => setTab(name)}
-              onKeyDown={(event) => {
-                const tabs = [
-                  "Overview",
-                  "Environments",
-                  "Access",
-                  "Operations",
-                  "Activity",
-                ];
-                const index = tabs.indexOf(name);
-                const next =
-                  event.key === "ArrowRight"
-                    ? (index + 1) % tabs.length
-                    : event.key === "ArrowLeft"
-                      ? (index + tabs.length - 1) % tabs.length
-                      : event.key === "Home"
-                        ? 0
-                        : event.key === "End"
-                          ? tabs.length - 1
-                          : -1;
-                if (next >= 0) {
-                  event.preventDefault();
-                  setTab(tabs[next]);
-                  document.getElementById(`tab-${tabs[next]}`)?.focus();
-                }
-              }}
-            >
-              {name}
-            </button>
-          ),
-        )}
+        {TABS.map((name) => (
+          <button
+            key={name}
+            role="tab"
+            id={`tab-${name}`}
+            aria-controls="application-panel"
+            tabIndex={tab === name ? 0 : -1}
+            aria-selected={tab === name}
+            onClick={() => setTab(name)}
+            onKeyDown={(event) => {
+              const index = TABS.indexOf(name);
+              const next =
+                event.key === "ArrowRight"
+                  ? (index + 1) % TABS.length
+                  : event.key === "ArrowLeft"
+                    ? (index + TABS.length - 1) % TABS.length
+                    : event.key === "Home"
+                      ? 0
+                      : event.key === "End"
+                        ? TABS.length - 1
+                        : -1;
+              if (next >= 0) {
+                event.preventDefault();
+                setTab(TABS[next]);
+                document.getElementById(`tab-${TABS[next]}`)?.focus();
+              }
+            }}
+          >
+            {name}
+          </button>
+        ))}
       </div>
       <div
         id="application-panel"
@@ -511,6 +512,12 @@ function ApplicationContent({ id }: { id: string }) {
               </div>
             </section>
           </div>
+        )}
+        {tab === "Bundles" && (
+          <Bundles applicationId={id} canDevelop={!!caps?.edit_metadata} />
+        )}
+        {tab === "Revisions" && (
+          <Revisions applicationId={id} canDevelop={!!caps?.edit_metadata} />
         )}
         {tab === "Environments" && (
           <Bindings applicationId={id} canManage={!!caps?.manage_bindings} />

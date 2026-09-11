@@ -416,7 +416,16 @@ current application. Do not expand Streamlit with new feature screens.
 
 ## T05 — Generate a bundle and capture a revision
 
-**Status:** not started. **Depends on:** T04a (frontend) and T04 (worker).
+**Status:** implemented on `feat/t05-bundle-generation`, pending review/merge.
+**Depends on:** T04a (frontend) and T04 (worker), both merged.
+
+**Evidence:** 188 offline tests (63 new), 23 isolated PostgreSQL tests (8 new),
+11 Chromium browser workflows (2 new), the production nginx smoke, Ruff/mypy, and
+`scripts/check_generated_project.py` proving the generated project installs from
+its own lock and passes its own tests with `uv --offline`. Local Docker Compose
+was migrated to head 008 with existing accounts preserved, and the artifact mount
+was confirmed shared between the API and worker containers. See `next-agent.md`
+for exact counts and what was not run. See ADR-017 for the decisions taken.
 
 **Read:** [integrations](integrations.md), artifact/revision/validation contracts,
 T05 API rows. Inspect template-related code, worker handler patterns and the

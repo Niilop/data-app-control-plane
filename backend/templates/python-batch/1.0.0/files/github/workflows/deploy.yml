@@ -1,0 +1,65 @@
+# Manual deployment request for @@application_slug@@.
+#
+# This workflow is a reviewed skeleton, not an enabled deployment path. It runs
+# only on explicit dispatch, never on push, and it stops before any bundle
+# command until a repository administrator has separately configured a scoped
+# workspace identity and set the `DEPLOYMENT_ENABLED` repository variable.
+# The control plane's approval records are not enforced here: anyone able to
+# dispatch this workflow or edit it bypasses the platform. Read
+# mdfiles/integrations.md before enabling anything below.
+name: Deploy bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      revision_id:
+        description: Control-plane revision UUID being deployed
+        required: true
+      source_commit:
+        description: Exact application commit to check out and deploy
+        required: true
+      bundle_target:
+        description: Bundle target name
+        required: true
+        default: "@@bundle_target@@"
+      correlation_id:
+        description: Control-plane operation correlation UUID
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  check-request:
+    name: Validate the request
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_commit }}
+          persist-credentials: false
+      - name: Confirm the dispatched commit was checked out
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          echo "Checked out ${actual} for revision ${REVISION_ID} (${CORRELATION_ID})"
+          case "${actual}" in
+            "${SOURCE_COMMIT}"*) ;;
+            *) echo "Checked-out commit does not match the request"; exit 1 ;;
+          esac
+        env:
+          REVISION_ID: ${{ inputs.revision_id }}
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+          CORRELATION_ID: ${{ inputs.correlation_id }}
+      - name: Stop unless deployment has been explicitly enabled
+        if: vars.DEPLOYMENT_ENABLED != 'true'
+        run: |
+          echo "Deployment is not enabled for this repository."
+          echo "No bundle command was run and no workspace was contacted."
+          exit 1
+      - name: Deployment steps are intentionally absent
+        run: |
+          echo "Add validate/deploy steps only with a reviewed scoped identity."
+          echo "A workflow success flag alone is not evidence of deployment."
+          exit 1

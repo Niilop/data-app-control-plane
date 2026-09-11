@@ -1,4 +1,8 @@
-"""Closed simulated probe input and sanitized operation views."""
+"""Closed probe input and sanitized operation views.
+
+`execution_mode` distinguishes work that stands in for a provider
+(`simulated`) from work this machine really performs (`local`).
+"""
 
 from datetime import datetime, timezone
 from typing import Literal
@@ -7,6 +11,8 @@ from uuid import UUID
 from models.platform_schemas import Input, Record
 from pydantic import Field, field_serializer
 
+Kind = Literal["queue_probe", "bundle_generation", "offline_validation"]
+ExecutionMode = Literal["simulated", "local"]
 Status = Literal[
     "queued",
     "running",
@@ -35,8 +41,8 @@ class OperationResponse(Record):
     binding_id: UUID
     binding_version: int
     requested_by: int
-    kind: Literal["queue_probe"]
-    execution_mode: Literal["simulated"]
+    kind: Kind
+    execution_mode: ExecutionMode
     status: Status
     attempt_count: int
     max_attempts: int
@@ -79,4 +85,4 @@ class AttemptResponse(Record):
 class Accepted(Input):
     operation_id: UUID
     status: Status
-    execution_mode: Literal["simulated"] = "simulated"
+    execution_mode: ExecutionMode = "simulated"

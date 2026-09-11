@@ -8,8 +8,9 @@ The platform provides development login, an owned application registry, team and
 role administration, transactional audit, and a React + TypeScript interface,
 plus admin-managed simulated environments and application bindings.
 A separate durable worker runs explicit simulated probes with operation history
-and recovery controls. Bundle generation, GitHub integration and Databricks
-deployment remain planned work.
+and recovery controls, and performs deterministic local bundle generation and
+offline validation. Approval, GitHub integration and Databricks deployment remain
+planned work.
 The old AI chat, RAG, LLM, and model-inference features have been removed.
 
 ## Local setup
@@ -228,6 +229,7 @@ organization identity require a later review. See ADR-016 for the session contra
 | POST | `/auth/session` | Browser login; sets HTTP-only cookie and returns current user |
 | DELETE | `/auth/session` | Browser logout; clears cookie |
 | GET | `/auth/me` | Current user; cookie or bearer token |
+| GET | `/api/v1/templates` | Approved template versions and their input contract |
 | GET | `/docs` | OpenAPI UI |
 
 AI routes and placeholder metrics are absent. CSV/example modules remain dormant
@@ -239,8 +241,8 @@ and are not mounted by the platform API. The registry is under `/api/v1`; see
 ```bash
 uv run --locked pytest -q
 uv run --locked mypy
-uv run --locked ruff check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
-uv run --locked ruff format --check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
+uv run --locked ruff check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py backend/integrations backend/services/template_service.py backend/services/offline_validation.py backend/services/delivery_service.py backend/api/endpoints/delivery.py backend/alembic/versions/008_bundle_generation.py scripts tests/browser_server.py tests/conftest.py tests/unit tests/integration
+uv run --locked ruff format --check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py backend/integrations backend/services/template_service.py backend/services/offline_validation.py backend/services/delivery_service.py backend/api/endpoints/delivery.py backend/alembic/versions/008_bundle_generation.py scripts tests/browser_server.py tests/conftest.py tests/unit tests/integration
 ```
 
 Unit tests (`tests/unit`, the default `testpaths`) block network calls. Startup and
@@ -333,3 +335,68 @@ resolved failure/cancellation, or request reconciliation with a reason. Running
 cancellation is intent until observed. Unknown outcomes retain their reservation;
 no force-success or blind reservation-release control exists. The probe alone is
 not a generated application, deployment, or proof of external connectivity.
+
+## Bundle generation and revisions (T05)
+
+Migrate to head 008 and start the API and worker. A **developer** on an
+application with a usable binding can open **Applications → Bundles** and select
+**Generate bundle**. Generation is queued as a durable operation and performed by
+the worker; it makes no network calls of any kind.
+
+Only two values come from the form: the Python package name and the relative
+`.csv` output path. The application slug comes from the registry, the bundle
+target from the selected binding, and the row count and job timeout from that
+binding's configuration. There is no field for a credential, command, URL, target
+or template path, and unknown fields are rejected.
+
+| Aspect | Behavior |
+|---|---|
+| Determinism | The same template content and inputs always produce the same archive bytes and digest |
+| Archive | Uncompressed ZIP, entries sorted, fixed timestamp and `0644` permissions |
+| Rejected | Absolute paths, `..`, backslashes, empty segments, control characters, duplicate entries, symlinks, oversize entries |
+| Storage | `ARTIFACT_DIR` (default `<DATA_DIR>/artifacts`), addressed by digest, written atomically |
+| Download | Requires current read access to an associated application; content is re-hashed and a mismatch is refused |
+
+Generated projects contain `databricks.yml`, `resources/synthetic_job.yml`,
+`src/<package>/`, `tests/`, `pyproject.toml`, `uv.lock`, both GitHub Actions
+workflows, a README and a `.gitignore`. The project declares **no third-party
+dependencies**, so it installs from its own lock and runs its tests with no
+network access. Its bundle `spark_version` and `node_type_id` variables have no
+defaults on purpose: supply values you have verified for your own workspace and
+budget. Its deployment workflow is manual-dispatch only and stops before any
+bundle command until a repository administrator explicitly enables it.
+
+Verify a generated project yourself:
+
+```bash
+uv run --locked python scripts/check_generated_project.py
+```
+
+This renders the template into a temporary directory, runs `uv sync --locked
+--offline` and the project's own `unittest` suite, and removes the directory. CI
+runs the same command.
+
+In **Applications → Revisions**, a developer captures an artifact as an immutable
+revision. The snapshot records the artifact digest, template version, binding and
+environment policy, and the configuration, plus a `scope_digest` that a later
+approval binds to. Nothing about a revision can be edited; changing the artifact,
+binding, target or configuration creates a new revision.
+
+**Run offline checks** queues an offline validation. The checks parse the stored
+archive — Python via `ast.parse`, `pyproject.toml` and `uv.lock` via `tomllib`,
+and structural reads of the bundle and workflow files. **No generated code is
+executed, no dependency is installed and no workspace is contacted.** The stored
+JSON report says so in every copy. A passing offline report is **not** workspace
+validation, approval, or evidence that the bundle would deploy. The operation
+succeeds when the check runs; whether the artifact passed is the validation result.
+
+Generation and validation are recorded with `execution_mode="local"` — real work
+this machine performed — never `simulated`, which is reserved for work standing in
+for a provider. They take no binding reservation, so they never block a probe or a
+future deployment on that binding. `POST /operations/{id}/retry` refuses them with
+`unsupported_retry`: request a new generation or validation instead, which is
+equivalent because generation is deterministic.
+
+The API and worker containers mount the same `./data` directory, so artifacts
+survive a restart of either. Set `ARTIFACT_DIR` to an absolute path to store them
+elsewhere; moving to another host requires migrating that directory.

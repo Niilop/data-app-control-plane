@@ -102,3 +102,92 @@ export interface Attempt extends RecordBase {
   diagnostic_code: string | null;
   finished_at: string | null;
 }
+export interface TemplateParameter {
+  name: string;
+  kind: string | null;
+  label: string | null;
+  description: string;
+  example: string | null;
+  source: string | null;
+}
+export interface Template {
+  name: string;
+  version: string;
+  title: string;
+  summary: string;
+  active: boolean;
+  content_digest: string;
+  payload_version: number;
+  tool_versions: Record<string, string>;
+  supplied_parameters: TemplateParameter[];
+  derived_parameters: TemplateParameter[];
+  produces: string[];
+}
+export interface Artifact extends RecordBase {
+  application_id: string;
+  digest: string;
+  size_bytes: number;
+  media_type: string;
+  kind: "generated_bundle" | "validation_report";
+  provenance: {
+    template_name?: string;
+    template_version?: string;
+    template_content_digest?: string;
+    parameter_digest?: string;
+    parameters?: Record<string, string>;
+    scope?: string;
+    revision_id?: string;
+  };
+  created_by: number;
+  operation_id: string | null;
+}
+export interface Revision extends RecordBase {
+  application_id: string;
+  source_kind: string;
+  artifact_id: string;
+  artifact_digest: string;
+  template_version_id: string;
+  binding_id: string;
+  binding_version: number;
+  bundle_target: string;
+  binding_snapshot: {
+    id?: string;
+    version?: number;
+    bundle_target?: string;
+    environment?: {
+      id?: string;
+      version?: number;
+      workspace_ref?: string;
+      enabled?: boolean;
+      allowed_executor?: string;
+      allow_self_approval?: boolean;
+    };
+  };
+  config_snapshot: {
+    schema_version: number;
+    synthetic_row_count: number;
+    max_runtime_seconds: number;
+  };
+  config_digest: string;
+  scope_digest: string;
+  execution_mode: string;
+  requested_by: number;
+}
+export interface Validation extends RecordBase {
+  revision_id: string;
+  operation_id: string;
+  scope: "offline";
+  validator: string;
+  validator_version: string;
+  tool_versions: Record<string, string>;
+  result: "passed" | "failed" | null;
+  check_summary: {
+    result?: string;
+    passed?: number;
+    total?: number;
+    failed?: string[];
+  };
+  report_artifact_id: string | null;
+  observed_at: string | null;
+  requested_by: number;
+}

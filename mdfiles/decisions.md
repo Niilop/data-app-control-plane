@@ -302,3 +302,65 @@ fixtures; PostgreSQL migration/concurrency tests remain separate and mandatory i
 CI. A Docker test image packages Chromium's OS libraries for hosts without them.
 This avoids requiring a host-global browser dependency installation. Browser tests
 cover UI behavior rather than reimplementing backend policy in mocks.
+
+## ADR-017 — Deterministic generation, local artifacts and offline-only validation
+
+**T05 implementation, 2026-09-12; pending human review/merge.**
+
+*Execution mode names what actually happens.* Generation and validation carry
+`execution_mode="local"`, not `"simulated"`. They are real work this machine
+performs and produce real artifacts; labelling them simulated would be inaccurate
+in the opposite direction from the risk ADR-013 guards against. Deployment
+execution remains `simulated` and is not implemented. The queue's check constraint
+enforces the pairing in both directions: `queue_probe` must be `simulated`,
+`bundle_generation`/`offline_validation` must be `local`.
+
+*Archives are byte-reproducible.* Entries are rendered from reviewed on-disk
+assets, sorted by target path, given a fixed 1980-01-01 timestamp, fixed `0644`
+permissions and a fixed Unix create-system, and stored **uncompressed**. Deflate
+output can differ between zlib versions, so compression would make the digest
+depend on the generating machine. The template's own identity is a content digest
+over its manifest plus every asset; a registered version whose assets change is
+refused rather than silently regenerating different content under the same name.
+
+*The client supplies two parameters.* Application slug comes from the registry and
+bundle target from the environment binding, so a caller cannot direct generation at
+an unapproved target or impersonate another application. Only `package_name` and
+`synthetic_output_path` are client input, both strictly patterned. Row count and
+timeout come from the T03 binding configuration. The payload has no credential,
+command, URL or template-path field, and unknown fields are rejected.
+
+*Artifacts are content-addressed in a configured shared mount.* The store writes
+atomically under `sha256/<aa>/<bb>/<digest>`, deduplicates identical content, and
+re-hashes on every read so content that no longer matches its recorded digest is
+refused rather than served. Compose mounts the same directory into the API and the
+worker; without that, downloads would fail after either process restarted. Moving
+hosts requires migrating this directory, as architecture.md already states.
+
+*Local delivery work takes no binding reservation.* Reservations exist to serialize
+work competing for one binding's external state. Generation and validation touch
+none, so reserving would let an unresolved probe block generation, and a queued
+generation block a deployment, for no safety gain. Idempotency keys still
+deduplicate submissions. Consequently `POST /operations/{id}/retry` returns 409
+`unsupported_retry` for these kinds: retry re-runs work under the **operator**
+authority the queue requires, while generation and validation are **developer**
+actions. Submitting a new generation is the supported path and is equivalent,
+because generation is deterministic. The worker rechecks the role each kind needs.
+
+*Offline validation is never workspace validation.* `ValidationResult.scope` is
+constrained to `offline` in the database, and the stored JSON report states in
+every copy that no workspace, cluster, credential or network was contacted, that
+no generated code was executed, and that dependencies were parsed rather than
+installed. Checks parse: `ast.parse` for Python, `tomllib` for `pyproject.toml`
+and `uv.lock`, and comment-stripped structural reads of the bundle and workflow
+files. The *operation* succeeds when the check runs; whether the artifact passed
+is the separate validation result, surfaced as a `validation_failed` diagnostic.
+
+*The generated project is dependency-free on purpose.* Its runtime and tests use
+only the standard library, so `uv sync --locked` and its test suite run with no
+network at all, and `scripts/check_generated_project.py` can prove the acceptance
+criterion offline in CI. Its Databricks compute variables have **no defaults**:
+a real deployment must supply values verified for an actual workspace and budget.
+Its deployment workflow is dispatch-only and fails before any bundle command until
+a repository administrator explicitly enables it. Adding a third-party dependency
+to the template requires re-locking and loses the fully offline property.

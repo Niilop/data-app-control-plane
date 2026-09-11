@@ -14,7 +14,13 @@ from models.operations import (
     OperationReservation,
     QueueProbe,
 )
-from models.platform import Application, ApplicationRole, EnvironmentBinding, utcnow
+from models.platform import (
+    Application,
+    ApplicationRole,
+    Environment,
+    EnvironmentBinding,
+    utcnow,
+)
 from services import audit_service
 from services.application_service import transaction
 from services.environment_service import (
@@ -26,12 +32,25 @@ from services.policy_service import (
     PolicyError,
     get_application,
     require_active,
+    require_developer,
     role_filter,
 )
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 TERMINAL = {"succeeded", "failed", "cancelled"}
+# Real local work, deliberately not labelled simulated. These take no binding
+# reservation because they touch no external state.
+LOCAL_KINDS = {"bundle_generation", "offline_validation"}
+
+
+def record_result(db: Session, operation: Operation, status: str) -> None:
+    """Write the probe's related result row; other kinds record their own rows."""
+    if operation.kind != "queue_probe":
+        return
+    probe = db.scalar(select(QueueProbe).where(QueueProbe.operation_id == operation.id))
+    assert probe is not None
+    probe.result = status
 
 
 def require_operator(db: Session, actor: User, application: Application) -> None:
@@ -85,6 +104,24 @@ def check_execution(
     if version is not None and binding.version != version:
         raise PolicyError(409, "stale_binding", "Binding policy has changed")
     return binding
+
+
+def check_delivery(
+    db: Session, actor: User, application_id: UUID, binding_id: UUID
+) -> tuple[Application, EnvironmentBinding, Environment]:
+    """Developer authority plus current, usable binding policy for local delivery work."""
+    require_local_simulation(get_settings())
+    application = get_application(db, actor, application_id)
+    require_developer(db, actor, application)
+    if application.lifecycle == "archived":
+        raise PolicyError(409, "archived", "Application is archived")
+    binding = db.get(EnvironmentBinding, binding_id)
+    if binding is None or binding.application_id != application_id:
+        raise PolicyError(422, "invalid_binding", "Binding is unavailable")
+    environment = lock_environment(db, binding.environment_id)
+    db.refresh(binding)
+    require_target(environment, binding.bundle_target)
+    return application, binding, environment
 
 
 def digest(payload: dict) -> str:
@@ -156,7 +193,8 @@ def audit(
         operation.id,
         {
             "operation_id": str(operation.id),
-            "execution_mode": "simulated",
+            "kind": operation.kind,
+            "execution_mode": operation.execution_mode,
             **(details or {}),
         },
         operation.application_id,
@@ -202,14 +240,24 @@ def enqueue(
     payload: dict,
     request_id: str,
     retry_of: UUID | None = None,
+    *,
+    kind: str = "queue_probe",
+    execution_mode: str = "simulated",
+    reserve: bool = True,
 ) -> Operation:
-    reservation = db.get(OperationReservation, binding.id)
-    if reservation:
-        raise PolicyError(
-            409,
-            "operation_conflict",
-            f"Binding has unresolved work: operation {reservation.operation_id}",
-        )
+    """Reservations serialize work that competes for one binding's external state.
+
+    Local generation and offline validation have no external state to conflict
+    over, so they do not take one and never block a deployment on that binding.
+    """
+    if reserve:
+        reservation = db.get(OperationReservation, binding.id)
+        if reservation:
+            raise PolicyError(
+                409,
+                "operation_conflict",
+                f"Binding has unresolved work: operation {reservation.operation_id}",
+            )
     operation = Operation(
         id=uuid4(),
         application_id=binding.application_id,
@@ -217,17 +265,20 @@ def enqueue(
         binding_version=binding.version,
         requested_by=actor.id,
         request_id=request_id,
+        kind=kind,
+        execution_mode=execution_mode,
         payload=payload,
         retry_of=retry_of,
     )
     db.add(operation)
     db.flush()
-    db.add_all(
-        [
-            QueueProbe(operation_id=operation.id),
-            OperationReservation(binding_id=binding.id, operation_id=operation.id),
-        ]
-    )
+    if reserve:
+        db.add_all(
+            [
+                QueueProbe(operation_id=operation.id),
+                OperationReservation(binding_id=binding.id, operation_id=operation.id),
+            ]
+        )
     audit(db, actor, operation, request_id, "operation.queued")
     return operation
 
@@ -255,15 +306,18 @@ def command(
                 operation.cancel_requested = True
                 if operation.status in {"queued", "retry_wait"}:
                     operation.status = "cancelled"
-                    probe = db.scalar(
-                        select(QueueProbe).where(
-                            QueueProbe.operation_id == operation.id
-                        )
-                    )
-                    assert probe is not None
-                    probe.result = "cancelled"
+                    record_result(db, operation, "cancelled")
                     release(db, operation)
         elif action == "retry":
+            if operation.kind in LOCAL_KINDS:
+                # Retry re-runs the original request under the operator's authority.
+                # Local delivery work is requested by developers, so submit a new
+                # generation or validation instead of re-authorizing it here.
+                raise PolicyError(
+                    409,
+                    "unsupported_retry",
+                    "Request a new generation or validation instead of retrying",
+                )
             if operation.status not in {"failed", "cancelled"}:
                 raise PolicyError(
                     409,

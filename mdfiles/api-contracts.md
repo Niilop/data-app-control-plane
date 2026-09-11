@@ -1,6 +1,6 @@
 # API contracts
 
-Status: T02/T03 registry and T04 operation endpoints are implemented; later task rows remain planned. Existing `/auth/*` remains the development login
+Status: T02/T03 registry, T04 operation and T05 delivery endpoints are implemented; later task rows remain planned. Existing `/auth/*` remains the development login
 surface initially. Implement endpoints with their tasks; this document does not
 claim they exist. Keep services usable by API and worker without importing routers.
 
@@ -251,3 +251,61 @@ direct/team developer grant; `manage_access` for the owner or administrator;
 grant. These describe controls, not transferable authorization. Mutation services
 and sensitive worker actions continue to check current policy independently.
 There are no new user-directory or arbitrary operation-submission endpoints.
+
+## T05 implemented details
+
+All T05 rows above are implemented, plus supporting paginated reads
+`GET /api/v1/applications/{id}/artifacts` and
+`GET /api/v1/revisions/{id}/validations`. Reads follow current application
+visibility; writes require an explicit direct/team **developer** grant.
+
+`GET /templates` needs only authentication and returns the reviewed on-disk
+catalogue: name, version, title, summary, active flag, content digest, payload
+version, pinned tool versions, the supplied and derived parameter contract, and
+the list of files each version produces. It exposes no application data.
+
+`POST /applications/{id}/generations` is `202` with `Location` and requires an
+`Idempotency-Key`. Closed payload schema 1: `template_name`, `template_version`,
+`binding_id`, `package_name`, and optional `synthetic_output_path` (default
+`output/synthetic.csv`). `package_name` is a lowercase Python package name, at
+most 40 characters, not a keyword and not a reserved layout name. The output path
+is a relative POSIX `.csv` path of at most four lowercase segments. Slug comes
+from the application and bundle target from the binding; neither is accepted from
+the client. Row count and timeout come from the binding configuration. Unknown
+fields — including credential, command, URL, target and slug fields — are `422`.
+Idempotency scope is actor + action + application + key, with the existing replay
+and `409 idempotency_conflict` behavior. The operation is `kind=bundle_generation`,
+`execution_mode=local`, and takes **no** binding reservation.
+
+`GET /artifacts/{digest}` streams the stored bytes to an actor who can currently
+read an application the artifact belongs to; anyone else gets `404`. The digest
+must be 64 lowercase hexadecimal characters. Responses carry the recorded media
+type, `Content-Disposition: attachment`, `Cache-Control: no-store`,
+`X-Content-Type-Options: nosniff` and `X-Artifact-Digest`. The storage layout is
+never exposed. Content is re-hashed on read; a mismatch is `500
+artifact_digest_mismatch` rather than a served file.
+
+`POST /applications/{id}/revisions` is a synchronous `201` with `Location`. It
+takes `artifact_digest`, `binding_id`, optional `expected_binding_version` and an
+optional `config` using the T03 closed schema. An unknown or unstored artifact is
+`422 invalid_artifact`; a stale binding version is `409 stale_binding`; a disabled
+environment or unapproved target follow the existing T03 codes. The response
+carries the immutable snapshot: artifact digest, template version, binding and
+environment policy snapshot, configuration snapshot, `config_digest` and
+`scope_digest`. There is no update or delete route, so `PATCH`/`PUT`/`DELETE`
+return `405`; a different artifact, binding, target or configuration creates a new
+revision. `GET /applications/{id}/revisions` and `GET /revisions/{id}` read them.
+
+`POST /revisions/{id}/validations` is `202` and requires an `Idempotency-Key`. Its
+only field is `scope`, which must be `"offline"`; `"workspace"` and every other
+value are `422`. The operation is `kind=offline_validation`,
+`execution_mode=local`. `GET /revisions/{id}/validations` returns append-only
+results with scope, validator and version, pinned tool versions, `passed`/`failed`,
+a small check summary, the report artifact ID and the observation time. The report
+itself is a `validation_report` artifact downloaded through `GET /artifacts/{digest}`.
+
+`POST /operations/{id}/retry` returns `409 unsupported_retry` for
+`bundle_generation` and `offline_validation`: submit a new request instead. Cancel
+and reconcile keep their T04 contract. `execution_mode` in operation views and
+`202` responses is now `simulated` or `local`; `local` is never a provider claim,
+and `simulated` is never used for work that really happened.

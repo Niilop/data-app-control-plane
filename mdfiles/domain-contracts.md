@@ -1,6 +1,7 @@
 # Domain and workflow contracts
 
-Status: T02/T03 registry entities and permissions implemented; later task entities remain proposed. Introduce entities in their owning task,
+Status: T02/T03 registry, T04 queue and T05 delivery entities and permissions are
+implemented; later task entities remain proposed. Introduce entities in their owning task,
 not all at once. New entities use UUIDs, timezone-aware UTC timestamps, explicit
 foreign keys, and database constraints for uniqueness. Historical AI tables remain migration-only metadata after T01a; no runtime AI
 features are retained. Existing user IDs may remain
@@ -196,3 +197,46 @@ Worker observations retain the original requester as audit actor, plus operation
 ID, worker UUID and fencing token in safe details. Recovery actions record the
 acting operator. The initial probe does not implement external workspace limits,
 provider cancellation or exactly-once external execution.
+
+## T05 template, artifact, revision and validation invariants
+
+`TemplateVersion`, `Artifact`, `DeploymentRevision` and `ValidationResult` are
+implemented as UUID/UTC records. Template versions are unique on name + version
+and record the content digest of the reviewed on-disk assets, the parameter
+contract, pinned tool versions and an active flag. A registered version whose
+assets later differ is refused with `template_digest_mismatch`: publish a new
+version instead of editing a released one.
+
+Artifact content is immutable and content-addressed. Rows are unique on
+(application, digest), so identical content generated for two applications is
+stored once on disk while each application keeps its own authorization boundary.
+`storage_key` is derived from the digest and never encodes an actor. Reads
+re-hash the stored bytes and refuse a mismatch. Provenance records the template
+identity, content digest, the full parameter set and a parameter digest; it holds
+no credentials. A `validation_report` artifact is the offline report itself.
+
+A revision is written once and never updated. Its snapshot captures source kind,
+artifact digest, template version, binding ID/version, bundle target, environment
+policy (reference, enabled flag, allowed executor, self-approval), configuration
+and a configuration digest. `scope_digest` covers all of those plus execution mode
+and `POLICY_VERSION`, and is what T06 approval must bind to and recheck. Capturing
+the same inputs again yields the same scope digest; changing any of them produces a
+different one. There is no edit path, in the API or in a service.
+
+Validation results are append-only observations, one per operation. `scope` is
+constrained to `offline` by a database check; workspace validation does not exist
+and this value must never be reinterpreted as one. A result records the validator
+and its version, pinned tool versions, `passed`/`failed`, a bounded check summary
+and the report artifact. A new result never rewrites an earlier one, and a passing
+offline result is not approval, deployment eligibility or evidence about a workspace.
+
+Generation, revision capture and validation require an explicit direct or team
+**developer** grant, matching the permission table. Reads follow existing
+application visibility. Recovery commands remain operator actions, so retry is
+refused for local delivery work rather than re-authorized under a different role;
+requesting a new generation or validation is the supported path. The worker
+rechecks the role each operation kind requires before acting, and a revoked
+developer grant fails the operation with `authorization_changed` and writes no
+artifact. Operations record `execution_mode` `local` for real work done on this
+machine and `simulated` only for work standing in for a provider; a database check
+constraint enforces the pairing with the operation kind in both directions.

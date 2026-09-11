@@ -1,14 +1,22 @@
 """Short database transactions implement leases and fence every result write."""
 
 import random
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 from uuid import UUID, uuid4
 
 from models.database import User
-from models.operations import Operation, OperationAttempt, QueueProbe, WorkerHeartbeat
-from services.operation_service import audit, check_execution, release
+from models.operations import Operation, OperationAttempt, WorkerHeartbeat
+from services.operation_service import (
+    LOCAL_KINDS,
+    audit,
+    check_delivery,
+    check_execution,
+    record_result,
+    release,
+)
 from services.policy_service import PolicyError
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
@@ -16,6 +24,8 @@ from sqlalchemy.orm import Session
 Outcome = Literal[
     "succeeded", "transient", "failed", "cancelled", "unknown", "safe_to_retry"
 ]
+# A handler's own result writes, executed inside the fenced result transaction.
+Apply = Callable[[Session, "Operation"], None]
 
 
 class LostLease(Exception):
@@ -169,26 +179,43 @@ def heartbeat(db: Session, item: Claim, lease_seconds: int = 30) -> bool:
 
 
 def authorize(db: Session, item: Claim) -> None:
+    """Recheck the role this kind of work requires, not merely the original one."""
     with db.begin():
         operation = owned(db, item)
         actor = db.get(User, operation.requested_by)
         if actor is None:
             raise PolicyError(403, "inactive_actor", "Requester unavailable")
-        check_execution(
-            db,
-            actor,
-            operation.application_id,
-            operation.binding_id,
-            operation.binding_version,
-        )
+        if operation.kind in LOCAL_KINDS:
+            # Generation and validation are developer actions; the binding policy
+            # is rechecked, but its version may have moved on without invalidating
+            # work that only reads the application's own recorded state.
+            check_delivery(db, actor, operation.application_id, operation.binding_id)
+        else:
+            check_execution(
+                db,
+                actor,
+                operation.application_id,
+                operation.binding_id,
+                operation.binding_version,
+            )
         # Policy locks can wait; recheck the lease after acquiring them.
         owned(db, item)
 
 
 def finish(
-    db: Session, item: Claim, outcome: Outcome, *, diagnostic: str | None = None
+    db: Session,
+    item: Claim,
+    outcome: Outcome,
+    *,
+    diagnostic: str | None = None,
+    apply: Apply | None = None,
 ) -> None:
-    """Operation, attempt, related result, reservation and audit commit together."""
+    """Operation, attempt, related result, reservation and audit commit together.
+
+    `apply` writes a handler's own result rows (artifacts, validation results)
+    inside this same fenced transaction, so a lost lease discards them with
+    everything else rather than leaving a half-recorded outcome behind.
+    """
     with db.begin():
         operation = owned(db, item)
         timestamp = now(db)
@@ -230,12 +257,10 @@ def finish(
         attempt.outcome = status
         attempt.diagnostic_code = code
         if status in {"succeeded", "failed", "cancelled"}:
-            probe = db.scalar(
-                select(QueueProbe).where(QueueProbe.operation_id == operation.id)
-            )
-            assert probe is not None
-            probe.result = status
+            record_result(db, operation, status)
             release(db, operation)
+        if apply is not None and status == "succeeded":
+            apply(db, operation)
         actor = db.get(User, operation.requested_by)
         assert actor is not None
         audit(

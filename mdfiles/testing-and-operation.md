@@ -7,6 +7,29 @@ profile, isolated PostgreSQL migration integration tests, and platform CI; see
 Historical auth/example scripts are under `tests/manual/` with names outside
 pytest discovery; obsolete RAG tests were removed.
 
+## T05 verification
+
+Run the commands in root README/CI. Beyond the standard suites, T05 adds
+`scripts/check_generated_project.py`, which renders the template into a temporary
+directory and runs `uv sync --locked --offline` and the generated project's own
+`unittest` suite. That is the acceptance check that a generated project installs
+from its own lock and passes its own tests in an isolated environment, and it runs
+in CI. It proves nothing about a Databricks workspace.
+
+Offline delivery tests cover archive determinism and normalization, unsafe archive
+entries (traversal, absolute paths, backslashes, symlinks, duplicates), rejected
+package names, output paths and secret-shaped fields, developer-only writes,
+idempotent submission and conflict, download authorization, digest-mismatch
+refusal, immutable revisions, offline-only validation scope, report content and
+policy-drift notes. PostgreSQL tests add artifact persistence in the configured
+mount, cross-process digest determinism, concurrent generation deduplication, the
+revision/validation round trip, database rejection of an unknown source kind, a
+workspace validation scope and a mislabelled execution mode, and generation
+stopping when the developer grant is revoked. Browser tests cover the template
+catalogue, a real download verified against its digest, the revision snapshot,
+offline validation labelling and viewer denial. See `next-agent.md` for actual
+counts and for what was not run.
+
 ## T04a verification
 
 React/browser checks and Docker test-image commands are in root README. Chromium

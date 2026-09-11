@@ -1,4 +1,9 @@
-"""Separate polling worker: python -m worker [--once]."""
+"""Separate polling worker: python -m worker [--once].
+
+Runs simulated probes and real local delivery work (bundle generation and
+offline validation). Local work is labelled `local`, never `simulated`; no
+handler contacts a provider or executes adopted repository code.
+"""
 
 import argparse
 import logging
@@ -9,9 +14,11 @@ from uuid import uuid4
 from core.config import get_settings
 from core.database import SessionLocal
 from models.operation_schemas import ProbeInput
+from services.delivery_service import run_generation, run_validation
 from services.environment_service import require_local_simulation
 from services.policy_service import PolicyError
 from services.queue_service import (
+    Apply,
     Claim,
     LostLease,
     Outcome,
@@ -20,9 +27,14 @@ from services.queue_service import (
     finish,
     heartbeat,
 )
+from services.template_service import GenerationError
 from sqlalchemy.orm import Session, sessionmaker
 
 logger = logging.getLogger(__name__)
+HANDLERS = {
+    "bundle_generation": run_generation,
+    "offline_validation": run_validation,
+}
 
 
 def probe(item: Claim, cancelled: Event, lost: Event) -> Outcome:
@@ -49,6 +61,26 @@ def probe(item: Claim, cancelled: Event, lost: Event) -> Outcome:
     }[data.scenario]  # type: ignore[return-value]
 
 
+def local_work(
+    sessions: sessionmaker[Session], item: Claim
+) -> tuple[Outcome, str | None, Apply | None]:
+    """Deterministic local generation or offline validation; no provider, no user code.
+
+    Repeating this work is always safe: rendering is deterministic and artifacts
+    are content-addressed, so a lost lease can only leave identical bytes behind.
+    """
+    if item.phase == "reconcile":
+        return "safe_to_retry", "local_work_repeatable", None
+    try:
+        with sessions() as db:
+            return HANDLERS[item.kind](db, item.operation_id)
+    except GenerationError as error:
+        # A template or parameter defect is terminal; retrying cannot change it.
+        return "failed", error.code, None
+    except PolicyError as error:
+        return "failed", error.code, None
+
+
 def run_one(
     sessions: sessionmaker[Session], worker_id: str, lease_seconds: int = 30
 ) -> bool:
@@ -57,6 +89,7 @@ def run_one(
     if item is None:
         return False
     stopped, cancelled, lost = Event(), Event(), Event()
+    apply: Apply | None = None
 
     def pulse() -> None:
         while not stopped.wait(lease_seconds / 3):
@@ -78,12 +111,13 @@ def run_one(
         with sessions() as db:
             authorize(db, item)
         # Explicit dispatch; no dynamic imports, shell commands or task endpoint.
-        if item.kind != "queue_probe":
-            outcome: Outcome = "failed"
-            diagnostic = "unsupported_handler"
-        else:
-            outcome = probe(item, cancelled, lost)
+        if item.kind == "queue_probe":
+            outcome: Outcome = probe(item, cancelled, lost)
             diagnostic = "probe_rejected" if outcome == "failed" else None
+        elif item.kind in HANDLERS:
+            outcome, diagnostic, apply = local_work(sessions, item)
+        else:
+            outcome, diagnostic = "failed", "unsupported_handler"
     except LostLease:
         return True
     except PolicyError:
@@ -98,7 +132,7 @@ def run_one(
     if not lost.is_set():
         try:
             with sessions() as db:
-                finish(db, item, outcome, diagnostic=diagnostic)
+                finish(db, item, outcome, diagnostic=diagnostic, apply=apply)
         except LostLease:
             pass
     return True
@@ -106,7 +140,7 @@ def run_one(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run the simulated durable operation worker"
+        description="Run the durable operation worker (simulated probes, local delivery)"
     )
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
@@ -116,7 +150,7 @@ def main() -> None:
     signal.signal(signal.SIGINT, lambda *_: stopped.set())
     worker_id = str(uuid4())
     logging.basicConfig(level=logging.INFO)
-    logger.info("Simulated worker started: %s", worker_id)
+    logger.info("Durable operation worker started: %s", worker_id)
     while not stopped.is_set():
         try:
             worked = run_one(SessionLocal, worker_id)

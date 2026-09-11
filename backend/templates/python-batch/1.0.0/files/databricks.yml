@@ -1,0 +1,28 @@
+# Databricks Asset Bundle for @@application_slug@@.
+# Generated from template @@template_name@@ @@template_version@@.
+#
+# This file is reviewable configuration only. The control plane does not deploy
+# it, and its presence is not evidence of a workspace, of available compute, or
+# of a successful deployment. Compute variables below have no defaults on
+# purpose: supply values you have verified for your own workspace and budget.
+bundle:
+  name: @@application_slug@@
+
+include:
+  - resources/*.yml
+
+variables:
+  spark_version:
+    description: >-
+      Databricks Runtime version for the synthetic batch cluster. No default:
+      supply a runtime verified as available in your workspace.
+  node_type_id:
+    description: >-
+      Worker node type for the synthetic batch cluster. No default: supply a
+      node type verified as available and affordable in your workspace.
+
+targets:
+  @@bundle_target@@:
+    default: true
+    workspace:
+      root_path: /Shared/.bundle/@@application_slug@@/${bundle.target}

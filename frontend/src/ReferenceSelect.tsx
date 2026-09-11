@@ -1,20 +1,23 @@
 import { Field } from "./components";
 import { usePage } from "./state";
 
-export function ReferenceSelect({
+export function ReferenceSelect<T extends { id: string }>({
   path,
   name,
   label,
   value,
   onChange,
+  render,
 }: {
   path: string;
   name: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
+  /** Label records that have no `name`, such as environment bindings. */
+  render?: (item: T) => string;
 }) {
-  const page = usePage<{ id: string; name: string }>(path);
+  const page = usePage<T & { name?: string }>(path);
   return (
     <div>
       <Field label={label}>
@@ -30,7 +33,7 @@ export function ReferenceSelect({
           )}
           {page.data?.items.map((item) => (
             <option key={item.id} value={item.id}>
-              {item.name}
+              {render ? render(item) : item.name}
             </option>
           ))}
         </select>

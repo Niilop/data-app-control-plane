@@ -25,6 +25,9 @@ __pycache__/
 .mypy_cache/
 app.db
 
+# Generated artifact store (content is reproducible from templates)
+data/artifacts/
+
 # React frontend
 node_modules/
 dist/

@@ -51,10 +51,15 @@ services:
       dockerfile: backend/Dockerfile
     env_file:
       - .env
+    environment:
+      - DATA_DIR=/app/data
+    # The worker generates artifacts and the API serves them, so both mount the
+    # same directory. Without it, downloads would fail after a worker restart.
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./backend:/app
+      - ./data:/app/data
     command: python -m worker
     restart: unless-stopped
     depends_on:

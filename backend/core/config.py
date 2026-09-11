@@ -32,6 +32,9 @@ class Settings(BaseSettings):
         ]
     )
     data_dir: str = str(_REPO_ROOT / "data")
+    # Generated artifacts must survive an API restart, so this is a configured
+    # shared mount rather than a temporary or process-private directory.
+    artifact_dir: str = ""
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env"),
@@ -49,6 +52,15 @@ class Settings(BaseSettings):
                 return json.loads(value)
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
+
+    @model_validator(mode="after")
+    def resolve_artifact_dir(self) -> "Settings":
+        """Default beneath the mounted data directory; require an absolute path."""
+        if not self.artifact_dir:
+            self.artifact_dir = str(Path(self.data_dir) / "artifacts")
+        if not Path(self.artifact_dir).is_absolute():
+            raise ValueError("ARTIFACT_DIR must be an absolute path")
+        return self
 
     @model_validator(mode="after")
     def supported_execution_profile(self) -> "Settings":

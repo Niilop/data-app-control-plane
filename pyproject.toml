@@ -41,6 +41,10 @@ files = [
     "backend/bootstrap.py", "backend/seed_sandbox.py",
     "backend/models/environment_schemas.py", "backend/services/environment_service.py",
     "backend/api/endpoints/environments.py",
+    "backend/models/delivery.py", "backend/models/delivery_schemas.py",
+    "backend/services/template_service.py", "backend/services/offline_validation.py",
+    "backend/services/delivery_service.py", "backend/api/endpoints/delivery.py",
+    "backend/integrations",
 ]
 mypy_path = ["backend"]
 explicit_package_bases = true

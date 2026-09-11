@@ -24,8 +24,12 @@ class Operation(Identity, Base):
             "status IN ('queued','running','retry_wait','reconciling','succeeded','failed','cancelled','needs_attention')",
             name="ck_operation_status",
         ),
+        # Simulated work stands in for a provider; local work really happens here
+        # and must never be labelled simulated, or the reverse.
         CheckConstraint(
-            "kind = 'queue_probe' AND execution_mode = 'simulated'",
+            "(kind = 'queue_probe' AND execution_mode = 'simulated')"
+            " OR (kind IN ('bundle_generation','offline_validation')"
+            " AND execution_mode = 'local')",
             name="ck_operation_handler",
         ),
         CheckConstraint(

@@ -166,3 +166,32 @@ recent worker presence; admin telemetry describes queue age/counts/expired lease
 Neither heartbeat freshness nor local simulation asserts provider readiness.
 Future T05 handlers must extend the closed dispatch/schema and fenced related
 result transaction without executing adopted repository code in this worker.
+
+### T05 implemented delivery slice
+
+`services/template_service.py` owns the reviewed on-disk catalogue, placeholder
+rendering, archive-entry safety and deterministic uncompressed archive creation.
+`integrations/artifact_store.py` is the first concrete adapter: content-addressed
+local storage with atomic writes and verification on every read, behind the narrow
+put/get-by-digest interface this document anticipated. `services/delivery_service.py`
+owns generation submission, revision capture, validation submission and the two
+worker handlers. `services/offline_validation.py` holds the checks and the report.
+
+Handlers keep the T04 shape: they read what they need in a short transaction,
+compute outside any transaction, write content to the store, and return their
+result rows as an `apply` callback that `queue_service.finish` runs inside the
+fenced result transaction. A lost lease therefore discards the database rows with
+everything else. Only content-addressed bytes may already be on disk, which is
+harmless because identical input produces identical bytes and the row is what
+makes an artifact visible or downloadable.
+
+`ARTIFACT_DIR` defaults to `<DATA_DIR>/artifacts` and must be absolute. Compose
+mounts the same host directory into both the API and the worker, so artifacts
+survive a restart of either and a download does not depend on a process's private
+filesystem. Moving to another host still requires migrating this directory.
+
+Generation performs no network access at all, and the offline suite's socket guard
+is active while its tests run. The generated project declares no third-party
+dependencies, so it also installs and tests offline; `scripts/check_generated_project.py`
+proves that in CI with `uv --offline`. Generated code is never executed by the
+platform: validation parses Python with `ast.parse` and reads TOML with `tomllib`.

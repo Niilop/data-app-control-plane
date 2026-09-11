@@ -22,6 +22,7 @@ os.environ.update(
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
 import uvicorn  # noqa: E402
+from core.config import get_settings  # noqa: E402
 from core.database import Base, get_db  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from main import create_app  # noqa: E402
@@ -34,8 +35,54 @@ from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 from worker import run_one  # noqa: E402
 
 
+def seed_delivery(engine: object, application_id: UUID, binding_id: UUID) -> None:
+    """Generate, capture and validate once, so browser tests see finished records."""
+    from models.delivery import Artifact
+    from models.delivery_schemas import GenerationInput, RevisionCreate
+    from services.delivery_service import (
+        create_generation,
+        create_revision,
+        create_validation,
+    )
+    from sqlalchemy import select
+
+    sessions = sessionmaker(engine)  # type: ignore[arg-type]
+    with Session(engine) as db:  # type: ignore[arg-type]
+        create_generation(
+            db,
+            db.get(User, 2),
+            application_id,
+            GenerationInput(
+                template_name="python-batch",
+                template_version="1.0.0",
+                binding_id=binding_id,
+                package_name="customer_analytics",
+            ),
+            "browser-generation",
+            str(uuid4()),
+        )
+    assert run_one(sessions, str(uuid4()))
+    with Session(engine) as db:  # type: ignore[arg-type]
+        digest = db.scalar(select(Artifact.digest))
+        assert digest, "Generation did not produce an artifact"
+        revision = create_revision(
+            db,
+            db.get(User, 2),
+            application_id,
+            RevisionCreate(artifact_digest=digest, binding_id=binding_id),
+            str(uuid4()),
+        )
+        create_validation(
+            db, db.get(User, 2), revision.id, "browser-validation", str(uuid4())
+        )
+    assert run_one(sessions, str(uuid4()))
+
+
 def run() -> None:
     with TemporaryDirectory(prefix="control-plane-browser-") as directory:
+        # Disposable artifact store; never the developer's configured directory.
+        os.environ["ARTIFACT_DIR"] = str(Path(directory) / "artifacts")
+        get_settings.cache_clear()
         engine = create_engine(
             f"sqlite:///{directory}/browser.db",
             connect_args={"check_same_thread": False},
@@ -66,6 +113,10 @@ def run() -> None:
                 "queue_probes",
                 "operation_commands",
                 "worker_heartbeats",
+                "template_versions",
+                "artifacts",
+                "deployment_revisions",
+                "validation_results",
             }
         ]
         Base.metadata.create_all(engine, tables=tables)
@@ -123,6 +174,7 @@ def run() -> None:
                     f"/applications/{application['id']}/roles",
                     {"user_id": user_id, "role": role},
                 )
+            bindings = {}
             for target, scenario in (
                 ("dev", "success"),
                 ("test", "terminal"),
@@ -151,6 +203,7 @@ def run() -> None:
                         },
                     },
                 )
+                bindings[target] = UUID(binding["id"])
                 with Session(engine) as db:
                     create_probe(
                         db,
@@ -182,6 +235,9 @@ def run() -> None:
                     assert run_one(sessionmaker(engine), str(uuid4()))
                     if scenario == "unknown":
                         assert run_one(sessionmaker(engine), str(uuid4()))
+            # Delivery state. Every remaining probe is deferred by the loop above,
+            # so these are the only operations the worker cycles below can claim.
+            seed_delivery(engine, UUID(application["id"]), bindings["dev"])
         uvicorn.run(
             app,
             host=os.environ.get("BROWSER_TEST_HOST", "127.0.0.1"),

@@ -37,8 +37,14 @@ def block_network(
 
 
 @pytest.fixture
-def registry(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple]:
+def registry(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> Iterator[tuple]:
     monkeypatch.setenv("DATABASE_URL", "postgresql://test:test@127.0.0.1:1/unused")
+    # Never write generated artifacts into the repository's data directory.
+    monkeypatch.setenv(
+        "ARTIFACT_DIR", str(tmp_path_factory.mktemp("artifacts", numbered=True))
+    )
     monkeypatch.setenv("SECRET_KEY", "registry-unit-test-only")
     monkeypatch.setenv("DEBUG", "false")
     monkeypatch.setenv("RUNTIME_PROFILE", "local")
@@ -81,6 +87,10 @@ def registry(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple]:
             "queue_probes",
             "operation_commands",
             "worker_heartbeats",
+            "template_versions",
+            "artifacts",
+            "deployment_revisions",
+            "validation_results",
         }
     ]
     Base.metadata.create_all(engine, tables=tables)
