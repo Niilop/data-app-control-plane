@@ -7,6 +7,30 @@ profile, isolated PostgreSQL migration integration tests, and platform CI; see
 Historical auth/example scripts are under `tests/manual/` with names outside
 pytest discovery; obsolete RAG tests were removed.
 
+## T03 verification
+
+Current check commands and complete Ruff scope are in root README and CI. T03
+requires explicit `DEPLOYMENT_EXECUTOR=simulated` even in isolated configuration;
+fixtures and subprocess tests supply it without reading developer credentials.
+
+Locally, `uv run --locked pytest -q` passed **108 tests** with the offline network
+guard enabled (outside this sandbox's TestClient restriction). This includes
+profile rejection, secret-safe settings errors, environment/binding authorization,
+closed config, approved targets, version invalidation, transactional rollback,
+explicit seed and Streamlit create/edit/stale-form cases. `uv run --locked mypy`
+passed for **24 source files**. Ruff lint/format passed over the current scope.
+
+`uv run --locked pytest tests/integration -q -rs` reported **10 skipped** locally
+because `TEST_DATABASE_URL` is unset. New PostgreSQL tests preserve T02 application/
+audit data through migration 006, enforce unique/FK constraints, verify rollback,
+and race binding writes against each other and environment policy updates.
+Existing tests now verify head 006 and T03 ORM/schema parity. Hosted evidence is
+recorded in the handoff when inspected; local skips prove no PostgreSQL behavior.
+
+No real seed, provider connectivity, paid execution, Docker image build or live
+container startup was run. Root README documents the optional local simulated
+seed and UI path; legacy Docker/devstack limitations remain.
+
 ## T02 verification
 
 The current checks are the commands in root README and `.github/workflows/ci.yml`.

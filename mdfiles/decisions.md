@@ -161,6 +161,38 @@ paths. References remain visibly unverified until T08. SQLite supports fast offl
 API/UI checks; only isolated PostgreSQL tests establish migration, constraints and
 concurrent-update behavior. This distinction is retained in verification reports.
 
+## ADR-013 — T03 explicit simulation and versioned environment policy
+
+**Accepted implementation direction (T03), 2026-09-11.** Support only local runtime
+with an explicitly configured `DEPLOYMENT_EXECUTOR=simulated`. Organization mode
+is rejected until external identity exists; real sandbox mode is rejected until
+GitHub execution is implemented. A local simulated environment named "sandbox"
+does not enable the real sandbox runtime. Existing `.env` files need explicit
+simulation opt-in. Validation diagnostics suppress input values.
+
+Environment records approve a set of bundle targets and carry simulated workspace
+references, enabled state, self-approval policy (default false), and a version.
+Only platform admins manage them or their application bindings. Readers see only
+environments bound to visible applications. No external resource or permission is
+created, checked or granted.
+
+Binding config schema 1 contains only bounded integer synthetic row count/runtime
+settings. This intentionally excludes arbitrary string variables, commands, URLs,
+credential values and unapproved compute references; later template/integration
+tasks must explicitly extend the contract when needed. Config PATCH replaces the
+whole typed object with defaults for omitted fields.
+
+Environment-row locks serialize policy edits and binding writes on PostgreSQL.
+Every environment change, including rename, conservatively increments associated
+binding versions and audits each affected application in one transaction. Removed
+targets/disabled environments preserve history but block binding commands. Future
+revision/approval logic must capture and recheck environment and binding versions.
+
+The explicit local seed accepts an existing active admin ID, creates only the
+simulated environment, and refuses to overwrite changed policy. The identical
+repeat does nothing. It is a direct-DB local administration helper, not a provider
+adapter. No actual simulation execution is introduced before its owning task.
+
 ## Questions reserved for their implementation gates
 
 | Question | Needed by | Default until resolved |

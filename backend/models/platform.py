@@ -105,3 +105,45 @@ class AuditEvent(Identity, Base):
     outcome: Mapped[str] = mapped_column(String(20), default="success")
     request_id: Mapped[str] = mapped_column(String(36))
     details: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class Environment(Identity, Base):
+    __tablename__ = "environments"
+    __table_args__ = (
+        CheckConstraint("version >= 1", name="ck_environment_version"),
+        CheckConstraint(
+            "allowed_executor = 'simulated'", name="ck_environment_executor"
+        ),
+    )
+    name: Mapped[str] = mapped_column(String(100), unique=True)
+    workspace_ref: Mapped[str] = mapped_column(String(100))
+    enabled: Mapped[bool] = mapped_column(default=True)
+    allowed_executor: Mapped[str] = mapped_column(String(30))
+    allow_self_approval: Mapped[bool] = mapped_column(default=False)
+    allowed_bundle_targets: Mapped[list[str]] = mapped_column(JSON)
+    version: Mapped[int] = mapped_column(default=1)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+
+
+class EnvironmentBinding(Identity, Base):
+    __tablename__ = "environment_bindings"
+    __table_args__ = (
+        UniqueConstraint(
+            "application_id", "environment_id", name="uq_application_environment"
+        ),
+        CheckConstraint("version >= 1", name="ck_binding_version"),
+    )
+    application_id: Mapped[UUID] = mapped_column(
+        ForeignKey("applications.id"), index=True
+    )
+    environment_id: Mapped[UUID] = mapped_column(
+        ForeignKey("environments.id"), index=True
+    )
+    bundle_target: Mapped[str] = mapped_column(String(63))
+    config: Mapped[dict] = mapped_column(JSON)
+    version: Mapped[int] = mapped_column(default=1)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )

@@ -2,28 +2,8 @@
 
 import streamlit as st
 from api_client import APIClient, APIError
-
-
-def page(client: APIClient, path: str, key: str) -> list[dict]:
-    cursor_key = f"registry_cursor_{key}"
-    data = client.request(
-        "GET", path, params={"limit": 20, "cursor": st.session_state.get(cursor_key)}
-    )
-    left, right = st.columns(2)
-    if left.button(
-        "First page", key=f"{key}_first", disabled=not st.session_state.get(cursor_key)
-    ):
-        st.session_state.pop(cursor_key, None)
-        st.rerun()
-    if right.button("Next page", key=f"{key}_next", disabled=not data["next_cursor"]):
-        st.session_state[cursor_key] = data["next_cursor"]
-        st.rerun()
-    return data["items"]
-
-
-def changed(message: str) -> None:
-    st.session_state.registry_message = message
-    st.rerun()
+from environment_ui import render_bindings, render_environments
+from registry_widgets import changed, page
 
 
 def application_detail(client: APIClient, application_id: str, profile: dict) -> None:
@@ -140,6 +120,7 @@ def application_detail(client: APIClient, application_id: str, profile: dict) ->
                 changed(
                     "Assignment revoked. Other direct or team assignments may still grant access."
                 )
+    render_bindings(client, application_id, profile)
     st.subheader("Application history")
     st.json(page(client, path + "/audit-events", f"audit_{application_id}"))
 
@@ -232,13 +213,15 @@ def render_registry(api_url: str, token: str) -> None:
             st.success(st.session_state.pop("registry_message"))
         view = st.radio(
             "Registry",
-            ["Applications", "Register application", "Teams"],
+            ["Applications", "Register application", "Teams", "Environments"],
             horizontal=True,
         )
         if view == "Register application":
             register_application(client, profile)
         elif view == "Teams":
             team_admin(client, profile)
+        elif view == "Environments":
+            render_environments(client, profile)
         else:
             applications = page(client, "/api/v1/applications", "applications")
             if not applications:

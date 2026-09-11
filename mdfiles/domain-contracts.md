@@ -1,6 +1,6 @@
 # Domain and workflow contracts
 
-Status: T02 registry entities and permissions implemented; later task entities remain proposed. Introduce entities in their owning task,
+Status: T02/T03 registry entities and permissions implemented; later task entities remain proposed. Introduce entities in their owning task,
 not all at once. New entities use UUIDs, timezone-aware UTC timestamps, explicit
 foreign keys, and database constraints for uniqueness. Historical AI tables remain migration-only metadata after T01a; no runtime AI
 features are retained. Existing user IDs may remain
@@ -78,6 +78,37 @@ metadata/source editing still requires a developer assignment. Bootstrap creates
 new local users with explicit admin intent and an audit event; no public route
 can grant global admin. Account deactivation has no management UI/API in T02,
 but authentication and every platform policy enforce the current active flag.
+
+## T03 environment and binding invariants
+
+Environment and EnvironmentBinding are implemented as UUID/UTC records with
+positive versions. Environment name is unique; each application/environment pair
+has one binding, enforced by a unique database constraint. Foreign keys preserve
+references; neither deletion nor external retirement is exposed.
+
+Only active platform admins create/edit environments and bindings. Application
+readers can read their bindings and environments referenced by their visible
+applications; unbound/private environments remain hidden to nonadmins. Owner,
+data owner and developer roles do not grant binding or infrastructure authority.
+
+An enabled environment approves an explicit nonempty set of bundle targets.
+Bindings reject unknown/disabled environments, unapproved targets and archived
+applications. A disabled environment or removed target preserves existing binding
+history but marks it unusable. Re-enabling/restoring the target can make it usable
+again; this is recorded policy, not proof of deployment or external availability.
+
+T03 accepts only simulated workspace references and executor. Self-approval is off
+by default; an explicit local simulated environment policy can enable it for future
+approval tasks. Typed config schema version 1 has only bounded integer
+`synthetic_row_count` and `max_runtime_seconds`, with unknown keys and inline
+credentials rejected. It has no compute, credential, URL, command or arbitrary
+variable fields. Later template/resource contracts can extend the schema explicitly.
+
+Both environment and binding updates require `expected_version`. Environment
+changes serialize with binding creation/update under an environment row lock,
+bump all associated binding versions, and write attributable application/admin
+audit in the same transaction. Future approval scope must capture/recheck these
+versions as well as source/config. No approval or worker is implemented in T03.
 
 ## State contracts
 

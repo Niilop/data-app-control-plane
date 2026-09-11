@@ -3,9 +3,9 @@
 import json
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -14,6 +14,9 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 class Settings(BaseSettings):
     app_name: str = "Data Application Control Plane"
     debug: bool = False
+    runtime_profile: Literal["local", "sandbox", "organization"] = "local"
+    # No implicit simulation: existing local .env files must opt in explicitly.
+    deployment_executor: Literal["simulated", "github_actions"]
 
     # Required for development authentication and persistence, including local mode.
     database_url: str = Field(min_length=1)
@@ -31,7 +34,10 @@ class Settings(BaseSettings):
     data_dir: str = str(_REPO_ROOT / "data")
 
     model_config = SettingsConfigDict(
-        env_file=(".env", "../.env"), env_file_encoding="utf-8", extra="ignore"
+        env_file=(".env", "../.env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+        hide_input_in_errors=True,
     )
 
     @field_validator("cors_origins", mode="before")
@@ -43,6 +49,21 @@ class Settings(BaseSettings):
                 return json.loads(value)
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
+
+    @model_validator(mode="after")
+    def supported_execution_profile(self) -> "Settings":
+        if self.runtime_profile == "organization":
+            raise ValueError(
+                "Organization profile is unsupported; external identity is not implemented"
+            )
+        expected = "simulated" if self.runtime_profile == "local" else "github_actions"
+        if self.deployment_executor != expected:
+            raise ValueError("Runtime profile and deployment executor do not match")
+        if self.runtime_profile != "local":
+            raise ValueError(
+                "Sandbox execution is unsupported until the GitHub Actions integration is implemented"
+            )
+        return self
 
 
 @lru_cache

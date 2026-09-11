@@ -6,7 +6,8 @@ scope, architecture, contracts, and bounded agent tasks.
 
 The platform provides development login, an owned application registry, team and
 role administration, transactional audit, and Streamlit registration/detail/history
-screens. Workers, GitHub integration, and Databricks deployment remain planned work.
+screens, plus admin-managed simulated environments and application bindings.
+Workers, GitHub integration, and Databricks deployment remain planned work.
 The old AI chat, RAG, LLM, and model-inference features have been removed.
 
 ## Local setup
@@ -19,7 +20,9 @@ cp .env.example .env
 ```
 
 Set `DATABASE_URL` to a dedicated development PostgreSQL database and replace
-`SECRET_KEY` with a random local secret. No AI API keys are used. Do not commit
+`SECRET_KEY` with a random local secret. Set `RUNTIME_PROFILE=local` and explicitly
+set `DEPLOYMENT_EXECUTOR=simulated` (also required when upgrading an existing
+T02 `.env`). No AI API keys are used. Do not commit
 `.env`. The existing migration chain still requires PostgreSQL with pgvector.
 Use the existing devstack when available; do not point migrations at another
 application's database.
@@ -76,6 +79,51 @@ The UI uses paginated lists with First/Next controls. If another edit makes a fo
 stale, reload its version and review fields before resubmitting. Administrative
 history includes team/membership and local-bootstrap events; application history
 is visible only to actors who can currently read that application.
+
+## Simulated sandbox bindings (T03)
+
+Only the local runtime with explicitly selected simulation is currently supported.
+Startup rejects organization mode, mismatched profile/executor combinations, and
+real sandbox execution because the required integrations are not implemented.
+No workspace, provider credentials or connectivity are needed.
+
+After migration, an administrator can create a simulated environment in the UI's
+**Environments** view. It records an opaque `simulated://<name>` workspace reference,
+approved bundle targets, an enabled flag and a self-approval policy. Self-approval
+is **off by default** and applies only to later local simulated approval workflows.
+Alternatively, from `backend/`, explicitly seed the same local sandbox:
+
+```bash
+uv run --locked python -m seed_sandbox --admin-user-id <your-admin-user-id>
+```
+
+The command requires an existing active administrator and direct access to the
+local database. It creates `local-sandbox`, reference `simulated://local-sandbox`,
+and approved target `sandbox`. Repeating the identical seed is a no-op; it refuses
+to overwrite a changed environment. Pass `--allow-self-approval` only to explicitly
+opt in when creating the seed. Creation and policy are audited under the supplied
+local administrator ID. No accounts or resources are created by this command.
+
+In an application's detail view, an administrator can **Bind an environment** and
+choose one of its approved targets. Only one binding per application/environment
+is allowed. The closed configuration schema accepts only:
+
+| Field | Default | Allowed value |
+|---|---|---|
+| `schema_version` | 1 | Integer 1 |
+| `synthetic_row_count` | 100 | Integer 1–10,000 |
+| `max_runtime_seconds` | 300 | Integer 1–3,600 |
+
+These are preparation settings for later tasks; nothing runs in T03. Unknown keys,
+credential fields, arbitrary strings, commands and unsupported schema versions are
+rejected. Editing `config` replaces the entire typed config, filling its defaults.
+
+Application readers can see bindings and the environments bound to their visible
+applications. Only platform admins can change either. Disabling an environment or
+removing an approved target preserves bindings/history and makes affected bindings
+unusable. Every environment edit increments its version and all associated binding
+versions in the same audited transaction; stale forms must be reloaded and reviewed.
+All environment/binding responses and screens explicitly identify simulation.
 
 ## Containers
 
@@ -134,8 +182,8 @@ and are not mounted by the platform API. The registry is under `/api/v1`; see
 ```bash
 uv run --locked pytest -q
 uv run --locked mypy
-uv run --locked ruff check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py frontend tests/conftest.py tests/unit tests/integration
-uv run --locked ruff format --check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py frontend tests/conftest.py tests/unit tests/integration
+uv run --locked ruff check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py frontend tests/conftest.py tests/unit tests/integration
+uv run --locked ruff format --check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py frontend tests/conftest.py tests/unit tests/integration
 ```
 
 Unit tests (`tests/unit`, the default `testpaths`) block network calls. Startup and
@@ -143,7 +191,7 @@ migration-rendering tests use an isolated process with controlled configuration;
 running database or provider is required. UI tests use Streamlit's test runner and
 in-process API calls for registry workflows. Offline registry tests use SQLite
 with foreign keys enabled; PostgreSQL tests establish real migration, constraint,
-transaction and concurrent-update behavior. Mypy covers 18 new/affected platform
+transaction and concurrent-update behavior. Mypy covers 24 new/affected platform
 modules; unrelated legacy modules remain outside its scope.
 
 Isolated PostgreSQL migration integration tests (`tests/integration`, marked

@@ -111,6 +111,28 @@ Profile changes do not provision infrastructure or migrate data. Local artifacts
 must be migrated before moving to another host; references cannot depend on an
 API process's private filesystem.
 
+### T03 implemented profile gate
+
+`RUNTIME_PROFILE` defaults to `local`; `DEPLOYMENT_EXECUTOR=simulated` must be
+configured explicitly, including for an existing local `.env`. T03 implements
+only this combination. `local/github_actions` and `sandbox/simulated` fail as
+mismatches; `sandbox/github_actions` fails until its integration is available.
+All `organization` configurations fail because external identity is not implemented.
+Settings error messages omit input values to avoid echoing credentials.
+
+Environment records in T03 are simulated sandbox references, not live workspace
+connections: `workspace_ref=simulated://<name>`, `allowed_executor=simulated`.
+Registration, seeding, reads and policy changes perform no provider calls. The
+later sandbox-runtime gate is distinct from naming a local simulated environment
+"sandbox". T03 introduces no nominal deployment adapter or execution worker.
+
+Environment and binding mutations lock the environment row first. Environment
+edits increment all associated binding versions and audit the policy change in
+each affected application's history atomically. Future revision preparation must
+capture binding and environment versions/config/policy; execution must recheck
+current enabled state, approved target, versions and actor permissions. A GET's
+`usable` flag describes current recorded eligibility, not an execution guarantee.
+
 ## Observability and lifecycle
 
 Use structured logs with request, operation, attempt, and actor identifiers;

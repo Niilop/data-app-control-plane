@@ -35,7 +35,10 @@ files = [
     "backend/api/endpoints/auth.py", "backend/api/endpoints/applications.py", "backend/api/endpoints/teams.py",
     "backend/services/auth_service.py", "backend/services/application_service.py",
     "backend/services/policy_service.py", "backend/services/audit_service.py", "backend/services/pagination.py",
-    "backend/bootstrap.py", "frontend/api_client.py", "frontend/registry.py",
+    "backend/bootstrap.py", "backend/seed_sandbox.py",
+    "backend/models/environment_schemas.py", "backend/services/environment_service.py",
+    "backend/api/endpoints/environments.py",
+    "frontend/api_client.py", "frontend/registry.py", "frontend/registry_widgets.py", "frontend/environment_ui.py",
 ]
 mypy_path = ["backend", "frontend"]
 explicit_package_bases = true

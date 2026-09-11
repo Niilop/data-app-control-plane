@@ -36,8 +36,10 @@ EXPECTED_HEAD_TABLES = {
     "applications",
     "application_roles",
     "audit_events",
+    "environments",
+    "environment_bindings",
 }
-HEAD_REVISION = "005_owned_applications"
+HEAD_REVISION = "006_environment_bindings"
 
 
 def _scoped_database_url(schema: str) -> str:
@@ -81,6 +83,8 @@ def isolated_schema(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
         monkeypatch.setenv("DATABASE_URL", _scoped_database_url(schema))
         monkeypatch.setenv("SECRET_KEY", "integration-test-secret-key-only")
         monkeypatch.setenv("DEBUG", "false")
+        monkeypatch.setenv("RUNTIME_PROFILE", "local")
+        monkeypatch.setenv("DEPLOYMENT_EXECUTOR", "simulated")
         get_settings.cache_clear()
 
         yield schema
@@ -191,6 +195,8 @@ def test_upgrade_from_old_head_preserves_user_and_safe_flags(
             "applications",
             "application_roles",
             "audit_events",
+            "environments",
+            "environment_bindings",
         }
         with engine.connect() as connection:
             context = MigrationContext.configure(

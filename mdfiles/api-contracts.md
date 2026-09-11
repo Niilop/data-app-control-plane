@@ -1,6 +1,6 @@
 # API contracts
 
-Status: T02 `/api/v1` registry endpoints are implemented; later task rows remain planned. Existing `/auth/*` remains the development login
+Status: T02/T03 `/api/v1` registry endpoints are implemented; later task rows remain planned. Existing `/auth/*` remains the development login
 surface initially. Implement endpoints with their tasks; this document does not
 claim they exist. Keep services usable by API and worker without importing routers.
 
@@ -111,6 +111,45 @@ sanitized `registry_conflict` 409; invalid references return 422; unexpected
 failures return `internal_error` 500 and roll back. Audit reads have no edit/delete
 endpoint. Failed requests do not produce success audit rows. User/team deletion
 is not exposed; database foreign keys retain references without delete cascades.
+
+## T03 implemented details
+
+The T03 rows above are implemented, plus authorized supporting reads:
+`GET /environments/{id}`, `GET /applications/{id}/bindings`, and
+`GET /applications/{id}/bindings/{binding_id}`. Environment lists are filtered to
+those bound to applications the actor can read; admins see all. Binding reads
+require application visibility. All writes require an active platform admin.
+Lists follow the existing scoped keyset cursor contract.
+
+Environment create accepts `name`, `workspace_ref` (`simulated://<name>`), explicit
+`allowed_executor="simulated"`, `allowed_bundle_targets` (1–20 unique identifiers),
+`enabled` (default true), and `allow_self_approval` (default false). PATCH accepts
+`expected_version` plus one or more non-null fields. Workspace references cannot
+contain credentials, URLs to real services, traversal, query or fragment. Bundle
+targets start with a lowercase letter and contain only lowercase letters, digits,
+underscores and hyphens (maximum 63 characters).
+
+Binding create accepts `environment_id`, `bundle_target`, and optional `config`.
+PATCH accepts `expected_version` and `bundle_target` and/or replacement `config`;
+application/environment identity cannot be reassigned. Config is closed schema 1:
+`schema_version: 1`, `synthetic_row_count: 100` (1–10,000),
+`max_runtime_seconds: 300` (1–3,600). Booleans/numeric strings are not integers;
+unknown/credential keys, arbitrary variables, null patches and unsupported schema
+versions return 422. Omitted config fields receive defaults, including in a
+replacement config. No credential values are returned or audited.
+
+Environment and binding responses include UUID/UTC identity, `version`,
+`updated_at`, and `execution_mode="simulated"`. A binding also includes current
+`environment` policy and a `usable` flag (enabled environment, approved target,
+nonarchived application); it is not an execution or connectivity result.
+
+Create is 201 with a readable `Location`; update is 200. Unknown references are
+422, inaccessible lookup is 404, denied writes are 403, duplicates/stale versions
+are 409. Disabled environments and archived applications return 409; unapproved
+targets return 422. All mutations share one transaction with audit. Environment
+edits bump associated binding versions and append `binding.environment_changed`
+events to affected application history, plus admin-wide `environment.updated`.
+Self-approval changes are explicit in the before/after policy audit.
 
 ## Example: registration and deployment
 
