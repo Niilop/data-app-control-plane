@@ -1,159 +1,156 @@
 # Agent handoff
 
-This describes implemented code, not this PR's merge status. Inspect Git status,
-preserve unrelated changes, verify prerequisites on updated main, and read
-AGENTS.md before starting the next bounded task. Do not assume T03 is merged.
+Inspect Git status, preserve unrelated changes, verify prerequisites on updated
+main, and read AGENTS.md before creating the next task branch. This handoff
+records implementation; it does not imply that its PR has merged.
 
 ## Implemented state
 
-T01/T02 are merged; T02 is PR #6 at `712aa25`. Its handoff reconciliation PR #7
-is also merged. T03 started from updated main `928f2f7` on its own branch.
-**T03 — Register a sandbox environment binding is implemented in draft PR #8,
-awaiting review and merge.** T04/worker, real adapters and deployment were not started. AI/chat/
-RAG/LLM/inference remain removed.
+T01–T03 are merged. T03 PR #8 was confirmed merged at
+`46a9cd9194ea4384d281c956b61eca493cac830a`. T04 is implemented on its own branch
+from that updated main in [PR #9](https://github.com/Niilop/data-app-control-plane/pull/9)
+and awaits review/merge. T04a and T05 have not started. The agreed next milestone
+is T04a: migrate current workflows to React + TypeScript + Vite before T05.
+AI/chat/RAG/LLM/inference remain removed; historical tables/migrations are retained.
 
-T02 behavior is preserved: development login/accounts, explicit local admin
-bootstrap, teams/memberships, owned applications, current direct/team role policy,
-versioned metadata, paginated reads and transactional audit. Owner/data owner
-confer no infrastructure rights. No external credentials or permissions are granted.
+The platform has development accounts, explicit local admin bootstrap,
+teams/memberships, owned applications, direct/team roles, versioned metadata and
+simulated environment bindings, filtered paginated reads and transactional audit.
+Local configuration requires `RUNTIME_PROFILE=local` and explicit
+`DEPLOYMENT_EXECUTOR=simulated`. Organization and real sandbox execution fail at
+startup. Local secrets remain in ignored `.env`, outside versioned context.
 
-T03 adds:
+T04 adds:
 
-- `006_environment_bindings`: versioned UUID/UTC environments and bindings;
-  unique application/environment pair and noncascading foreign keys. Migration
-  history 001–005 and existing data remain intact. ORM is in `models/platform.py`;
-  strict schemas are in `models/environment_schemas.py`.
-- Startup settings: `RUNTIME_PROFILE=local` (default) plus **explicit required
-  `DEPLOYMENT_EXECUTOR=simulated`**. Existing local `.env` files must add this.
-  Organization mode, profile/executor mismatches and real sandbox execution fail
-  clearly at startup. Settings validation errors omit input values. `.env.example`
-  and isolated test configuration document/provide the opt-in; no user `.env` was
-  changed. No nominal executor or worker is introduced.
-- Admin environment create/list/detail/update: name, opaque
-  `simulated://<name>` workspace reference, explicit simulated executor, approved
-  bundle-target allowlist, enabled flag, self-approval policy (off by default),
-  and positive version. Self-approval true is an explicit local policy for future
-  approval tasks, not implemented approval execution.
-- Admin application binding create/update; authorized list/detail. One binding
-  per application/environment. Unknown/disabled environment, unapproved target,
-  archived application, invalid config and stale versions fail predictably.
-  Nonadmins only see bindings for readable apps and environments bound to those
-  apps; app ownership/developer role never grants environment-write authority.
-- Closed config schema 1: integer `synthetic_row_count` (default 100, 1–10,000)
-  and `max_runtime_seconds` (default 300, 1–3,600). No credential, arbitrary string,
-  URL, command, compute or unknown config keys are accepted. Config PATCH replaces
-  the whole typed object, applying defaults for omitted fields.
-- Synchronous environment service transactions include every mutation and audit.
-  Environment-row locks serialize environment changes with binding create/update.
-  Each environment edit increments its own version and every associated binding
-  version, with `binding.environment_changed` audit in each affected app's history
-  and an admin environment event. Stale edits return 409. Policy disable/target
-  removal retains bindings and history but makes them unusable. Future revisions/
-  approvals must capture and recheck environment plus binding versions/policy.
-- Responses embed current environment policy and explicitly show
-  `execution_mode=simulated`; binding `usable` describes recorded eligibility, not
-  connectivity, execution success or an immutable snapshot.
-- Streamlit Environments view and per-app Environment bindings controls support
-  creation/edit/read with approved-target selectors, bounded config fields,
-  explicit simulation/self-approval labels and retained form versions. Shared
-  pagination/feedback moved from `registry.py` to `registry_widgets.py`.
-- `uv run --locked python -m seed_sandbox --admin-user-id <id>` from `backend/`
-  explicitly seeds `local-sandbox`, reference `simulated://local-sandbox`, approved
-  target `sandbox`. Requires an existing active platform admin and direct local
-  DB access. Self-approval stays false unless `--allow-self-approval` is supplied.
-  Identical repeats are no-ops; changed existing policy is never overwritten.
-  Creation is audited under the supplied local admin ID. No users are created.
+- Migration `007_durable_operations`: operations, attempts, binding reservations,
+  idempotency command history, internal queue probe request/results, and worker
+  heartbeats. UUID/UTC metadata and noncascading references preserve existing data.
+- Synchronous command transactions atomically create request, operation,
+  reservation, command hash and audit. Idempotency scope is actor/action/target/key;
+  identical repeats return the original operation/current state, mismatches 409.
+  Reads require current application visibility. Cancel/retry/reconcile and probe
+  submission require an explicit current operator role, including for admins.
+- `python -m worker` is independent of FastAPI; Compose includes a worker service.
+  Short PostgreSQL `FOR UPDATE SKIP LOCKED` claims persist attempt/correlation,
+  worker UUID, monotonic fencing token and 30-second lease. Separate-session
+  heartbeats renew every 10 seconds. Idle polling publishes worker freshness.
+- Worker authorization rechecks the requester’s active account, direct/team
+  operator grant, application lifecycle, current binding version, environment
+  enablement/executor and approved target before handling. Handlers hold no DB
+  transaction. All operation/attempt/result/reservation/audit writes are fenced,
+  including rollback if the lease expires during result flush.
+- Only the typed `queue_probe` handler exists. It is explicitly simulated and
+  has no external side effects. Closed payload schema 1 has deterministic success,
+  transient, terminal and unknown scenarios for tests. The local CLI exposes only
+  the success probe; no HTTP arbitrary task execution endpoint exists.
+- Known safe failures retry at most three executions, with jittered exponential
+  delay (2-second base, 60-second cap). Lease expiry always enters reconciliation;
+  the probe establishes no external effects before scheduling a safe retry.
+  Unknown outcomes become `needs_attention` and retain the binding reservation.
+- Cancellation before claim immediately prevents execution; running cancellation
+  is intent until observed, and observed success may win. Retry creates a new
+  linked operation after renewed policy checks. Reconcile requires an operator
+  reason, schedules observation, and never forces an outcome. Only its hash is
+  retained, avoiding pasted secret text in history.
+- Status/list/attempt and cancel/retry/reconcile APIs, Streamlit operation history,
+  refresh/freshness and recovery controls. Responses omit payloads, worker tokens
+  and raw exception messages. `/health` is API liveness; `/ready` requires queue
+  access plus a worker pulse within 60 seconds. Admin-only `/api/v1/queue/telemetry`
+  exposes state counts, oldest eligible age, expired leases and live worker count.
 
 ## Verification performed
 
-Actually run locally:
+- `uv run --locked pytest -q`: **126 passed**, including queue state/API/UI,
+  current authorization, transaction failures, stale leases before and during
+  result flush, bounded retries, sanitized diagnostics and prior T01–T03 coverage.
+  Network blocking remained enabled; TestClient ran outside this sandbox's thread
+  restriction. The UI workflow asserts the actual attempt outcome column.
+- `uv run --locked mypy`: **32 source files passed**.
+- Ruff lint and format: clean over the complete README/CI scope, **53 files**.
+- `uv run --locked pytest tests/integration -q -rs`: **15 skipped** locally because
+  `TEST_DATABASE_URL` is unset. These skips do not establish PostgreSQL behavior.
+- Hosted [Platform CI run 34632237191](https://github.com/Niilop/data-app-control-plane/actions/runs/34632237191)
+  passed at implementation commit `d1c417d4b26304628dd556147901097a5f4185e1`.
+  The actual [PostgreSQL job log](https://github.com/Niilop/data-app-control-plane/actions/runs/34632237191/job/103371592921)
+  reports **15 passed in 12.12s**, no skips, against the isolated pgvector/pg16
+  service. This covers separate-process contention/restart, heartbeat/cancel,
+  migration preservation/schema parity, concurrent submissions and atomic rollback.
+  The offline job reports **126 passed in 18.33s**, Ruff clean (53 files) and
+  mypy clean (32 source files). Actual logs were inspected.
+- Agent handoff CI run 34632237152 and the local handoff checker against
+  `origin/main` passed. The frontend roadmap follow-up changes documentation only;
+  its diff and task/dependency consistency were reviewed, and `git diff --check`
+  passed. Application tests were not rerun locally for this documentation update.
+  Recheck CI on subsequent revisions. This PR is not claimed merged.
 
-- `uv run --locked pytest -q`: **108 passed**. Includes API authorization,
-  invalid/unapproved/disabled targets, config and profile validation, sanitized
-  errors, version changes, seed behavior, rollback after flush, and Streamlit
-  create-binding/stale-policy workflows. The offline network guard stayed enabled;
-  TestClient requires execution outside this sandbox's thread restriction.
-- `uv run --locked mypy`: **24 source files passed**.
-- Ruff lint and format passed over the current explicit scope in root README and
-  `.github/workflows/ci.yml`, including new schemas/service/router/seed/migration,
-  frontend and tests. Historical migrations and manual examples are unchanged.
-- `uv run --locked pytest tests/integration -q -rs`: **10 skipped**, with explicit
-  missing-`TEST_DATABASE_URL` reasons. These skips are not PostgreSQL verification.
+Local Docker follow-up on 2026-09-11 also passed: `compose config --quiet`, all
+three image builds from uv.lock, bundled pgvector/pg16 startup, fresh Alembic
+upgrade with the database reporting `007_durable_operations`, API `/health` and
+`/ready`, and Streamlit `/_stcore/health`. Four services were running. A missing
+`.env` was created from the example with generated local secrets and `db:5432`;
+its values were neither printed nor committed. No application account was seeded.
+The first-start/migration/admin-bootstrap sequence is now in root README.
 
-**Hosted T03 verification passed** at implementation commit
-`974c16ec76178328e90ed66f3db6e96714294cf3` in
-[draft PR #8](https://github.com/Niilop/data-app-control-plane/pull/8).
-[Platform CI run 34624002359](https://github.com/Niilop/data-app-control-plane/actions/runs/34624002359)
-passed both jobs. The actual
-[PostgreSQL job log](https://github.com/Niilop/data-app-control-plane/actions/runs/34624002359/job/103344569742)
-reports **10 passed in 2.92s**, no skips, against `pgvector/pgvector:pg16`.
-This verifies T02-data preservation through migration 006, T03 schema parity,
-unique/FK constraints, rollback, concurrent binding updates and serialization of
-policy edits with binding creation. The offline job reports **108 passed in
-12.90s**, Ruff clean/42 files formatted and mypy clean/24 files. Agent handoff run
-34624002288 also passed. Actual logs were inspected; CI configuration alone was
-not treated as evidence.
-
-Locked offline sync and the local handoff checker against updated `origin/main`
-also passed. This follow-up records evidence without changing implementation;
-application tests were not rerun for the documentation follow-up. Recheck current
-CI on later revisions. This PR is not claimed merged.
+Docker Desktop 4.90.0 / Engine 29.7.2 / Compose 5.5.1 worked directly in Ubuntu.
+The earlier I/O error persisted only through this agent session's Docker CLI
+mount. Verification used explicitly approved `wsl.exe -d Ubuntu -- ...` commands;
+no Docker/WSL reset or global installation was needed. Inspect current availability
+rather than assuming that an agent-session CLI failure means Docker is stopped.
 
 ## Remaining work and limitations
 
-- Review draft PR #8 and confirm current CI before merge. Do not infer merge or
-  live database correctness from code or local SQLite tests alone.
-- Local PostgreSQL/devstack and Docker builds/live container startup remain
-  unverified. No configured disposable test DB or devstack checkout is available
-  here; the Docker launcher previously reported missing WSL integration.
-- No actual local database was migrated/seeded during this implementation.
-  Existing `.env` must explicitly enable simulation before API/Alembic/seed use.
-- Only local simulation configuration is accepted. Real workspace references,
-  provider connectivity, compute selection, real executors and external identity
-  remain later integration gates; no paid/provider workload was run.
-- Self-approval and bounded run config are preparation policy, not executed work.
-  T04 adds durable operations; T05/T06 add revisions/approval/simulated deployment.
-- Audit remains editable by DB administrators, although no audit-write/delete API
-  exists. Account deactivation has no management API/UI. Local admin seed/bootstrap
-  are direct-DB tools, not an external identity system. Legacy dependency
-  deprecation warnings remain; no dependencies were added or globally installed.
+- Review PR #9 and current CI before merge. Hosted PostgreSQL checks passed;
+  local SQLite tests alone cannot establish concurrent claim/process behavior.
+- Devstack integration is still unverified; `~/code/devstack` was absent.
+  The bundled PostgreSQL path and container health are verified. The startup smoke
+  did not create an application account or run the full interactive user journey.
+- The probe only exercises infrastructure. No generated bundle, artifact store,
+  revision, approval, deployment, GitHub or Databricks adapter exists yet. No real
+  provider, paid workload or infrastructure activation was attempted.
+- Unknown probe scenarios intentionally remain unresolved after reconciliation.
+  There is no force-success/reservation-release API. Future real handlers need
+  provider-specific correlation, reconciliation and outcome evidence.
+- Binding reservations are implemented; future provider workspace concurrency
+  limits and provider submission deduplication are not applicable to this probe.
+  No exactly-once external execution claim is made.
+- Worker heartbeat rows and operation/idempotency history are retained. Retention,
+  richer metrics/exporters and organization identity remain later work.
 
 ## Next task
 
-After verifying T03 is merged into updated main and inspecting its current CI,
-implement **T04 — Durable operations with a separate worker** only. Create its
-own task branch after inspecting Git status/prerequisites and preserving unrelated
-changes. If T03 needs corrections, complete them before T04.
+Verify T04 is merged on updated main, then implement **T04a — Replace Streamlit
+with React**, on its own branch. Read its full scope and acceptance criteria in
+`development-plan.md` and ADR-015. Establish the React + TypeScript + Vite frontend,
+migrate current T01–T04 workflows, verify browser behavior and Docker startup, then
+retire Streamlit. Preserve existing accounts/data and API/worker authorization,
+versioning, audit and idempotency. Review browser session handling and keep all
+server secrets out of browser assets. Do not add new Streamlit feature screens.
 
-T04 adds operations/attempts/reservations, typed dispatch, a separately runnable
-worker, idempotency, atomic claims, leases/heartbeat/fencing, retry/recovery/
-cancellation and operation UI. Use an internal deterministic test handler; do not
-expose arbitrary task execution. No provider submission, broker or restored RAG
-job runner. Keep authorization and transactional audit/queue ownership intact.
+T05 waits until T04a is reviewed and merged. No generation, revision, approval,
+deployment or provider features belong in this migration.
 
 ## Files to read first
 
-| Purpose | Files |
-|---|---|
-| Entry/task | `AGENTS.md`, `mdfiles/README.md`, T04 in `mdfiles/development-plan.md` |
-| Worker contracts | `mdfiles/architecture.md`, `mdfiles/domain-contracts.md`, T04 rows in `mdfiles/api-contracts.md` |
-| Settings/model baseline | `backend/core/config.py`, `backend/models/platform.py`, `backend/models/environment_schemas.py`, migration 006 |
-| Transactions/policy | `backend/services/application_service.py`, `environment_service.py`, `policy_service.py`, `audit_service.py`, `pagination.py` |
-| API | `backend/main.py`, `backend/api/dependencies.py`, `platform_errors.py`, `backend/api/endpoints/environments.py` |
-| UI | `frontend/registry.py`, `registry_widgets.py`, `environment_ui.py`, `api_client.py` |
-| Tests | `tests/conftest.py`, `tests/unit/test_environments.py`, `test_registry_ui.py`, `tests/integration/test_migrations.py`, `test_environment_bindings.py` |
-| Setup/checks | Root README, `.env.example`, `mdfiles/testing-and-operation.md`, CI workflow, `backend/seed_sandbox.py` |
-
-Do not read `.env` into tool output. PostgreSQL/Redis, when available, belong to
-`~/code/devstack`; use isolated app/test databases and do not modify shared
-configuration or other databases. Redis is not required by this platform.
+- `AGENTS.md`, `mdfiles/README.md`, T04a in `mdfiles/development-plan.md`, ADR-015
+  in `mdfiles/decisions.md`.
+- `mdfiles/product-scope.md`, `mdfiles/architecture.md`, `mdfiles/api-contracts.md`,
+  `mdfiles/domain-contracts.md`, `mdfiles/repository-map.md`.
+- `frontend/app.py`, `api_client.py`, `registry.py`, `registry_widgets.py`,
+  `environment_ui.py`, `operation_ui.py`.
+- `backend/api/dependencies.py`, `backend/api/endpoints/auth.py`, `applications.py`,
+  `teams.py`, `environments.py`, `operations.py`; affected schemas/services.
+- `tests/unit/test_registry_ui.py`, `test_operations.py`, `tests/conftest.py`,
+  and the PostgreSQL integration tests for behavior to preserve.
+- Root README, `docker-compose.yaml`, both Dockerfiles, root/frontend/backend
+  `pyproject.toml`, `uv.lock` and `.github/workflows/ci.yml`.
 
 ## Suggested agent prompt
 
-> Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Inspect Git status
-> and verify T03 is merged into updated main, including current CI evidence.
-> Implement T04 only on its own branch. Preserve unrelated changes, explain the
-> plan, run acceptance checks, update the handoff and affected docs, and open a
-> draft PR against main. Do not merge, start T05, run paid workloads or deploy
-> infrastructure. Keep simulation explicit and worker execution durable in
-> PostgreSQL. Docker builds/startup remain unverified unless newer evidence exists.
+Read AGENTS.md, mdfiles/README.md and mdfiles/next-agent.md. Inspect Git status,
+preserve unrelated changes, and verify T04 is merged into updated main. Create a
+new task branch if needed and implement T04a only: React + TypeScript + Vite,
+current workflow migration, browser/session behavior, frontend checks and Docker
+cutover, followed by Streamlit retirement after parity passes. Preserve accounts,
+data, API/worker policy, versioning and idempotency. Explain the plan, run checks,
+update the handoff/contracts/map and open a draft PR. Do not merge, begin T05,
+expand Streamlit feature scope, or activate external providers.

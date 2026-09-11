@@ -7,6 +7,28 @@ profile, isolated PostgreSQL migration integration tests, and platform CI; see
 Historical auth/example scripts are under `tests/manual/` with names outside
 pytest discovery; obsolete RAG tests were removed.
 
+## T04 verification
+
+Hosted [Platform CI run 34632237191](https://github.com/Niilop/data-app-control-plane/actions/runs/34632237191)
+at `d1c417d` passed: **15 PostgreSQL tests**, **126 offline tests**, Ruff and mypy.
+Actual logs were inspected; exact evidence is in `next-agent.md`. The offline suite
+covers queue/API/UI behavior, policy revocation, atomicity, sanitized errors,
+retry limits and stale tokens. The isolated PostgreSQL suite adds independent
+competing worker processes, fresh API/worker processes after a lost lease,
+heartbeat/cancellation, concurrent idempotency, migration round trips and rollback.
+The migrated schema head is now 007, including new ORM/schema parity checks.
+
+Run the commands in root README/CI. Integration tests require a dedicated
+`TEST_DATABASE_URL`; missing configuration produces explicit skips, not success.
+The later local Docker follow-up passed quiet Compose validation, all three image
+builds, fresh bundled PostgreSQL migration through 007, API `/health` and `/ready`,
+and Streamlit health. Regular Ubuntu could access Docker Desktop; the I/O error
+was limited to the agent session's CLI mount. No reset or new global installation
+was needed. Root README documents `.env`, database startup, migration, then service
+startup. No application account was seeded or interactive user journey exercised.
+Devstack is absent and remains unverified. Migration 001–006 is preserved and no
+dependency was added. Historical task notes below describe their original checks.
+
 ## T03 verification
 
 Current check commands and complete Ruff scope are in root README and CI. T03
@@ -24,7 +46,7 @@ passed for **24 source files**. Ruff lint/format passed over the current scope.
 because `TEST_DATABASE_URL` is unset. New PostgreSQL tests preserve T02 application/
 audit data through migration 006, enforce unique/FK constraints, verify rollback,
 and race binding writes against each other and environment policy updates.
-Existing tests now verify head 006 and T03 ORM/schema parity. Hosted
+At T03, tests verified head 006 and T03 ORM/schema parity. Hosted
 [Platform CI run 34624002359](https://github.com/Niilop/data-app-control-plane/actions/runs/34624002359)
 at `974c16e` confirmed **10 PostgreSQL tests passed**, no skips, **108 offline
 tests passed**, Ruff clean/42 files and mypy clean/24 files. The actual job logs

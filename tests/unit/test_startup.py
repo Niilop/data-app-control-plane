@@ -97,5 +97,5 @@ command.upgrade(config, "head", sql=True)
     assert "CREATE TABLE applications" in output
     assert "005_owned_applications" in output
     assert "CREATE TABLE environment_bindings" in output
-    assert "006_environment_bindings" in output
+    assert "007_durable_operations" in output
     assert "DROP TABLE" not in output

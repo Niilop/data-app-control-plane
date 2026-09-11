@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from core.config import get_settings
 from models import database as runtime_models
+from models import operations as operation_models  # noqa: F401
 from models import platform as platform_models  # noqa: F401
 
 # Retain historical AI table metadata without importing it into the application.

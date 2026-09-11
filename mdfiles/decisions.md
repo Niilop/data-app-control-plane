@@ -10,7 +10,8 @@ retain its history, rationale, affected contracts/tasks, and replacement decisio
 Streamlit for initial UI, shared business services. Local hosting supports a
 single developer with essentially no cloud budget. Organizational hosting later
 does not require replacing core workflows. No microservices, Azure hosting,
-message broker, or Redis dependency initially.
+message broker, or Redis dependency initially. The initial Streamlit choice is
+superseded for future frontend development by ADR-015; the backend direction remains.
 
 ## ADR-002 — GitHub and GitHub Actions first
 
@@ -192,6 +193,59 @@ The explicit local seed accepts an existing active admin ID, creates only the
 simulated environment, and refuses to overwrite changed policy. The identical
 repeat does nothing. It is a direct-DB local administration helper, not a provider
 adapter. No actual simulation execution is introduced before its owning task.
+
+## ADR-014 — T04 durable queue with a fixed simulated probe
+
+**Accepted implementation direction (T04), 2026-09-11.** Use PostgreSQL queue rows,
+short synchronous transactions, `FOR UPDATE SKIP LOCKED`, renewable leases and
+monotonic fencing. No broker or FastAPI background execution. Fencing covers
+related probe results, attempts, reservation release and audit in one transaction.
+Use database wall time after locks and recheck after flush; stale workers discard
+results. Preserve requester identity while recording worker identity separately.
+
+Keep an explicit typed, side-effect-free probe to exercise infrastructure without
+an arbitrary task API. Its success path is available only via local CLI/service.
+Closed deterministic failure scenarios support tests. Expiry first reconciles;
+only established safe outcomes may retry. Unknown work retains the binding
+reservation. An operator reason schedules observation and cannot force success;
+retain only its digest to avoid pasted credentials in audit/history.
+
+Store idempotency in command records so recovery endpoints have the same replay
+contract as initial submission. Retries create linked operations after current
+policy checks. Admin/owner status does not imply operator rights. API and worker
+both enforce current grants, lifecycle and environment/binding eligibility.
+
+Public readiness reports database/worker availability without diagnostics;
+global queue telemetry is admin-only. No provider readiness, exactly-once external
+execution, workspace capacity management or organization identity is implied.
+
+## ADR-015 — Replace Streamlit before T05
+
+**Accepted user direction, 2026-09-11; implementation planned as T04a.** After T04
+merges, replace Streamlit with React + TypeScript built using Vite before starting
+T05. The backend now provides enough real workflows to support a useful UI;
+migrating while the UI is small avoids implementing future feature screens twice.
+This supersedes ADR-001's initial UI choice, not its FastAPI/worker/PostgreSQL design.
+
+Reuse existing API contracts, accounts, data, roles, services and worker behavior.
+Build the replacement alongside Streamlit for verification, starting with login
+and application list/register/detail, then current administration and operation
+workflows. Retire Streamlit only after equivalent browser workflows pass and
+Docker/startup documentation is updated. Subsequent tasks build their UI in React.
+
+The migration includes coherent navigation/forms/status feedback, accessibility,
+API failure/session-expiry handling and reviewed browser authentication storage.
+Server-side Streamlit session state is not a browser session design. Keep server
+credentials/signing keys out of frontend assets and retain API-side authorization,
+optimistic version checks and idempotency. Small API additions must retain scoped
+visibility and receive their own contract/behavior checks.
+
+Introduce a locked, project-local frontend toolchain and browser tests while
+preserving Python/uv backend verification. Supporting component/routing/data
+libraries and their versions are implementation choices; no packages are installed
+by this decision. Current Streamlit remains operational until T04a cuts over.
+No T05 features, speculative dashboards, provider activation or organization
+identity redesign are part of the migration. T05 depends on T04a completion.
 
 ## Questions reserved for their implementation gates
 

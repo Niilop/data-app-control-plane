@@ -6,7 +6,7 @@ Status: target design. See [repository map](repository-map.md) for actual code.
 
 ```mermaid
 flowchart LR
-    UI[Streamlit / CLI] --> API[FastAPI]
+    UI[React browser UI / CLI] --> API[FastAPI]
     API --> DB[(PostgreSQL)]
     W[Python worker] --> DB
     W --> FS[Artifact store]
@@ -16,6 +16,10 @@ flowchart LR
     CI --> D[Databricks sandbox]
     W --> D
 ```
+
+The React UI is the agreed T04a target; Streamlit remains implemented until that
+migration passes. Both use the FastAPI boundary. See ADR-015 for the staged
+replacement, browser session review and Streamlit retirement gate.
 
 The worker-to-Databricks path supports status observation and permitted run
 commands. Deployment execution belongs to the environment's selected executor:
@@ -145,3 +149,19 @@ attempts/retries, stale leases, and last observation time. Archived applications
 retain revision/deployment/audit history and external data. Reject archive while a
 conflicting operation is unresolved; require explicit separate retirement work for
 external resources in a future phase.
+
+### T04 implemented worker slice
+
+`worker.py` is a separate PostgreSQL polling process, also included in Compose.
+`services/queue_service.py` owns claims, short lease/heartbeat/result transactions
+and fencing; `services/operation_service.py` owns user commands, authorization,
+reservation and idempotency/audit transactions. The worker has explicit typed
+probe dispatch and no provider or arbitrary-code execution path. Worker loss
+enters reconciliation; a fixed probe can establish safe repeat execution because
+it has no external side effects. An unknown probe retains its reservation.
+
+API liveness is independent from readiness. Readiness requires queue access and
+recent worker presence; admin telemetry describes queue age/counts/expired leases.
+Neither heartbeat freshness nor local simulation asserts provider readiness.
+Future T05 handlers must extend the closed dispatch/schema and fenced related
+result transaction without executing adopted repository code in this worker.

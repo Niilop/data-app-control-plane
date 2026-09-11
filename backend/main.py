@@ -31,12 +31,13 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    from api.endpoints import applications, auth, environments, teams
+    from api.endpoints import applications, auth, environments, operations, teams
 
     app.include_router(auth.router)
     app.include_router(applications.router)
     app.include_router(teams.router)
     app.include_router(environments.router)
+    app.include_router(operations.router)
 
     @app.get("/")
     def root(settings: Settings = Depends(get_settings)) -> dict[str, str]:
@@ -46,6 +47,31 @@ def create_app() -> FastAPI:
     def health() -> dict[str, str]:
         """Process liveness only; does not claim database readiness."""
         return {"status": "ok"}
+
+    from api.endpoints.applications import DB
+
+    @app.get("/ready")
+    def ready(db: DB, response: Response) -> dict[str, str]:
+        """Readiness requires the queue schema and a recent worker database pulse."""
+        from datetime import timedelta
+
+        from models.operations import Operation, WorkerHeartbeat
+        from services.queue_service import now
+        from sqlalchemy import select
+
+        try:
+            db.execute(select(Operation.id).limit(1))
+            live = db.scalar(
+                select(WorkerHeartbeat.worker_id)
+                .where(WorkerHeartbeat.seen_at >= now(db) - timedelta(seconds=60))
+                .limit(1)
+            )
+            if live:
+                return {"status": "ready"}
+        except Exception:
+            db.rollback()
+        response.status_code = 503
+        return {"status": "unavailable"}
 
     return app
 
