@@ -397,37 +397,6 @@ def test_bounded_failure_and_sanitized_exception(
     )
 
 
-def test_ui_operation_cancel_retry_and_attempt_history(
-    registry: tuple, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from test_registry_ui import control, signed_in
-    from worker import run_one
-
-    identifier = queued(registry)
-    app = signed_in(registry, monkeypatch, 2)
-    assert any("Simulated execution" in caption.value for caption in app.caption)
-    control(app.button, "Cancel").click().run()
-    assert not app.exception
-    assert any("cancelled" in message.value for message in app.success)
-    control(app.button, "Retry").click().run()
-    assert not app.exception
-    assert run_one(sessionmaker(registry[2]), str(uuid4()))
-    control(app.button, "Refresh operations").click().run()
-    assert not app.exception
-    assert any(
-        "outcome" in frame.value.columns
-        and "succeeded" in frame.value["outcome"].tolist()
-        for frame in app.dataframe
-    )
-    client, headers, _, _ = registry
-    assert (
-        client.get(f"/api/v1/operations/{identifier}", headers=headers[2]).json()[
-            "status"
-        ]
-        == "cancelled"
-    )
-
-
 def test_lease_expiring_during_result_flush_rolls_back(
     registry: tuple, monkeypatch: pytest.MonkeyPatch
 ) -> None:

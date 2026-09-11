@@ -7,7 +7,15 @@ profile, isolated PostgreSQL migration integration tests, and platform CI; see
 Historical auth/example scripts are under `tests/manual/` with names outside
 pytest discovery; obsolete RAG tests were removed.
 
-## T04 verification
+## T04a verification
+
+React/browser checks and Docker test-image commands are in root README. Chromium
+workflows use a disposable real FastAPI/SQLite server; they do not replace the
+PostgreSQL migration/concurrency suite. Streamlit-only tests were retired after
+equivalent browser workflows passed. See `next-agent.md` for current counts,
+actual Docker checks and CI evidence. Browser artifacts are ignored by Git.
+
+## T04 verification (historical)
 
 Hosted [Platform CI run 34632237191](https://github.com/Niilop/data-app-control-plane/actions/runs/34632237191)
 at `d1c417d` passed: **15 PostgreSQL tests**, **126 offline tests**, Ruff and mypy.
@@ -105,8 +113,8 @@ Run from the repository root:
 uv sync --locked --all-packages --group dev
 uv run --locked pytest -q
 uv run --locked mypy
-uv run --locked ruff check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit
-uv run --locked ruff format --check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit
+uv run --locked ruff check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py tests/browser_server.py tests/conftest.py tests/unit
+uv run --locked ruff format --check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py tests/browser_server.py tests/conftest.py tests/unit
 ```
 
 All passed in T01a. Mypy checks settings/API assembly initially; Ruff covers the
@@ -124,8 +132,8 @@ registers the `integration` pytest marker; `testpaths` still defaults to
 uv sync --locked --all-packages --group dev
 uv run --locked pytest -q
 uv run --locked mypy
-uv run --locked ruff check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit tests/integration
-uv run --locked ruff format --check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit tests/integration
+uv run --locked ruff check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
+uv run --locked ruff format --check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
 ```
 
 **Actually run and passing** in the sandbox that implemented T01b: all four
@@ -172,8 +180,9 @@ uv run --locked uvicorn main:app --reload
 ```
 
 Only point Alembic at the dedicated development database. T04 adds, from the same
-directory, `uv run --locked python -m worker`. From `frontend/`, the intended UI
-command remains `uv run --locked streamlit run app.py`, with a configurable API URL.
+directory, `uv run --locked python -m worker`. From `frontend/`, run `npm ci` then
+`npm run dev` using Node 24.21.0 / npm 11.19.0. Vite proxies to the local API;
+`API_PROXY_TARGET` can override its server-side target. Docker uses nginx on 8501.
 Containers must run these processes independently, with separate environment and
 credential injection. Migrations run once as an explicit step, not from every replica.
 

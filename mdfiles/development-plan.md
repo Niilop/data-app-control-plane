@@ -1,7 +1,7 @@
 # Development plan and agent task ledger
 
-Status: **T01–T03 complete and merged; T04 implemented, pending review/merge**.
-T04a frontend migration is next, followed by T05 onward (not started).
+Status: **T01–T04 complete and merged; T04a implemented, pending review/merge**.
+T05 is next after T04a merges; later tasks have not started.
 This plan is implementation-ready guidance,
 not a claim of implemented capabilities. Task order follows dependencies rather
 than estimated calendar dates. Do not implement the entire roadmap in one turn.
@@ -34,8 +34,7 @@ T07 + T09 + T11 -> T12
 T10 + T12 -> T13 organizational pilot design
 ```
 
-Complete T04a before adding T05 feature screens; Streamlit remains the current UI
-until migration acceptance passes. Complete T11 after T07 for the full offline
+Complete review/merge of T04a before adding T05 feature screens to React. Complete T11 after T07 for the full offline
 demonstration, then T08–T09 for real
 GitHub integration. T10 can wait for an available workspace; continue recovery
 tests using scripted provider failures without pretending the real gate passed.
@@ -273,7 +272,8 @@ configuration changes increment binding version and are audited.
 
 ## T04 — Durable operations with a separate worker
 
-**Status:** implemented in PR #9, pending review/merge. **Depends on:** T03 (merged).
+**Status:** PR #9 confirmed merged as `9a36e56aac10a3b8c87cafbdc0f75f85b7752ff1`.
+**Depends on:** T03 (merged).
 
 **Delivered:** migration 007 queue/attempt/reservation/probe/command/heartbeat tables;
 transactional enqueue/audit and scoped idempotency; PostgreSQL claims, leases,
@@ -296,7 +296,7 @@ was confined to the agent session's Docker CLI mount; regular Ubuntu could reach
 Docker Desktop. First-start migration/configuration steps are documented in root
 README. Devstack integration and the interactive account journey remain unverified.
 
-**Next:** review/merge T04, then implement T04a only. T05 waits for the frontend migration.
+**Next:** T04a is implemented below and awaits review/merge; T05 follows.
 
 **Read:** worker/failure protocol in [architecture](architecture.md), operation
 state/idempotency contracts, T04 API rows; the operation contract; the old RAG job runner has been removed.
@@ -323,7 +323,38 @@ expose an arbitrary task-execution API. Add liveness/readiness and queue telemet
 
 ## T04a — Replace Streamlit with React
 
-**Status:** planned, not started; next after T04 merges. **Depends on:** T04.
+**Status:** implemented, pending review/merge. **Depends on:** T04 (merged).
+
+**Delivered:** clean light React/TypeScript/Vite interface for accounts, applications,
+ownership/roles, teams/memberships, environments/bindings, audit and operation
+history/recovery. Native dialogs restore keyboard focus; responsive navigation and
+paginated tables/selectors preserve usable narrow layouts. Forms retain original
+versions; current API capabilities control affordances without replacing policy.
+Browser login uses HTTP-only cookies with origin/custom-header write checks;
+bearer API clients remain compatible. Docker now serves static React assets and
+same-origin API routes through nginx on 8501. Streamlit runtime, workspace member,
+dependencies and UI-only tests were retired after browser parity passed. Existing
+accounts, data and migrations are preserved. ADR-016 records the session/runtime
+choices. Frontend checks and production-proxy smoke are included in CI.
+
+**Verification:** 125 offline Python tests passed; Ruff lint/format clean across
+48 files; mypy passed for 28 platform files. Locked frontend install, lint,
+format, type checks and production build passed; 9 real Chromium workflows passed
+using a disposable FastAPI/SQLite API and simulated worker fixtures. Desktop and
+390px mobile screenshots were inspected. All Compose images built, four local
+services started, and `/ready` through nginx returned ready. An isolated production
+nginx browser smoke passed routing, CSP, login, cookie reload, an authenticated
+write, readiness and logout. Browser assets contain no configured server secrets
+or test credentials. Hosted
+[Platform CI run 34649546595](https://github.com/Niilop/data-app-control-plane/actions/runs/34649546595)
+passed at `7cb2c20`: actual logs confirm **125 offline**, **15 PostgreSQL** (no skips),
+**9 browser** tests and production nginx smoke, with all lint/type/build checks.
+The delayed-response regression verifies that versioned edit controls wait for
+fresh records after refresh. PostgreSQL integration tests were not rerun locally.
+The final follow-up only records verification in docs; no local application rerun
+was needed for it. Recheck current CI before merge.
+
+
 **Decision:** [ADR-015](decisions.md#adr-015--replace-streamlit-before-t05).
 
 **Read:** current frontend modules and UI tests in [repository map](repository-map.md),

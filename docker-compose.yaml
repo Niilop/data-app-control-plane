@@ -67,15 +67,12 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
     ports:
-      - "127.0.0.1:8501:8501"
-    env_file:
-      - .env
-    environment:
-      API_URL: http://backend:8000
-    volumes:
-      - ./frontend:/app:ro
-    command: >
-      streamlit run app.py --server.port=8501 --server.address=0.0.0.0
+      - "127.0.0.1:8501:80"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
       - backend
 

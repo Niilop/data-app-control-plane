@@ -5,8 +5,8 @@ backed by GitHub repositories. See [the development plan](mdfiles/README.md) for
 scope, architecture, contracts, and bounded agent tasks.
 
 The platform provides development login, an owned application registry, team and
-role administration, transactional audit, and Streamlit registration/detail/history
-screens, plus admin-managed simulated environments and application bindings.
+role administration, transactional audit, and a React + TypeScript interface,
+plus admin-managed simulated environments and application bindings.
 A separate durable worker runs explicit simulated probes with operation history
 and recovery controls. Bundle generation, GitHub integration and Databricks
 deployment remain planned work.
@@ -45,12 +45,16 @@ uv run --locked python -m worker
 From `frontend/` in another terminal:
 
 ```bash
-uv run --locked streamlit run app.py
+npm ci
+npm run dev
 ```
 
-The UI defaults to `http://localhost:8000`; set `API_URL` in the environment or
-root `.env` to override it. Container Compose sets the internal frontend URL to
-`http://backend:8000`.
+Use Node **24.21.0** and npm **11.19.0** (`frontend/.node-version`). The UI is at
+<http://127.0.0.1:5173>; Vite proxies API requests to `http://127.0.0.1:8000`.
+Set `API_PROXY_TARGET` in the shell running Vite to change that server-side target.
+Vite does not read root `.env`, and no server credentials belong in frontend config.
+Docker serves the same interface on <http://localhost:8501>. Existing accounts
+continue to work; this frontend migration needs no database migration or reset.
 
 ## Local accounts and application registration
 
@@ -83,7 +87,7 @@ Public registration always creates an active nonadmin account.
    membership alone does not grant application visibility; an explicit team role
    does. No platform role grants GitHub, Databricks, or data permissions.
 
-The UI uses paginated lists with First/Next controls. If another edit makes a form
+The UI uses paginated lists with Previous/Next controls. If another edit makes a form
 stale, reload its version and review fields before resubmitting. Administrative
 history includes team/membership and local-bootstrap events; application history
 is visible only to actors who can currently read that application.
@@ -135,11 +139,11 @@ All environment/binding responses and screens explicitly identify simulation.
 
 ## Containers
 
-Backend and frontend images build from the locked workspace with uv (pinned to
-`0.12.11`, matching CI): a builder stage runs `uv sync --locked --package
-<backend|frontend> --no-dev`, and the runtime stage copies only that resulting
-virtual environment plus the member's source — no `.env`, credentials, local
-`data/`, or host `.venv` are copied in.
+Backend/worker images use uv 0.12.11 and `uv.lock`, with their environment at
+`/opt/venv`. The frontend uses a Node 24.21.0 builder with `npm ci`, then nginx
+serves only the compiled assets and proxies API requests to `backend:8000`.
+The frontend receives no `.env`, credentials, Python runtime, or source bind mount.
+Rebuild its image after frontend changes; use Vite for live local development.
 
 For a first start using the bundled database, create `.env` from `.env.example`
 if it does not exist. Set a generated `SECRET_KEY`, matching `POSTGRES_PASSWORD`
@@ -191,17 +195,25 @@ uses:
   defaults to `5433` (`POSTGRES_HOST_PORT`) to avoid colliding with devstack's
   PostgreSQL on `5432`.
 
-See `.env.example` for the exact `DATABASE_URL` value in each case. Frontend's
-container `API_URL` is fixed to `http://backend:8000` by Compose; running the
-frontend image standalone (outside Compose) requires setting `API_URL` to
-wherever the backend is actually reachable from that container.
+See `.env.example` for the database configuration. The nginx upstream is the
+Compose service name `backend:8000`; standalone use requires that DNS name on the
+same Docker network or an explicitly adapted nginx configuration. `API_URL` is
+retired. Existing `.env` files may retain it harmlessly; it is no longer used.
 
-Local Docker verification passed on 2026-09-11: quiet Compose validation,
-backend/frontend/worker image builds, fresh bundled PostgreSQL migration through
-007, API liveness/readiness and Streamlit health. Docker Desktop was reachable
-from regular Ubuntu; an earlier agent-session CLI mount returned an I/O error.
-That session error did not indicate a broken Docker daemon. Devstack integration
-and external providers remain unverified.
+For an existing installation, preserve `.env` and database volumes, then run:
+
+```bash
+docker compose --profile local-db build
+docker compose --profile local-db up -d --wait backend worker frontend
+curl --fail http://localhost:8501/health
+curl --fail http://localhost:8501/ready
+```
+
+Use your existing account at <http://localhost:8501>. Docker binds published ports
+to loopback. Browser sessions use HTTP-only SameSite=Strict cookies, a 30-minute
+default lifetime, and origin/custom-header checks on writes. Logout clears the
+cookie; copied development JWTs remain valid until expiry. HTTPS proxy trust and
+organization identity require a later review. See ADR-016 for the session contract.
 
 ## Available endpoints
 
@@ -213,7 +225,9 @@ and external providers remain unverified.
 | GET | `/api/v1/queue/telemetry` | Admin-only queue counts, age and worker freshness |
 | POST | `/auth/register` | Create a development account |
 | POST | `/auth/login` | Email/username and password as form data |
-| GET | `/auth/me` | Current user; requires bearer token |
+| POST | `/auth/session` | Browser login; sets HTTP-only cookie and returns current user |
+| DELETE | `/auth/session` | Browser logout; clears cookie |
+| GET | `/auth/me` | Current user; cookie or bearer token |
 | GET | `/docs` | OpenAPI UI |
 
 AI routes and placeholder metrics are absent. CSV/example modules remain dormant
@@ -225,17 +239,55 @@ and are not mounted by the platform API. The registry is under `/api/v1`; see
 ```bash
 uv run --locked pytest -q
 uv run --locked mypy
-uv run --locked ruff check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py frontend tests/conftest.py tests/unit tests/integration
-uv run --locked ruff format --check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py frontend tests/conftest.py tests/unit tests/integration
+uv run --locked ruff check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
+uv run --locked ruff format --check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
 ```
 
 Unit tests (`tests/unit`, the default `testpaths`) block network calls. Startup and
 migration-rendering tests use an isolated process with controlled configuration; no
-running database or provider is required. UI tests use Streamlit's test runner and
-in-process API calls for registry workflows. Offline registry tests use SQLite
-with foreign keys enabled; PostgreSQL tests establish real migration, constraint,
-transaction and concurrent-update behavior. Mypy covers 24 new/affected platform
+running database or provider is required. Offline registry tests use SQLite with
+foreign keys enabled; PostgreSQL tests establish real migration, constraint,
+transaction and concurrent-update behavior. Mypy covers the selected platform
 modules; unrelated legacy modules remain outside its scope.
+
+Frontend checks, from `frontend/`:
+
+```bash
+npm ci
+npm run lint
+npm run format:check
+npm run typecheck
+npm run build
+npx playwright install chromium
+npm run test:e2e
+```
+
+Playwright launches Vite and a real FastAPI test server on loopback ports 5174 and
+8001. The server uses disposable SQLite fixtures and simulated worker services;
+it never connects to `.env`'s database. Tests cover accounts, registry, admin
+workflows, conflicts, revoked permissions, pagination, recovery idempotency and
+keyboard/mobile behavior. PostgreSQL behavior remains covered separately.
+
+If Chromium's OS libraries are absent, use the isolated test image instead of
+installing global host packages:
+
+```bash
+docker build -f tests/Dockerfile.browser -t control-plane-browser-tests .
+docker run --rm --ipc=host control-plane-browser-tests
+```
+
+CI builds this image and runs frontend lint/format/build/browser checks. It also
+verifies production nginx routing, login, cookie persistence and authenticated
+writes against separate disposable API fixtures:
+
+```bash
+docker build -f frontend/Dockerfile -t data-app-control-plane-frontend .
+docker compose -p control-plane-browser-check -f tests/compose.browser.yaml up --abort-on-container-exit --exit-code-from browser
+docker compose -p control-plane-browser-check -f tests/compose.browser.yaml down
+```
+
+This test project has no application database volume or published ports. No test
+accounts or test API endpoints are included in the production frontend image.
 
 Isolated PostgreSQL migration integration tests (`tests/integration`, marked
 `integration`) are not part of the default `testpaths` and need a dedicated,

@@ -1,0 +1,31 @@
+# Disposable test-only network and API fixtures. No .env or application DB volume.
+services:
+  backend:
+    image: control-plane-browser-tests
+    command: uv run --locked python ../tests/browser_server.py
+    environment:
+      BROWSER_TEST_HOST: 0.0.0.0
+      BROWSER_TEST_PORT: 8000
+    healthcheck:
+      test: ["CMD", "/workspace/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  frontend:
+    image: data-app-control-plane-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/health"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  browser:
+    image: control-plane-browser-tests
+    init: true
+    command: node e2e/nginx-smoke.mjs
+    shm_size: 1gb
+    depends_on:
+      frontend:
+        condition: service_healthy

@@ -1,5 +1,5 @@
 [tool.uv.workspace]
-members = ["backend", "frontend"]
+members = ["backend"]
 
 [dependency-groups]
 dev = [
@@ -31,20 +31,18 @@ python_version = "3.11"
 files = [
     "backend/core/config.py", "backend/core/database.py", "backend/main.py",
     "backend/models/platform.py", "backend/models/platform_schemas.py",
-    "backend/api/dependencies.py", "backend/api/platform_errors.py",
+    "backend/api/dependencies.py", "backend/api/browser_session.py", "backend/api/platform_errors.py",
     "backend/api/endpoints/auth.py", "backend/api/endpoints/applications.py", "backend/api/endpoints/teams.py",
     "backend/services/auth_service.py", "backend/services/application_service.py",
     "backend/services/policy_service.py", "backend/services/audit_service.py", "backend/services/pagination.py",
     "backend/models/operations.py", "backend/models/operation_schemas.py",
     "backend/services/operation_service.py", "backend/services/queue_service.py",
     "backend/api/endpoints/operations.py", "backend/worker.py", "backend/queue_probe.py",
-    "frontend/operation_ui.py",
     "backend/bootstrap.py", "backend/seed_sandbox.py",
     "backend/models/environment_schemas.py", "backend/services/environment_service.py",
     "backend/api/endpoints/environments.py",
-    "frontend/api_client.py", "frontend/registry.py", "frontend/registry_widgets.py", "frontend/environment_ui.py",
 ]
-mypy_path = ["backend", "frontend"]
+mypy_path = ["backend"]
 explicit_package_bases = true
 follow_imports = "silent"
 check_untyped_defs = true

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from models.database import User
 from models.platform import Application, ApplicationRole, AuditEvent
 from models.platform_schemas import (
+    ApplicationCapabilities,
     ApplicationCreate,
     ApplicationResponse,
     ApplicationUpdate,
@@ -19,7 +20,7 @@ from models.platform_schemas import (
 )
 from services import application_service as service
 from services.pagination import paginate
-from services.policy_service import get_application, visible_applications
+from services.policy_service import get_application, role_filter, visible_applications
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -56,6 +57,26 @@ def list_applications(
 @router.get("/{application_id}", response_model=ApplicationResponse)
 def detail(application_id: UUID, db: DB, actor: Actor) -> Application:
     return get_application(db, actor, application_id)
+
+
+@router.get("/{application_id}/capabilities", response_model=ApplicationCapabilities)
+def capabilities(application_id: UUID, db: DB, actor: Actor) -> dict[str, bool]:
+    """Current UI affordances only; mutation services still enforce authorization."""
+    application = get_application(db, actor, application_id)
+    roles = set(
+        db.scalars(
+            select(ApplicationRole.role).where(
+                ApplicationRole.application_id == application_id, role_filter(actor)
+            )
+        )
+    )
+    return {
+        "edit_metadata": "developer" in roles,
+        "manage_access": actor.is_platform_admin
+        or application.owner_user_id == actor.id,
+        "manage_bindings": actor.is_platform_admin,
+        "operate": "operator" in roles,
+    }
 
 
 @router.patch("/{application_id}", response_model=ApplicationResponse)

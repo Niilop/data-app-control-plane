@@ -1,13 +1,14 @@
 # Data application control plane: agent entry point
 
-Documentation baseline: 2026-09-11. Implementation status: **T01–T03 merged;
-T04 durable operations implemented, pending PR review/merge.** The platform
-includes an owned application registry and admin-managed simulated environments,
-versioned bindings, a simulated durable worker and operation history. Docker builds and bundled-database startup are verified; devstack integration remains unverified.
-Existing local configuration now requires `DEPLOYMENT_EXECUTOR=simulated`.
-Consult [next-agent.md](next-agent.md) for exact verification and prerequisites.
-The next milestone after T04 merges is **T04a: React + TypeScript + Vite frontend
-migration**, before T05. Streamlit is still implemented; its replacement is planned.
+Documentation baseline: 2026-09-12. Implementation status: **T01–T04 merged;
+T04a React frontend implemented, pending review/merge.** The platform includes
+owned applications, team/role administration, simulated environment bindings,
+durable operation history and recovery. React + TypeScript + Vite now replaces
+Streamlit; Docker serves the UI with nginx on localhost:8501. Existing accounts
+and database history are preserved. Local simulation must remain explicit.
+See [next-agent.md](next-agent.md) for verification and current limitations.
+The next bounded task after T04a merges is **T05: Generate a bundle and capture a
+revision**. No generation, provider deployment or organization identity exists yet.
 
 **Resume here:** [next-agent.md](next-agent.md). Verify prerequisite changes
 on updated `main` before creating or continuing any task branch; the handoff
@@ -62,11 +63,12 @@ Use this prompt (see [next-agent.md](next-agent.md) for the current, more
 specific version):
 
 > Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Inspect Git
-> status and verify T04 is merged into updated main. Implement T04a only on its
-> own branch, preserving unrelated changes. Explain the plan, run its checks,
-> update the handoff and affected docs, and open a draft PR against main. Do not
-> merge, begin T05, or deploy cloud resources. Migrate current workflows to React,
-> TypeScript and Vite, and retire Streamlit after equivalent behavior is verified.
+> status and verify T04a is merged into updated main. Create the next task branch
+> if needed and implement T05 only, using the React frontend and existing durable
+> worker contracts. Preserve accounts, data and unrelated work. Run the required
+> checks, update the handoff/contracts/map, and open a draft PR. Do not merge,
+> begin T06, publish repositories, or activate external providers.
+
 
 The handoff separates implemented behavior from verification and merge status.
 Infrastructure activation and later task completion are not implied by this plan.

@@ -19,3 +19,8 @@ mdfiles
 tests
 scripts
 README.md
+
+**/node_modules
+**/dist
+**/playwright-report
+**/test-results

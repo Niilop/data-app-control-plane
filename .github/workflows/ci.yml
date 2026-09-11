@@ -22,8 +22,8 @@ jobs:
           version: "0.12.11"
           enable-cache: true
       - run: uv sync --locked --all-packages --group dev
-      - run: uv run --locked ruff check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py frontend tests/conftest.py tests/unit tests/integration
-      - run: uv run --locked ruff format --check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py frontend tests/conftest.py tests/unit tests/integration
+      - run: uv run --locked ruff check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
+      - run: uv run --locked ruff format --check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
       - run: uv run --locked mypy
       - run: uv run --locked pytest -q
 
@@ -60,3 +60,18 @@ jobs:
           enable-cache: true
       - run: uv sync --locked --all-packages --group dev
       - run: uv run --locked pytest tests/integration -q
+
+  frontend-browser:
+    name: React checks and browser workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: docker build -f tests/Dockerfile.browser -t control-plane-browser-tests .
+      - run: docker run --rm --ipc=host control-plane-browser-tests sh -c 'npm run lint && npm run format:check && npm run build && npm run test:e2e'
+      - run: docker build -f frontend/Dockerfile -t data-app-control-plane-frontend .
+      - run: docker compose -p control-plane-browser-ci -f tests/compose.browser.yaml up --abort-on-container-exit --exit-code-from browser
+      - if: always()
+        run: docker compose -p control-plane-browser-ci -f tests/compose.browser.yaml down

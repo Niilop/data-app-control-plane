@@ -9,8 +9,8 @@ access; external access automation is introduced explicitly by integration.
 
 - GitHub is the first repository provider; GitHub Actions is the first CI/CD engine.
 - Run the platform locally with FastAPI, a separate Python worker, PostgreSQL,
-  and a React + TypeScript frontend built with Vite. Streamlit remains the current
-  UI until T04a replaces it after T04 and before T05 (ADR-015). Use the developer's
+  and a React + TypeScript frontend built with Vite. T04a replaces Streamlit
+  before T05 (ADR-015/016). Use the developer's
   existing devstack where practical.
 - Do not require Azure hosting for the platform. A real Databricks workspace can
   be used for a small, explicitly authorized integration demonstration.
