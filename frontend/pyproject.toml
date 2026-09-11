@@ -1,0 +1,14 @@
+[project]
+name = "frontend"
+version = "0.1.0"
+description = "Streamlit UI for the LLM template"
+requires-python = ">=3.11"
+dependencies = [
+    "streamlit",
+    "requests",
+    "pydantic-settings",
+    "python-dotenv",
+]
+
+[tool.uv]
+package = false

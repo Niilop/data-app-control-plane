@@ -1,0 +1,46 @@
+### ============= Authentication =============
+
+### Register a new user
+POST http://127.0.0.1:8000/auth/register
+Content-Type: application/json
+
+{
+  "email": "niilo@example.com",
+  "username": "niilo",
+  "password": "password123"
+}
+
+### Login
+POST http://127.0.0.1:8000/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+username=niilo%40example.com&password=password123
+
+### Get current user (requires token from login)
+GET http://127.0.0.1:8000/auth/me
+Authorization: Bearer YOUR_TOKEN_HERE
+
+### ============= Example Endpoint =============
+
+POST http://127.0.0.1:8000/example/
+Content-Type: application/json
+
+{
+  "name": "Niilo",
+  "task": "Test my API"
+}
+
+### ============= LLM Summarization =============
+
+POST http://127.0.0.1:8000/llm/summarize
+Content-Type: application/json
+
+{
+  "text": "This is a long text that should be summarized. Add your text here."
+}
+
+### ============= Health Checks =============
+
+GET http://127.0.0.1:8000/
+GET http://127.0.0.1:8000/health
+GET http://127.0.0.1:8000/metrics

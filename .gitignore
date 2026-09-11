@@ -1,0 +1,20 @@
+# .gitignore
+.contextwindow
+.claude
+.vscode
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+app.db

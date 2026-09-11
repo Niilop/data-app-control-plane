@@ -1,0 +1,7 @@
+# Normalize line endings so files stay consistent between Windows and WSL/Linux checkouts.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
