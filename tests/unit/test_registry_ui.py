@@ -113,3 +113,64 @@ def test_ui_connection_failure(
     assert not app.exception
     assert any("Unable to reach the API" in message.value for message in app.error)
     assert all("private diagnostic" not in message.value for message in app.error)
+
+
+def test_ui_environment_binding_and_stale_policy(
+    registry: tuple, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from test_registry import create
+
+    client, headers, _, _ = registry
+    application = create(registry)
+    app = signed_in(registry, monkeypatch, 1)
+    control(app.radio, "Registry").set_value("Environments").run()
+    assert not app.exception
+    control(app.checkbox, "Allow self-approval in this local simulation").check()
+    control(app.button, "Create simulated environment").click().run()
+    assert not app.exception
+    assert any(
+        "Simulated environment created" in message.value for message in app.success
+    )
+    environment = client.get("/api/v1/environments", headers=headers[1]).json()[
+        "items"
+    ][0]
+    assert environment["allow_self_approval"] is True
+    control(app.radio, "Registry").set_value("Applications").run()
+    control(app.button, "Create binding").click().run()
+    assert not app.exception
+    assert any(
+        "Simulated environment binding created" in message.value
+        for message in app.success
+    )
+    path = f"/api/v1/applications/{application['id']}/bindings"
+    binding = client.get(path, headers=headers[1]).json()["items"][0]
+    assert binding["config"]["schema_version"] == 1
+    assert any("simulated" in str(expander.label) for expander in app.expander)
+    client.patch(
+        f"/api/v1/environments/{environment['id']}",
+        headers=headers[1],
+        json={"expected_version": 1, "allow_self_approval": False},
+    )
+    control(app.button, "Save binding").click().run()
+    assert not app.exception
+    assert any("Binding changed" in message.value for message in app.error)
+    assert client.get(path, headers=headers[1]).json()["items"][0]["version"] == 2
+
+
+def test_ui_viewer_cannot_manage_environments_or_bindings(
+    registry: tuple, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from test_environments import bound
+
+    bound(registry)
+    app = signed_in(registry, monkeypatch, 4)
+    assert not app.exception
+    assert all(
+        button.label not in {"Create binding", "Save binding"} for button in app.button
+    )
+    control(app.radio, "Registry").set_value("Environments").run()
+    assert not app.exception
+    assert all(
+        button.label not in {"Create simulated environment", "Save environment"}
+        for button in app.button
+    )

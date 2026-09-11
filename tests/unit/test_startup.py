@@ -27,6 +27,7 @@ def run_isolated(script: str, tmp_path: Path) -> str:
             "PYTHONPATH": str(BACKEND),
             "DATABASE_URL": "postgresql://test:test@127.0.0.1:1/unused",
             "SECRET_KEY": "unit-test-key-only",
+            "DEPLOYMENT_EXECUTOR": "simulated",
         },
         capture_output=True,
         text=True,
@@ -95,4 +96,6 @@ command.upgrade(config, "head", sql=True)
     assert "004_add_background_jobs" in output
     assert "CREATE TABLE applications" in output
     assert "005_owned_applications" in output
+    assert "CREATE TABLE environment_bindings" in output
+    assert "006_environment_bindings" in output
     assert "DROP TABLE" not in output

@@ -7,8 +7,8 @@ affected files before editing; avoid a full repository crawl for each task.
 
 | Path | Responsibility / relevant limitation |
 |---|---|
-| `backend/main.py` | FastAPI assembly; auth/system and T02 registry routes, request IDs and safe error handlers; no AI routes |
-| `backend/core/config.py` | Cached Pydantic settings; DB/auth settings only; SQL debug off by default; no AI settings |
+| `backend/main.py` | FastAPI assembly; auth/system and T02/T03 registry routes, request IDs and safe error handlers; no AI routes |
+| `backend/core/config.py` | Cached settings; explicit simulated executor, local-only profile gate, DB/auth settings, sanitized validation errors and SQL debug off |
 | `backend/core/database.py` | Synchronous engine/session and typed DeclarativeBase; settings constructed on import |
 | `backend/core/logging.py` | Basic Python logging, no structured audit/correlation |
 | `backend/models/database.py` | User (T02 active/admin flags), dataset, and dormant pipeline tables; historical AI models moved to Alembic |
@@ -20,7 +20,7 @@ affected files before editing; avoid a full repository crawl for each task.
 | `backend/services/data_service.py` | Dormant CSV support; not a platform domain service |
 | `backend/alembic/env.py` | Imports runtime plus historical metadata; local package marker removed to avoid shadowing installed Alembic; T01b: escapes `%` in `sqlalchemy.url` for `configparser`, and caches the `legacy_models` load in `sys.modules` so re-running migrations in one process doesn't re-register `Base.metadata` tables |
 | `backend/alembic/versions/001_initial.py` … `004_add_background_jobs.py` | Existing migration chain; preserve it |
-| `frontend/app.py` | Development account/status and T02 registry UI entry point; API_URL configurable; no AI UI |
+| `frontend/app.py` | Development account/status and T02/T03 registry UI entry point; API_URL configurable; no AI UI |
 | `pyproject.toml` | uv workspace containing backend and frontend |
 | `backend/pyproject.toml`, `frontend/pyproject.toml`, `uv.lock` | Tracked lock and dependencies; AI providers/LangChain removed, dev tooling added |
 | `backend/Dockerfile`, `frontend/Dockerfile` | T01b: multi-stage, uv-locked (`uv sync --locked --package <name>`) builds pinned to `ghcr.io/astral-sh/uv:0.12.11`; venv at `/opt/venv`, not under the Compose dev bind mount |
@@ -50,6 +50,19 @@ affected files before editing; avoid a full repository crawl for each task.
 | `frontend/api_client.py`, `registry.py` | Authenticated HTTP/timeouts; application registration/detail/edit/history and minimal team/role controls |
 | `tests/unit/test_registry.py`, `test_registry_ui.py` | Offline API authorization/validation/atomicity and Streamlit-to-API workflows |
 
+### T03 implementation modules
+
+| Path | Responsibility |
+|---|---|
+| `backend/models/platform.py`, `backend/models/environment_schemas.py` | Environment/binding ORM and strict local simulation/target/config schemas |
+| `backend/alembic/versions/006_environment_bindings.py` | Add versioned environments and unique application bindings; 001–005 unchanged |
+| `backend/services/environment_service.py` | Admin policy, filtered reads, environment row locks, binding version invalidation and atomic audit |
+| `backend/api/endpoints/environments.py` | Environment and application-binding create/list/detail/update routes |
+| `backend/seed_sandbox.py` | Explicit local admin seed; repeatable, audited, no overwrites or external calls |
+| `frontend/environment_ui.py`, `frontend/registry_widgets.py` | Environment/binding screens and shared pagination/feedback extracted from T02 registry UI |
+| `tests/unit/test_environments.py`, `tests/unit/test_registry_ui.py` | Offline target/config/policy/rollback and real in-process API/UI workflows |
+| `tests/integration/test_environment_bindings.py` | Upgrade preservation, unique/FK checks, rollback and concurrent environment/binding writes on PostgreSQL |
+
 ## Reuse and migration strategy
 
 Reuse FastAPI, Pydantic, synchronous SQLAlchemy, Alembic, PostgreSQL, Streamlit,
@@ -66,7 +79,6 @@ Keep the existing import layout initially; a package-wide rename is outside T01.
 
 | Path | Planned content |
 |---|---|
-| `backend/api/endpoints/environments.py` | Environment registry/admin endpoints |
 | `backend/api/endpoints/revisions.py`, `operations.py`, `access.py` | Workflow endpoints |
 | `backend/services/operation_service.py`, `deployment_service.py`, `access_service.py` | Workflow logic |
 | `backend/worker.py` | Independently runnable worker entry point |

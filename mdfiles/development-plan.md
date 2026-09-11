@@ -1,6 +1,6 @@
 # Development plan and agent task ledger
 
-Status: **T01 and T02 complete and merged**; T03 onward not started. This plan is implementation-ready guidance,
+Status: **T01 and T02 complete and merged; T03 implemented, pending review/merge**; T04 onward not started. This plan is implementation-ready guidance,
 not a claim of implemented capabilities. Task order follows dependencies rather
 than estimated calendar dates. Do not implement the entire roadmap in one turn.
 
@@ -228,7 +228,30 @@ rights. Keep existing login compatible for local development.
 
 ## T03 — Register a sandbox environment binding
 
-**Status:** not started. **Depends on:** T02.
+**Status:** implemented in draft PR #8; pending review/merge. **Depends on:** T02 (merged).
+Started from updated main `928f2f7`, including the merged T02 handoff PR #7.
+
+**Implemented:** migration 006 adds versioned environments and unique application/
+environment bindings. Admin-only writes; permission-filtered environment/binding
+reads; explicit local simulated references/executor, approved bundle targets,
+enabled and self-approval policies, closed versioned integer configuration.
+Environment changes lock against binding writes and bump/audit all affected binding
+versions atomically. Streamlit supports environment creation/policy and binding
+create/edit/read. An explicit idempotent local seed requires an active admin.
+Startup requires `DEPLOYMENT_EXECUTOR=simulated` and rejects unsupported profiles,
+real executors and mismatches; existing local `.env` files need this opt-in.
+
+**Verification:** 108 offline tests passed, including API/UI authorization, target/
+config validation, stale edits, seed behavior and rollback. Ruff checks passed over
+the T03 scope and mypy passed for 24 source files. Local PostgreSQL execution
+reports ten skips with `TEST_DATABASE_URL` unset. Hosted
+[Platform CI run 34624002359](https://github.com/Niilop/data-app-control-plane/actions/runs/34624002359)
+at `974c16e` passed: actual logs report **10 PostgreSQL tests passed**, no skips,
+**108 offline tests passed**, Ruff and mypy clean. Agent handoff also passed.
+Exact evidence is in `next-agent.md`; local skips alone prove no database behavior. Docker builds/live startup remain unverified. No real environment was
+seeded and no provider or paid workload was run.
+
+**Next:** review/merge T03 with hosted PostgreSQL checks, then T04 only.
 
 **Read:** profile section in [architecture](architecture.md), binding/policy
 invariants in [domain contracts](domain-contracts.md), T03 API rows.

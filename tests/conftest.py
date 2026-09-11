@@ -41,6 +41,8 @@ def registry(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple]:
     monkeypatch.setenv("DATABASE_URL", "postgresql://test:test@127.0.0.1:1/unused")
     monkeypatch.setenv("SECRET_KEY", "registry-unit-test-only")
     monkeypatch.setenv("DEBUG", "false")
+    monkeypatch.setenv("RUNTIME_PROFILE", "local")
+    monkeypatch.setenv("DEPLOYMENT_EXECUTOR", "simulated")
     from core.config import get_settings
 
     get_settings.cache_clear()
@@ -71,6 +73,8 @@ def registry(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple]:
             "applications",
             "application_roles",
             "audit_events",
+            "environments",
+            "environment_bindings",
         }
     ]
     Base.metadata.create_all(engine, tables=tables)
