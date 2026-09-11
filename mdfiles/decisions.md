@@ -21,11 +21,14 @@ or tunnel is needed. Repository creation and automated onboarding PRs are deferr
 
 ## ADR-003 — Preserve template history; isolate new domain
 
-**Provisional, recommended.** Keep existing users/tables/migrations, disable
-unrelated legacy routes in platform mode, and create separate platform entities.
+**Provisional, recommended.** Keep existing users/tables/migrations and create separate platform entities.
+User clarification during T01a: remove AI chat/RAG/LLM/inference features fully,
+including runtime models, routes, services, UI, settings, and dependencies. Retain
+historical ORM metadata under Alembic so autogeneration preserves stored data.
+This supersedes the original proposal to keep AI features behind a toggle.
 Do not force application/revision/operation semantics into old Pipeline/BackgroundJob.
 Retain synchronous SQLAlchemy and current import layout initially. Consequence:
-legacy pgvector/dependency baggage may remain until separately migrated; local
+pgvector remains necessary for historical migrations; local
 startup must still be independent of LLM credentials.
 
 ## ADR-004 — PostgreSQL durable queue

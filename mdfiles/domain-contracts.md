@@ -2,7 +2,8 @@
 
 Status: proposed implementation contract. Introduce entities in their owning task,
 not all at once. New entities use UUIDs, timezone-aware UTC timestamps, explicit
-foreign keys, and database constraints for uniqueness. Existing user IDs may remain
+foreign keys, and database constraints for uniqueness. Historical AI tables remain migration-only metadata after T01a; no runtime AI
+features are retained. Existing user IDs may remain
 integers; external identity later maps issuer + subject to that internal user.
 
 ## Entity catalogue

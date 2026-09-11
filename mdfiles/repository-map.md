@@ -7,38 +7,38 @@ affected files before editing; avoid a full repository crawl for each task.
 
 | Path | Responsibility / relevant limitation |
 |---|---|
-| `backend/main.py` | FastAPI assembly; imports every legacy router; health is process-only and metrics are placeholders |
-| `backend/core/config.py` | Cached Pydantic settings; requires LLM settings and selected provider key |
+| `backend/main.py` | FastAPI assembly; auth/system routes only; AI routes and placeholder metrics removed in T01a |
+| `backend/core/config.py` | Cached Pydantic settings; DB/auth settings only; SQL debug off by default; no AI settings |
 | `backend/core/database.py` | Synchronous engine/session/base; settings constructed on import |
 | `backend/core/logging.py` | Basic Python logging, no structured audit/correlation |
-| `backend/models/database.py` | User, dataset, ML model, pipeline, chat, vector, and background-job tables |
+| `backend/models/database.py` | User, dataset, and dormant pipeline tables; historical AI models moved to Alembic |
 | `backend/models/schemas.py` | All legacy Pydantic API schemas in one file |
 | `backend/api/endpoints/auth.py` | Register/login/current-user; current-user dependency lives in router |
 | `backend/services/auth_service.py` | bcrypt/JWT helpers, user queries; token subject is email |
-| `backend/services/job_service.py` | Persists status but accepts in-memory callable; commits internally |
-| `backend/api/endpoints/rag.py` | Submits legacy work with FastAPI `BackgroundTasks` |
-| `backend/services/{chat,data,rag,llm}_service.py` | Legacy data-science features; not platform domain services |
-| `backend/alembic/env.py` | Imports settings and shared model metadata |
+| `backend/alembic/legacy_models.py` | Migration-only metadata for removed AI/model/job tables; prevents destructive autogeneration |
+| Former `chat`, `rag`, `llm`, `jobs` routers/services | Removed in T01a, including RAG-only background execution |
+| `backend/services/data_service.py` | Dormant CSV support; not a platform domain service |
+| `backend/alembic/env.py` | Imports runtime plus historical metadata; local package marker removed to avoid shadowing installed Alembic |
 | `backend/alembic/versions/001_initial.py` … `004_add_background_jobs.py` | Existing migration chain; preserve it |
-| `frontend/app.py` | Single Streamlit file; hardcoded `http://backend:8000/`, auth/chat/API tester |
+| `frontend/app.py` | Development account/status page; API_URL configurable; no AI UI |
 | `pyproject.toml` | uv workspace containing backend and frontend |
-| `backend/pyproject.toml`, `frontend/pyproject.toml`, `uv.lock` | Local dependencies/lock; legacy AI dependencies remain |
+| `backend/pyproject.toml`, `frontend/pyproject.toml`, `uv.lock` | Tracked lock and dependencies; AI providers/LangChain removed, dev tooling added |
 | `backend/Dockerfile`, `frontend/Dockerfile` | pip installs from separate requirements files; flattened container imports |
 | `docker-compose.yaml` | Bundled pgvector database; backend DB name hardcoded; no worker |
-| `tests/test_auth.py`, `tests/test_request.py` | Live HTTP scripts with import-time side effects |
-| `tests/test_rag_service.py` | Live server/provider tests; pytest-style functions lack a supplied `headers` fixture |
-| `README.md` | Legacy template guide; retain relevant legacy notes when replacing the main introduction |
+| `tests/manual/auth_smoke.py`, `tests/manual/request_smoke.py` | Historical manual HTTP examples; not pytest tests |
+| `tests/unit/`, `tests/conftest.py` | Offline settings/startup/UI/migration-rendering tests and network guards |
+| `README.md` | Current local startup and focused verification commands |
 
 ## Reuse and migration strategy
 
 Reuse FastAPI, Pydantic, synchronous SQLAlchemy, Alembic, PostgreSQL, Streamlit,
-and uv. Keep old tables/migrations intact; disable legacy routers and LLM startup
-in the default platform profile. Do not delete uploaded files or rewrite old
+and uv. Keep old tables/migrations intact; remove AI runtime features per the user's clarification; keep dormant CSV/example
+modules unmounted for now. Do not delete uploaded files or rewrite old
 migrations as a shortcut. Existing vector migrations may still require pgvector;
 verify the test/dev database supports it until a dedicated migration addresses it.
 
 Introduce new platform modules alongside legacy files. Do not repurpose legacy
-`Pipeline` as an application or legacy `BackgroundJob` as the durable queue.
+`Pipeline` as an application or historical `BackgroundJob` as the durable queue.
 Keep the existing import layout initially; a package-wide rename is outside T01.
 
 ## Proposed locations (create only as tasks need them)
@@ -64,7 +64,5 @@ Keep the existing import layout initially; a package-wide rename is outside T01.
 Keep this table aligned with the actual implementation after every completed task.
 Do not create empty architectural scaffolding for all proposed paths upfront.
 
-During documentation preparation, `.gitignore` was independently changed to include
-`uv.lock` and `.mdfiles`. That edit was left untouched. T01 must check lockfile
-tracking: a clean CI checkout needs the agreed lockfile available. `.mdfiles` is a
-different path from the `mdfiles/` documentation directory used here.
+The existing `uv.lock` is tracked. The user's concurrent `.gitignore` changes
+remain outside the implementation commits; `AGENTS.md` is intentionally local.
