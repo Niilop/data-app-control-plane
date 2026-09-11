@@ -8,7 +8,8 @@ records implementation; it does not imply that its PR has merged.
 
 T01–T03 are merged. T03 PR #8 was confirmed merged at
 `46a9cd9194ea4384d281c956b61eca493cac830a`. T04 is implemented on its own branch
-from that updated main and awaits review/merge. T05 has not started.
+from that updated main in [draft PR #9](https://github.com/Niilop/data-app-control-plane/pull/9)
+and awaits review/merge. T05 has not started.
 AI/chat/RAG/LLM/inference remain removed; historical tables/migrations are retained.
 
 The platform has development accounts, explicit local admin bootstrap,
@@ -67,14 +68,23 @@ T04 adds:
 - Ruff lint and format: clean over the complete README/CI scope, **53 files**.
 - `uv run --locked pytest tests/integration -q -rs`: **15 skipped** locally because
   `TEST_DATABASE_URL` is unset. These skips do not establish PostgreSQL behavior.
-  Separate-process contention/restart, heartbeat/cancel, migration round trip,
-  concurrent submission, fencing and rollback tests await hosted verification.
-- Hosted T04 CI has not yet been run. Review current results before merge.
+- Hosted [Platform CI run 34632237191](https://github.com/Niilop/data-app-control-plane/actions/runs/34632237191)
+  passed at implementation commit `d1c417d4b26304628dd556147901097a5f4185e1`.
+  The actual [PostgreSQL job log](https://github.com/Niilop/data-app-control-plane/actions/runs/34632237191/job/103371592921)
+  reports **15 passed in 12.12s**, no skips, against the isolated pgvector/pg16
+  service. This covers separate-process contention/restart, heartbeat/cancel,
+  migration preservation/schema parity, concurrent submissions and atomic rollback.
+  The offline job reports **126 passed in 18.33s**, Ruff clean (53 files) and
+  mypy clean (32 source files). Actual logs were inspected.
+- Agent handoff CI run 34632237152 and the local handoff checker against
+  `origin/main` passed. This documentation-only follow-up records evidence;
+  implementation tests were not rerun locally for documentation changes.
+  Recheck CI on subsequent revisions. This PR is not claimed merged.
 
 ## Remaining work and limitations
 
-- Review T04 and current CI before merge. PostgreSQL tests must actually pass;
-  SQLite cannot establish concurrent claim or process recovery behavior.
+- Review draft PR #9 and current CI before merge. Hosted PostgreSQL checks passed;
+  local SQLite tests alone cannot establish concurrent claim/process behavior.
 - No local devstack exists at `~/code/devstack`; the Docker executable fails with
   an input/output error. Live Compose startup and image builds are unverified.
 - The probe only exercises infrastructure. No generated bundle, artifact store,

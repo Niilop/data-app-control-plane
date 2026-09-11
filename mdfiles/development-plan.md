@@ -270,7 +270,7 @@ configuration changes increment binding version and are audited.
 
 ## T04 — Durable operations with a separate worker
 
-**Status:** implemented, pending review/merge. **Depends on:** T03 (merged).
+**Status:** implemented in draft PR #9, pending review/merge. **Depends on:** T03 (merged).
 
 **Delivered:** migration 007 queue/attempt/reservation/probe/command/heartbeat tables;
 transactional enqueue/audit and scoped idempotency; PostgreSQL claims, leases,
@@ -280,7 +280,9 @@ freshness; API liveness/readiness and admin queue telemetry. No generic task API
 
 **Verification:** 126 offline tests passed, Ruff clean (53 files), mypy clean
 (32 files). Local integration collection reports 15 explicit skips. Hosted
-PostgreSQL evidence is pending; exact results are recorded in `next-agent.md`.
+[Platform CI run 34632237191](https://github.com/Niilop/data-app-control-plane/actions/runs/34632237191)
+at `d1c417d` passed: actual logs confirm **15 PostgreSQL tests passed**, no skips,
+**126 offline tests passed**, Ruff and mypy clean. Exact results are in `next-agent.md`.
 PostgreSQL tests cover separate competing processes, API/worker restart recovery,
 stale fencing, concurrent submissions, heartbeat/cancel, migration round trip and
 transaction rollback. Do not treat local SQLite checks or integration skips as

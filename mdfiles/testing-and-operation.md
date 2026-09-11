@@ -9,7 +9,9 @@ pytest discovery; obsolete RAG tests were removed.
 
 ## T04 verification
 
-Current exact results and CI evidence are in `next-agent.md`. The offline suite
+Hosted [Platform CI run 34632237191](https://github.com/Niilop/data-app-control-plane/actions/runs/34632237191)
+at `d1c417d` passed: **15 PostgreSQL tests**, **126 offline tests**, Ruff and mypy.
+Actual logs were inspected; exact evidence is in `next-agent.md`. The offline suite
 covers queue/API/UI behavior, policy revocation, atomicity, sanitized errors,
 retry limits and stale tokens. The isolated PostgreSQL suite adds independent
 competing worker processes, fresh API/worker processes after a lost lease,
