@@ -2,6 +2,9 @@
 
 Documentation baseline: 2026-09-11. Implementation status: **T01a complete; T01b and platform workflows remain planned**.
 
+**Resume here:** [next-agent.md](next-agent.md). PRs #1 and #2 are merged; the next
+block is T01b on `build/t01b-containers-ci`, based on merged `main`.
+
 Build a self-service platform where a team requests onboarding of a Git repository
 as a governed Databricks data application. The platform manages ownership, access
 requests, revisions, approvals, deployment history, and run visibility. GitHub
@@ -13,7 +16,7 @@ development. Real external execution is an explicitly enabled integration gate.
 
 ## Reading path
 
-1. Read the root `AGENTS.md` if available (the developer keeps it local).
+1. Read the versioned root [AGENTS.md](../AGENTS.md).
 2. Read [product-scope.md](product-scope.md) for agreed scope and provisional choices.
 3. Select the assigned task in [development-plan.md](development-plan.md).
 4. Read only its referenced contracts and the relevant entries in
@@ -44,16 +47,15 @@ The contracts describe intended behavior until their implementation tasks are
 complete. Tests and implementation establish actual behavior; discrepancies must
 be resolved and documented, not silently treated as completed work.
 
-## First agent assignment
+## Next agent assignment
 
 Use this prompt:
 
-> Read local AGENTS.md if present and mdfiles/README.md. Implement the next
-> incomplete T01 block in
-> mdfiles/development-plan.md only. Read its linked context and affected files.
-> Explain your implementation plan, preserve existing data and migration history,
-> run the specified checks that are available, and update the task handoff with
-> evidence and any blockers. Do not start T02 or contact external services.
+> Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Continue
+> T01b only on build/t01b-containers-ci, based on merged main. Inspect Git status
+> and preserve my unrelated local changes. Explain the plan, implement the bounded
+> container/database/CI work, run its acceptance checks, update the handoff, and
+> open a draft PR against main. Do not merge, start T02, or deploy cloud resources.
 
 The general assignment/handoff templates are in the development plan. Read the T01 handoff for completed code and verification. Infrastructure
 activation and later task completion are not implied by the plan.

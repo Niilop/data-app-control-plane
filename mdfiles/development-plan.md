@@ -35,9 +35,10 @@ Deliver T01 as two reviewable branches, in order:
 - **T01b — `build/t01b-containers-ci`:** locked container builds, devstack/optional
   Compose database configuration, PostgreSQL migration smoke tests, and platform CI.
 
-T01 is complete only when both blocks meet their acceptance criteria. Use a
-documentation PR as the base for T01a until the documentation is merged. Rebase
-later work on the merged base; do not combine unrelated roadmap tasks in one PR.
+T01 is complete only when both blocks meet their acceptance criteria. PRs #1 and
+#2 are merged into main at `fd28d94`, including follow-up Compose DB-name fix
+`f1e4381`. T01b starts from merged main on `build/t01b-containers-ci`; do not combine
+unrelated roadmap tasks in one PR. See [the next-agent handoff](next-agent.md).
 
 **Read:** [architecture](architecture.md), current config/main/database, workspace
 pyprojects, Dockerfiles, Compose, frontend API URL, existing tests and migrations.
@@ -77,13 +78,15 @@ ignoring new errors or requiring unrelated legacy cleanup.
 **Handoff:** exact commands, dependency/tool versions, local DB setup, test baseline,
 files changed, unrun checks. Update the root README to link this plan and describe
 actual startup; preserve legacy usage notes where needed.
-The existing `uv.lock` is tracked. Preserve the user's separate staged/unstaged
-`.gitignore` edits when committing this task.
+`uv.lock`, `AGENTS.md`, and `mdfiles/` are deliberately tracked. The post-merge
+context handoff resolves the earlier `.gitignore`/local-only AGENTS uncertainty.
+Preserve any new unrelated local edits when committing this task.
 
 ### T01a handoff — 2026-09-11
 
-- **Status:** complete. Branch: `feat/t01a-local-startup`, based on
-  `docs/platform-development-plan`. T01b remains a separate next PR.
+- **Status:** complete and merged through PR #2, then PR #1 into main. Original
+  branch: `feat/t01a-local-startup`, based on `docs/platform-development-plan`.
+  T01b remains a separate next PR against main.
 - **Implemented:** AI/chat/RAG/inference services, routes, UI, configuration, and
   dependencies removed per user clarification; RAG-only job runner removed.
   Local API exposes auth/system routes with SQL debug off. UI provides account

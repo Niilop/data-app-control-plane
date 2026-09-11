@@ -3,8 +3,12 @@
 .claude
 .vscode
 
+# AGENTS.md, mdfiles/, and uv.lock are shared project context and stay versioned.
+
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -17,4 +21,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
 app.db

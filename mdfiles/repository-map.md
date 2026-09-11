@@ -24,7 +24,7 @@ affected files before editing; avoid a full repository crawl for each task.
 | `pyproject.toml` | uv workspace containing backend and frontend |
 | `backend/pyproject.toml`, `frontend/pyproject.toml`, `uv.lock` | Tracked lock and dependencies; AI providers/LangChain removed, dev tooling added |
 | `backend/Dockerfile`, `frontend/Dockerfile` | pip installs from separate requirements files; flattened container imports |
-| `docker-compose.yaml` | Bundled pgvector database; backend DB name hardcoded; no worker |
+| `docker-compose.yaml` | Bundled pgvector database; backend DB name now uses POSTGRES_DB (merged follow-up f1e4381); no worker or optional DB profile yet |
 | `tests/manual/auth_smoke.py`, `tests/manual/request_smoke.py` | Historical manual HTTP examples; not pytest tests |
 | `tests/unit/`, `tests/conftest.py` | Offline settings/startup/UI/migration-rendering tests and network guards |
 | `README.md` | Current local startup and focused verification commands |
@@ -64,5 +64,6 @@ Keep the existing import layout initially; a package-wide rename is outside T01.
 Keep this table aligned with the actual implementation after every completed task.
 Do not create empty architectural scaffolding for all proposed paths upfront.
 
-The existing `uv.lock` is tracked. The user's concurrent `.gitignore` changes
-remain outside the implementation commits; `AGENTS.md` is intentionally local.
+`uv.lock`, `AGENTS.md`, and `mdfiles/` are deliberately tracked. The user clarified
+that agent instructions should remain in source control; the context handoff on
+main resolves the earlier local-only instruction and ignore-file uncertainty.
