@@ -67,12 +67,17 @@ TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/disposable_test_db \
   uv run --locked pytest tests/integration -q
 ```
 
-The isolated migration tests were exercised only for their skip path (no
-`TEST_DATABASE_URL` set: 3 tests skip cleanly with a visible reason). They have
-not been run against a real PostgreSQL/pgvector server; that is first exercised
-for real by the `postgres-migration` job in `.github/workflows/ci.yml`, using a
-throwaway `pgvector/pgvector` service container. Treat that job's actual hosted
-result — not this description — as the evidence once the PR runs CI.
+The isolated migration tests were first exercised only for their skip path (no
+`TEST_DATABASE_URL` set: 3 tests skip cleanly with a visible reason) locally.
+The PR's first `postgres-migration` CI run (real `pgvector/pgvector` service
+container) then found a genuine bug: `Config.set_main_option` stores the URL
+through `configparser`, whose interpolation rejects the raw `%` from
+percent-encoding the `search_path` query value. Fixed by escaping `%` as `%%`
+before `set_main_option` (`configparser` un-escapes it back on read). The
+pgvector-availability test passed on that run, confirming the schema-isolation
+approach works against real PostgreSQL; the fix for the other two has not yet
+been confirmed by a subsequent CI run. Treat the next `postgres-migration`
+result on the PR — not this description — as that evidence.
 
 The following startup/migration commands remain documented but a live DB
 migration and real account login are still not verified end to end.

@@ -105,8 +105,23 @@ design — confirmed for both, then the full dev environment (`--all-packages
 
 `uv run --locked pytest tests/integration -q -rs` was run **without**
 `TEST_DATABASE_URL`: 3 tests skipped, each with the intended visible reason.
-This confirms the skip path only; it does not confirm the tests pass against a
-real PostgreSQL/pgvector server.
+
+**Update after the PR's first `postgres-migration` CI run:** it ran against a
+real `pgvector/pgvector` service container and reported 1 passed, 2 failed.
+`test_pgvector_extension_is_available` passed — the schema-isolation and
+pgvector-relocatability approach in ADR-011 does work against real PostgreSQL.
+The two Alembic-driven tests failed with a real bug: `Config.set_main_option`
+stores the URL through `configparser`, whose interpolation rejects the raw `%`
+characters produced by percent-encoding the `search_path` query value (e.g.
+`%3D`, `%2C`) — `ValueError: invalid interpolation syntax`. Fixed by escaping
+`%` as `%%` before calling `set_main_option` in `_alembic_config`
+(`tests/integration/test_migrations.py`); `configparser` un-escapes `%%` back
+to `%` on read, verified directly against `configparser.ConfigParser` offline.
+Offline checks (ruff/mypy/pytest -q, 37 passed) were re-run after this fix and
+stayed clean. **This fix has not yet been re-verified by an actual CI run
+against real PostgreSQL** — that is the first thing the next agent/reviewer
+should check (re-run or inspect the `postgres-migration` job on this PR) before
+treating `tests/integration` as passing.
 
 ## Remaining work and limitations
 
@@ -121,10 +136,11 @@ real PostgreSQL/pgvector server.
   containers, for the same reason.
 - `tests/integration` against a real PostgreSQL/pgvector server — no local
   PostgreSQL and no `~/code/devstack` checkout existed in the sandbox (`ls
-  ~/code` showed no `devstack` directory). Only the skip path was exercised
-  (see above). The `postgres-migration` CI job is the first real exercise of
-  these tests; treat its actual hosted result on the PR as the evidence, not
-  this handoff.
+  ~/code` showed no `devstack` directory). The PR's first `postgres-migration`
+  CI run did exercise these for real (see above): it found and this PR fixes a
+  genuine `configparser` percent-escaping bug, but the fix itself has not yet
+  been confirmed by a passing CI run. Treat the *next* `postgres-migration`
+  result on this PR as the evidence, not this handoff.
 - `docker compose config` / Compose and workflow YAML validation — the `docker`
   CLI is absent and PyYAML is not installed in this project's offline venv, so
   `docker-compose.yaml`, `ci.yml`, and the Dockerfiles were reviewed manually

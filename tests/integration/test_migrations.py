@@ -45,7 +45,10 @@ def _scoped_url(schema: str) -> str:
 def _alembic_config(scoped_url: str) -> Config:
     config = Config(str(BACKEND / "alembic.ini"))
     config.set_main_option("script_location", str(BACKEND / "alembic"))
-    config.set_main_option("sqlalchemy.url", scoped_url)
+    # Config uses configparser with interpolation: a literal "%" (from the
+    # percent-encoded query string) must be escaped as "%%" going in so it
+    # reads back correctly, or ConfigParser raises on the raw "%".
+    config.set_main_option("sqlalchemy.url", scoped_url.replace("%", "%%"))
     return config
 
 
