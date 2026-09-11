@@ -18,15 +18,18 @@ affected files before editing; avoid a full repository crawl for each task.
 | `backend/alembic/legacy_models.py` | Migration-only metadata for removed AI/model/job tables; prevents destructive autogeneration |
 | Former `chat`, `rag`, `llm`, `jobs` routers/services | Removed in T01a, including RAG-only background execution |
 | `backend/services/data_service.py` | Dormant CSV support; not a platform domain service |
-| `backend/alembic/env.py` | Imports runtime plus historical metadata; local package marker removed to avoid shadowing installed Alembic |
+| `backend/alembic/env.py` | Imports runtime plus historical metadata; local package marker removed to avoid shadowing installed Alembic; T01b: escapes `%` in `sqlalchemy.url` for `configparser`, and caches the `legacy_models` load in `sys.modules` so re-running migrations in one process doesn't re-register `Base.metadata` tables |
 | `backend/alembic/versions/001_initial.py` … `004_add_background_jobs.py` | Existing migration chain; preserve it |
 | `frontend/app.py` | Development account/status page; API_URL configurable; no AI UI |
 | `pyproject.toml` | uv workspace containing backend and frontend |
 | `backend/pyproject.toml`, `frontend/pyproject.toml`, `uv.lock` | Tracked lock and dependencies; AI providers/LangChain removed, dev tooling added |
-| `backend/Dockerfile`, `frontend/Dockerfile` | pip installs from separate requirements files; flattened container imports |
-| `docker-compose.yaml` | Bundled pgvector database; backend DB name now uses POSTGRES_DB (merged follow-up f1e4381); no worker or optional DB profile yet |
+| `backend/Dockerfile`, `frontend/Dockerfile` | T01b: multi-stage, uv-locked (`uv sync --locked --package <name>`) builds pinned to `ghcr.io/astral-sh/uv:0.12.11`; venv at `/opt/venv`, not under the Compose dev bind mount |
+| `.dockerignore` | T01b: root ignore file for the `context: .` Compose builds (`requirements.txt` files remain but are unused by the Dockerfiles) |
+| `docker-compose.yaml` | T01b: bundled `db` service moved behind the opt-in `local-db` Compose profile with a configurable host port (default 5433); `backend` gets `host.docker.internal` for devstack access and a non-blocking `depends_on: db` |
 | `tests/manual/auth_smoke.py`, `tests/manual/request_smoke.py` | Historical manual HTTP examples; not pytest tests |
-| `tests/unit/`, `tests/conftest.py` | Offline settings/startup/UI/migration-rendering tests and network guards |
+| `tests/unit/`, `tests/conftest.py` | Offline settings/startup/UI/migration-rendering tests; network guard now scoped to skip `integration`-marked tests (T01b) |
+| `tests/integration/test_migrations.py` | T01b: isolated PostgreSQL+pgvector migration chain tests via `TEST_DATABASE_URL`, marked `integration`, not in default `testpaths` |
+| `.github/workflows/ci.yml` | T01b: platform CI — locked lint/format/type/offline-test job, plus an isolated migration job using a `pgvector/pgvector` service container |
 | `README.md` | Current local startup and focused verification commands |
 | `.github/pull_request_template.md` | Same-PR handoff, verification, and related documentation checklist |
 | `.github/workflows/agent-handoff.yml` | Lightweight PR handoff validation; application CI remains T01b |

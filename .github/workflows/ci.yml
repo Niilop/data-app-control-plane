@@ -1,0 +1,62 @@
+name: Platform CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-type-offline-tests:
+    name: Lint, type check, and offline tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.11"
+          enable-cache: true
+      - run: uv sync --locked --all-packages --group dev
+      - run: uv run --locked ruff check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit tests/integration
+      - run: uv run --locked ruff format --check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit tests/integration
+      - run: uv run --locked mypy
+      - run: uv run --locked pytest -q
+
+  postgres-migration:
+    name: Isolated PostgreSQL migration check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: ci_migration_user
+          POSTGRES_PASSWORD: ci-migration-password
+          POSTGRES_DB: ci_migration_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_migration_user"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Throwaway CI service container; not a developer's local or shared
+      # database. tests/integration further isolates each test into its own
+      # disposable schema within it.
+      TEST_DATABASE_URL: postgresql://ci_migration_user:ci-migration-password@localhost:5432/ci_migration_db
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.11"
+          enable-cache: true
+      - run: uv sync --locked --all-packages --group dev
+      - run: uv run --locked pytest tests/integration -q

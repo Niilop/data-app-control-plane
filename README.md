@@ -38,10 +38,45 @@ uv run --locked streamlit run app.py
 ```
 
 The UI defaults to `http://localhost:8000`; set `API_URL` in the environment or
-root `.env` to override it. Existing Compose configuration sets the internal
-frontend URL to `http://backend:8000`. Container dependency locking, devstack
-integration, and live migration verification are the next block, T01b; the old
-Compose database configuration is not yet the recommended startup path.
+root `.env` to override it. Container Compose sets the internal frontend URL to
+`http://backend:8000`.
+
+## Containers
+
+Backend and frontend images build from the locked workspace with uv (pinned to
+`0.12.11`, matching CI): a builder stage runs `uv sync --locked --package
+<backend|frontend> --no-dev`, and the runtime stage copies only that resulting
+virtual environment plus the member's source — no `.env`, credentials, local
+`data/`, or host `.venv` are copied in.
+
+```bash
+docker compose build
+docker compose up
+```
+
+`DATABASE_URL` (from `.env`) decides which PostgreSQL the containerized backend
+uses:
+
+- **devstack, from the host** (`uv run` directly, no Docker):
+  `postgresql://.../data_app_control_plane` with `localhost`.
+- **devstack, from Docker Compose**: use `host.docker.internal` instead of
+  `localhost`; `docker-compose.yaml` maps that hostname to the host gateway.
+- **bundled, self-contained database** (no devstack dependency): start it
+  explicitly with `docker compose --profile local-db up`, and point
+  `DATABASE_URL` at `db` (e.g. `postgresql://...@db:5432/...`). It is disabled
+  by default and never a mandatory dependency of `backend`. Its host port
+  defaults to `5433` (`POSTGRES_HOST_PORT`) to avoid colliding with devstack's
+  PostgreSQL on `5432`.
+
+See `.env.example` for the exact `DATABASE_URL` value in each case. Frontend's
+container `API_URL` is fixed to `http://backend:8000` by Compose; running the
+frontend image standalone (outside Compose) requires setting `API_URL` to
+wherever the backend is actually reachable from that container.
+
+Image builds and a live `docker compose up` smoke check have not been run as
+part of this change — no Docker daemon was available in the environment that
+implemented it. Compose/Dockerfile syntax was reviewed manually, not validated
+with `docker compose config`.
 
 ## Available endpoints
 
@@ -62,15 +97,30 @@ and are not mounted by the platform API. Authorization roles arrive in T02.
 ```bash
 uv run --locked pytest -q
 uv run --locked mypy
-uv run --locked ruff check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit
-uv run --locked ruff format --check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit
+uv run --locked ruff check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit tests/integration
+uv run --locked ruff format --check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit tests/integration
 ```
 
-Unit tests block network calls. Startup and migration-rendering tests use an
-isolated process with controlled configuration; no running database or provider is
-required. UI tests use Streamlit's test runner and mocked HTTP responses. Mypy is
-initially scoped to the new settings and API assembly; unrelated legacy modules
-are not yet under strict checking.
+Unit tests (`tests/unit`, the default `testpaths`) block network calls. Startup and
+migration-rendering tests use an isolated process with controlled configuration; no
+running database or provider is required. UI tests use Streamlit's test runner and
+mocked HTTP responses. Mypy is initially scoped to the new settings and API
+assembly; unrelated legacy modules are not yet under strict checking.
+
+Isolated PostgreSQL migration integration tests (`tests/integration`, marked
+`integration`) are not part of the default `testpaths` and need a dedicated,
+disposable pgvector-capable database:
+
+```bash
+TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/disposable_test_db \
+  uv run --locked pytest tests/integration -q
+```
+
+Each test runs inside its own uniquely named schema in that database and drops it
+afterward; never point `TEST_DATABASE_URL` at a shared or primary database. Unset,
+these tests are skipped with a visible reason rather than failing. GitHub Actions
+CI (`.github/workflows/ci.yml`) runs them against a throwaway `pgvector/pgvector`
+service container.
 
 Historical migration files and database contents are preserved. Removed feature
 metadata lives in `backend/alembic/legacy_models.py` and is loaded only by Alembic,

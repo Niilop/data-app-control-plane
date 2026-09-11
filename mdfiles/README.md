@@ -1,10 +1,15 @@
 # Data application control plane: agent entry point
 
-Documentation baseline: 2026-09-11. Implementation status: **T01a complete; T01b and platform workflows remain planned**.
+Documentation baseline: 2026-09-11. Implementation status: **T01a merged; T01b
+implemented on `build/t01b-containers-ci`, opened as a draft PR against `main`
+(not merged) — Docker image builds, a live `docker compose up` check, and the
+isolated PostgreSQL migration tests are unverified locally; see
+[next-agent.md](next-agent.md). Platform workflows (T02+) remain planned.**
 
-**Resume here:** [next-agent.md](next-agent.md). The next platform
-block is T01b. Verify prerequisite changes on updated `main` before creating or
-continuing its task branch; the handoff describes code state, not merge status.
+**Resume here:** [next-agent.md](next-agent.md). Once the T01b PR is merged,
+the next platform block is T02. Verify prerequisite changes on updated `main`
+before creating or continuing any task branch; the handoff describes code
+state, not merge status.
 
 Build a self-service platform where a team requests onboarding of a Git repository
 as a governed Databricks data application. The platform manages ownership, access
@@ -50,13 +55,17 @@ be resolved and documented, not silently treated as completed work.
 
 ## Next agent assignment
 
-Use this prompt:
+Use this prompt (see [next-agent.md](next-agent.md) for the current, more
+specific version):
 
-> Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Verify prerequisites
-> on updated main and implement T01b only on its own branch. Inspect Git status
-> and preserve my unrelated local changes. Explain the plan, implement the bounded
-> container/database/CI work, run its acceptance checks, update the handoff, and
-> open a draft PR against main. Do not merge, start T02, or deploy cloud resources.
+> Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Inspect Git
+> status and verify the T01b PR is merged into updated main. Implement T02 only
+> on its own branch. Preserve unrelated changes, explain the plan, run the
+> acceptance checks, update the handoff and affected docs in the same PR, and
+> open a draft PR against main. Do not merge, start T03, or deploy cloud
+> resources.
 
-The general assignment/handoff templates are in the development plan. Read the T01 handoff for completed code and verification. Infrastructure
-activation and later task completion are not implied by the plan.
+The general assignment/handoff templates are in the development plan. Read the
+T01 handoff for completed code and verification, including which T01b checks
+are still unverified. Infrastructure activation and later task completion are
+not implied by the plan.

@@ -1,0 +1,21 @@
+# Root .dockerignore: applies to the "context: ." builds in docker-compose.yaml.
+# Keep the build context to workspace metadata and application source only.
+.git
+.github
+
+.venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+.env
+.env.*
+!.env.example
+
+data
+mdfiles
+tests
+scripts
+README.md
