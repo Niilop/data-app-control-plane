@@ -419,8 +419,8 @@ current application. Do not expand Streamlit with new feature screens.
 **Status:** implemented on `feat/t05-bundle-generation`, pending review/merge.
 **Depends on:** T04a (frontend) and T04 (worker), both merged.
 
-**Evidence:** hosted [Platform CI run 34656350744](https://github.com/Niilop/data-app-control-plane/actions/runs/34656350744)
-passed at `5893851`: 188 offline tests (63 new), 23 isolated PostgreSQL tests (8 new),
+**Evidence:** hosted [Platform CI run 34657096948](https://github.com/Niilop/data-app-control-plane/actions/runs/34657096948)
+passed at `44484ee`: 188 offline tests (63 new), 23 isolated PostgreSQL tests (8 new),
 11 Chromium browser workflows (2 new), the production nginx smoke, Ruff/mypy, and
 `scripts/check_generated_project.py` proving the generated project installs from
 its own lock and passes its own tests with `uv --offline`. Local Docker Compose

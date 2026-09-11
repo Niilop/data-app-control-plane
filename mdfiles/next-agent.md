@@ -127,7 +127,6 @@ On 2026-09-12, from branch `feat/t05-bundle-generation`:
   the probe file was deleted. Both containers resolve `ARTIFACT_DIR` to
   `/app/data/artifacts` and load the same template content digest.
   `GET /api/v1/templates` and `GET /api/v1/artifacts/...` return 401 unauthenticated.
-
 - The **first** hosted CI run failed one PostgreSQL test with a unique-constraint
   violation on `artifacts`. That was a real race in the generation handler's
   result write — a read-then-insert check — not a flaky test. It is fixed with a
@@ -136,20 +135,20 @@ On 2026-09-12, from branch `feat/t05-bundle-generation`:
   consecutive runs** of that test plus the full suites. The assertion was also
   strengthened to require every competing operation to reach `succeeded` with no
   diagnostic, not merely that one artifact row exists.
-- Hosted [Platform CI run 34656350744](https://github.com/Niilop/data-app-control-plane/actions/runs/34656350744)
-  passed at implementation commit `5893851`. Actual logs were inspected and
-  confirm **188 offline tests** (20.99s), **23 PostgreSQL tests** (20.11s, no
-  skips), **11 browser workflows** (32.8s), the production nginx smoke, Ruff
+- Hosted [Platform CI run 34657096948](https://github.com/Niilop/data-app-control-plane/actions/runs/34657096948)
+  passed at commit `44484ee`, including the fix above. Actual logs were inspected and
+  confirm **188 offline tests** (16.07s), **23 PostgreSQL tests** (18.44s, no
+  skips), **11 browser workflows** (34.5s), the production nginx smoke, Ruff
   clean over 61 files and mypy clean over 36 source files. The generated-project
   step reported **`Ran 7 tests ... Generated project installed from its lock and
   passed its own tests.`** Its archive digest
   `baee91f005812737f689384a8b3158efe4c01fc217fd7039aae01afab81fed63` is byte-identical
   to the digest produced on the development machine, which is cross-machine
   evidence for the determinism claim, not just a repeat run. Handoff run
-  34656350695 also passed.
+  34657096951 also passed.
 
-**Not run.** No interactive UI journey
-was performed against the developer's own database: no team, application, binding
+**Not run.** No interactive UI journey was performed against the developer's own
+database: no team, application, binding
 or artifact was created there, so the end-to-end screen flow is covered by the
 browser tests rather than by a manual walkthrough. Firefox and WebKit were not
 tested. No repository was published, no provider was contacted, and no paid or
