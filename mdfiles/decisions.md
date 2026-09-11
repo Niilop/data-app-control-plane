@@ -10,7 +10,8 @@ retain its history, rationale, affected contracts/tasks, and replacement decisio
 Streamlit for initial UI, shared business services. Local hosting supports a
 single developer with essentially no cloud budget. Organizational hosting later
 does not require replacing core workflows. No microservices, Azure hosting,
-message broker, or Redis dependency initially.
+message broker, or Redis dependency initially. The initial Streamlit choice is
+superseded for future frontend development by ADR-015; the backend direction remains.
 
 ## ADR-002 — GitHub and GitHub Actions first
 
@@ -217,6 +218,34 @@ both enforce current grants, lifecycle and environment/binding eligibility.
 Public readiness reports database/worker availability without diagnostics;
 global queue telemetry is admin-only. No provider readiness, exactly-once external
 execution, workspace capacity management or organization identity is implied.
+
+## ADR-015 — Replace Streamlit before T05
+
+**Accepted user direction, 2026-09-11; implementation planned as T04a.** After T04
+merges, replace Streamlit with React + TypeScript built using Vite before starting
+T05. The backend now provides enough real workflows to support a useful UI;
+migrating while the UI is small avoids implementing future feature screens twice.
+This supersedes ADR-001's initial UI choice, not its FastAPI/worker/PostgreSQL design.
+
+Reuse existing API contracts, accounts, data, roles, services and worker behavior.
+Build the replacement alongside Streamlit for verification, starting with login
+and application list/register/detail, then current administration and operation
+workflows. Retire Streamlit only after equivalent browser workflows pass and
+Docker/startup documentation is updated. Subsequent tasks build their UI in React.
+
+The migration includes coherent navigation/forms/status feedback, accessibility,
+API failure/session-expiry handling and reviewed browser authentication storage.
+Server-side Streamlit session state is not a browser session design. Keep server
+credentials/signing keys out of frontend assets and retain API-side authorization,
+optimistic version checks and idempotency. Small API additions must retain scoped
+visibility and receive their own contract/behavior checks.
+
+Introduce a locked, project-local frontend toolchain and browser tests while
+preserving Python/uv backend verification. Supporting component/routing/data
+libraries and their versions are implementation choices; no packages are installed
+by this decision. Current Streamlit remains operational until T04a cuts over.
+No T05 features, speculative dashboards, provider activation or organization
+identity redesign are part of the migration. T05 depends on T04a completion.
 
 ## Questions reserved for their implementation gates
 

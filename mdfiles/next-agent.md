@@ -8,8 +8,9 @@ records implementation; it does not imply that its PR has merged.
 
 T01–T03 are merged. T03 PR #8 was confirmed merged at
 `46a9cd9194ea4384d281c956b61eca493cac830a`. T04 is implemented on its own branch
-from that updated main in [draft PR #9](https://github.com/Niilop/data-app-control-plane/pull/9)
-and awaits review/merge. T05 has not started.
+from that updated main in [PR #9](https://github.com/Niilop/data-app-control-plane/pull/9)
+and awaits review/merge. T04a and T05 have not started. The agreed next milestone
+is T04a: migrate current workflows to React + TypeScript + Vite before T05.
 AI/chat/RAG/LLM/inference remain removed; historical tables/migrations are retained.
 
 The platform has development accounts, explicit local admin bootstrap,
@@ -77,8 +78,9 @@ T04 adds:
   The offline job reports **126 passed in 18.33s**, Ruff clean (53 files) and
   mypy clean (32 source files). Actual logs were inspected.
 - Agent handoff CI run 34632237152 and the local handoff checker against
-  `origin/main` passed. This documentation-only follow-up records evidence;
-  implementation tests were not rerun locally for documentation changes.
+  `origin/main` passed. The frontend roadmap follow-up changes documentation only;
+  its diff and task/dependency consistency were reviewed, and `git diff --check`
+  passed. Application tests were not rerun locally for this documentation update.
   Recheck CI on subsequent revisions. This PR is not claimed merged.
 
 Local Docker follow-up on 2026-09-11 also passed: `compose config --quiet`, all
@@ -97,7 +99,7 @@ rather than assuming that an agent-session CLI failure means Docker is stopped.
 
 ## Remaining work and limitations
 
-- Review draft PR #9 and current CI before merge. Hosted PostgreSQL checks passed;
+- Review PR #9 and current CI before merge. Hosted PostgreSQL checks passed;
   local SQLite tests alone cannot establish concurrent claim/process behavior.
 - Devstack integration is still unverified; `~/code/devstack` was absent.
   The bundled PostgreSQL path and container health are verified. The startup smoke
@@ -116,27 +118,39 @@ rather than assuming that an agent-session CLI failure means Docker is stopped.
 
 ## Next task
 
-Verify T04 is merged on updated main, then implement **T05 — Generate a bundle and
-capture a revision**, on its own branch. Read its full scope and acceptance tests;
-do not begin T06 or real provider work. Extend the closed handler/schema/migration
-contracts deliberately; do not introduce arbitrary shell/repository execution.
+Verify T04 is merged on updated main, then implement **T04a — Replace Streamlit
+with React**, on its own branch. Read its full scope and acceptance criteria in
+`development-plan.md` and ADR-015. Establish the React + TypeScript + Vite frontend,
+migrate current T01–T04 workflows, verify browser behavior and Docker startup, then
+retire Streamlit. Preserve existing accounts/data and API/worker authorization,
+versioning, audit and idempotency. Review browser session handling and keep all
+server secrets out of browser assets. Do not add new Streamlit feature screens.
+
+T05 waits until T04a is reviewed and merged. No generation, revision, approval,
+deployment or provider features belong in this migration.
 
 ## Files to read first
 
-- `AGENTS.md`, `mdfiles/README.md`, T05 in `mdfiles/development-plan.md`.
-- `mdfiles/integrations.md`, `mdfiles/domain-contracts.md`, `mdfiles/api-contracts.md`,
-  `mdfiles/architecture.md`, `mdfiles/testing-and-operation.md`.
-- `backend/models/operations.py`, `operation_schemas.py`, and migration 007.
-- `backend/services/operation_service.py`, `queue_service.py`, `backend/worker.py`.
-- `backend/services/environment_service.py`, `backend/api/endpoints/operations.py`.
-- `tests/unit/test_operations.py`, `tests/integration/test_operations.py`,
-  `frontend/operation_ui.py`, root README and CI.
+- `AGENTS.md`, `mdfiles/README.md`, T04a in `mdfiles/development-plan.md`, ADR-015
+  in `mdfiles/decisions.md`.
+- `mdfiles/product-scope.md`, `mdfiles/architecture.md`, `mdfiles/api-contracts.md`,
+  `mdfiles/domain-contracts.md`, `mdfiles/repository-map.md`.
+- `frontend/app.py`, `api_client.py`, `registry.py`, `registry_widgets.py`,
+  `environment_ui.py`, `operation_ui.py`.
+- `backend/api/dependencies.py`, `backend/api/endpoints/auth.py`, `applications.py`,
+  `teams.py`, `environments.py`, `operations.py`; affected schemas/services.
+- `tests/unit/test_registry_ui.py`, `test_operations.py`, `tests/conftest.py`,
+  and the PostgreSQL integration tests for behavior to preserve.
+- Root README, `docker-compose.yaml`, both Dockerfiles, root/frontend/backend
+  `pyproject.toml`, `uv.lock` and `.github/workflows/ci.yml`.
 
 ## Suggested agent prompt
 
-Read AGENTS.md, mdfiles/README.md and mdfiles/next-agent.md. Inspect Git status and
-verify T04 is merged into updated main. Create a task branch if needed and implement
-T05 only: generated bundle/artifact capture, immutable revision and offline
-validation, using the durable worker. Preserve unrelated changes, explain the plan,
-run applicable checks, update the handoff/contracts/map and open a draft PR. Do not
-merge, start T06, execute arbitrary adopted repository code, or activate providers.
+Read AGENTS.md, mdfiles/README.md and mdfiles/next-agent.md. Inspect Git status,
+preserve unrelated changes, and verify T04 is merged into updated main. Create a
+new task branch if needed and implement T04a only: React + TypeScript + Vite,
+current workflow migration, browser/session behavior, frontend checks and Docker
+cutover, followed by Streamlit retirement after parity passes. Preserve accounts,
+data, API/worker policy, versioning and idempotency. Explain the plan, run checks,
+update the handoff/contracts/map and open a draft PR. Do not merge, begin T05,
+expand Streamlit feature scope, or activate external providers.

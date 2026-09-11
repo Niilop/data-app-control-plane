@@ -6,7 +6,7 @@ Status: target design. See [repository map](repository-map.md) for actual code.
 
 ```mermaid
 flowchart LR
-    UI[Streamlit / CLI] --> API[FastAPI]
+    UI[React browser UI / CLI] --> API[FastAPI]
     API --> DB[(PostgreSQL)]
     W[Python worker] --> DB
     W --> FS[Artifact store]
@@ -16,6 +16,10 @@ flowchart LR
     CI --> D[Databricks sandbox]
     W --> D
 ```
+
+The React UI is the agreed T04a target; Streamlit remains implemented until that
+migration passes. Both use the FastAPI boundary. See ADR-015 for the staged
+replacement, browser session review and Streamlit retirement gate.
 
 The worker-to-Databricks path supports status observation and permitted run
 commands. Deployment execution belongs to the environment's selected executor:

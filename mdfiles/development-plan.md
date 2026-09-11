@@ -1,6 +1,8 @@
 # Development plan and agent task ledger
 
-Status: **T01–T03 complete and merged; T04 implemented, pending review/merge**; T05 onward not started. This plan is implementation-ready guidance,
+Status: **T01–T03 complete and merged; T04 implemented, pending review/merge**.
+T04a frontend migration is next, followed by T05 onward (not started).
+This plan is implementation-ready guidance,
 not a claim of implemented capabilities. Task order follows dependencies rather
 than estimated calendar dates. Do not implement the entire roadmap in one turn.
 
@@ -25,14 +27,16 @@ merge rules. The handoff describes proposed code state rather than merge status.
 ## Delivery order
 
 ```text
-T01 -> T02 -> T03 -> T04 -> T05 -> T06 -> T07
-                                             |-> T08 -> T09 -> T10
-                                             |-> T11
+T01 -> T02 -> T03 -> T04 -> T04a -> T05 -> T06 -> T07
+T07 -> T08 -> T09 -> T10
+T07 -> T11
 T07 + T09 + T11 -> T12
 T10 + T12 -> T13 organizational pilot design
 ```
 
-Complete T11 after T07 for the full offline demonstration, then T08–T09 for real
+Complete T04a before adding T05 feature screens; Streamlit remains the current UI
+until migration acceptance passes. Complete T11 after T07 for the full offline
+demonstration, then T08–T09 for real
 GitHub integration. T10 can wait for an available workspace; continue recovery
 tests using scripted provider failures without pretending the real gate passed.
 
@@ -269,7 +273,7 @@ configuration changes increment binding version and are audited.
 
 ## T04 — Durable operations with a separate worker
 
-**Status:** implemented in draft PR #9, pending review/merge. **Depends on:** T03 (merged).
+**Status:** implemented in PR #9, pending review/merge. **Depends on:** T03 (merged).
 
 **Delivered:** migration 007 queue/attempt/reservation/probe/command/heartbeat tables;
 transactional enqueue/audit and scoped idempotency; PostgreSQL claims, leases,
@@ -292,7 +296,7 @@ was confined to the agent session's Docker CLI mount; regular Ubuntu could reach
 Docker Desktop. First-start migration/configuration steps are documented in root
 README. Devstack integration and the interactive account journey remain unverified.
 
-**Next:** review/merge T04, then implement T05 only.
+**Next:** review/merge T04, then implement T04a only. T05 waits for the frontend migration.
 
 **Read:** worker/failure protocol in [architecture](architecture.md), operation
 state/idempotency contracts, T04 API rows; the operation contract; the old RAG job runner has been removed.
@@ -317,12 +321,75 @@ expose an arbitrary task-execution API. Add liveness/readiness and queue telemet
   intent until observed. Unknown outcomes retain conflict reservations.
 - A status/attempt page exposes useful sanitized diagnostics and freshness.
 
+## T04a — Replace Streamlit with React
+
+**Status:** planned, not started; next after T04 merges. **Depends on:** T04.
+**Decision:** [ADR-015](decisions.md#adr-015--replace-streamlit-before-t05).
+
+**Read:** current frontend modules and UI tests in [repository map](repository-map.md),
+[API contracts](api-contracts.md), role/version/idempotency rules in
+[domain contracts](domain-contracts.md), [architecture](architecture.md), and the
+local container/verification instructions in root README.
+
+**Implement:** a React + TypeScript frontend built with Vite, covering the existing
+T01–T04 workflows. Design a consistent navigation/layout, application list/detail,
+forms, status indicators, loading/empty/error states and accessible controls.
+Preserve the FastAPI/service/worker boundary, existing accounts, database data,
+permissions and audit history. Add only small, authorized API improvements needed
+by these workflows, such as selectors; document and test any new API contract.
+
+Build the new UI alongside Streamlit during migration. First establish routing,
+API access and browser login/session handling, then complete login -> application
+list -> registration -> detail/edit. Migrate teams/memberships, ownership/roles,
+environments/bindings, audit history and operation status/attempts/recovery next.
+Keep the current registration, logout and profile behavior available. Handle
+expired sessions deliberately; browser token/session storage must be reviewed,
+not copied mechanically from Streamlit's server-side session state. Keep database
+credentials and server signing keys out of browser bundles and frontend config.
+
+Add a project-local Node toolchain, committed package lock, frontend lint/type/build
+checks and browser workflow tests. Keep uv for Python; select and pin the frontend
+toolchain and supporting libraries during implementation. Update Docker/Compose
+and startup docs to serve the new frontend and route API requests consistently.
+Once current workflows are verified in the replacement, remove Streamlit runtime,
+its dependencies and Streamlit-specific tests; retain equivalent behavior coverage
+and the backend suites. Update the Python lock if removing the frontend workspace
+member or its dependencies. Do not leave two permanent UI implementations.
+
+**Exclude:** T05 generation/artifact/revision features, approvals/deployments, real
+providers, organization identity/SSO redesign, backend business-rule rewrites,
+marketing pages or speculative dashboards. Keep the initial visual scope to the
+current application. Do not expand Streamlit with new feature screens.
+
+**Acceptance:**
+
+- Existing accounts can sign in, view their profile and sign out; expired sessions
+  are handled predictably. No account/database reset is required for the cutover.
+- Browser tests exercise registration/list/detail/edit and administration of
+  teams, roles, environments and bindings against the real local/test API.
+- Visibility/denied actions, stale-version conflicts, validation errors, pagination,
+  simulation labels, audit history and idempotent operation recovery remain correct.
+  The API remains authoritative for authorization, including revoked grants.
+- Operation status/attempt history exposes observation freshness and supports
+  refresh/cancel/retry/reconcile without duplicate submissions on request retry.
+- Navigation, forms and status feedback work with keyboard access and at common
+  desktop and narrower viewport sizes. Loading, empty and API failure states are usable.
+- Locked frontend install, lint/type checks, production build and browser tests
+  pass; applicable backend checks remain green. Compose builds and serves the
+  replacement with working login/API access and worker readiness.
+- Streamlit runtime/dependencies/tests are retired only after equivalent workflows
+  pass. Root README, handoff and repository map describe the resulting toolchains
+  and launch commands; no server secrets appear in generated browser assets.
+
+**Next:** after T04a is reviewed and merged, resume T05 using the React frontend.
+
 ## T05 — Generate a bundle and capture a revision
 
-**Status:** not started. **Depends on:** T04.
+**Status:** not started. **Depends on:** T04a (frontend) and T04 (worker).
 
 **Read:** [integrations](integrations.md), artifact/revision/validation contracts,
-T05 API rows. Inspect only template-related new code plus worker handler patterns.
+T05 API rows. Inspect template-related code, worker handler patterns and the
+React frontend established in T04a. Add all new feature screens there.
 
 **Implement:** one versioned Python batch template with synthetic input and unit
 tests; deterministic safe archive generator; local artifact adapter with digest

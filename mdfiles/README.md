@@ -6,6 +6,8 @@ includes an owned application registry and admin-managed simulated environments,
 versioned bindings, a simulated durable worker and operation history. Docker builds and bundled-database startup are verified; devstack integration remains unverified.
 Existing local configuration now requires `DEPLOYMENT_EXECUTOR=simulated`.
 Consult [next-agent.md](next-agent.md) for exact verification and prerequisites.
+The next milestone after T04 merges is **T04a: React + TypeScript + Vite frontend
+migration**, before T05. Streamlit is still implemented; its replacement is planned.
 
 **Resume here:** [next-agent.md](next-agent.md). Verify prerequisite changes
 on updated `main` before creating or continuing any task branch; the handoff
@@ -60,10 +62,11 @@ Use this prompt (see [next-agent.md](next-agent.md) for the current, more
 specific version):
 
 > Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Inspect Git
-> status and verify T04 is merged into updated main. Implement T05 only on its
+> status and verify T04 is merged into updated main. Implement T04a only on its
 > own branch, preserving unrelated changes. Explain the plan, run its checks,
 > update the handoff and affected docs, and open a draft PR against main. Do not
-> merge, begin T06, or deploy cloud resources.
+> merge, begin T05, or deploy cloud resources. Migrate current workflows to React,
+> TypeScript and Vite, and retire Streamlit after equivalent behavior is verified.
 
 The handoff separates implemented behavior from verification and merge status.
 Infrastructure activation and later task completion are not implied by this plan.

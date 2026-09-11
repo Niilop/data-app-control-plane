@@ -65,8 +65,11 @@ affected files before editing; avoid a full repository crawl for each task.
 
 ## Reuse and migration strategy
 
-Reuse FastAPI, Pydantic, synchronous SQLAlchemy, Alembic, PostgreSQL, Streamlit,
-and uv. Keep old tables/migrations intact; remove AI runtime features per the user's clarification; keep dormant CSV/example
+Reuse FastAPI, Pydantic, synchronous SQLAlchemy, Alembic, PostgreSQL and uv.
+Streamlit is current; T04a replaces it with React + TypeScript + Vite before T05.
+Keep current frontend modules until equivalent workflows pass, then retire them
+and update this map (ADR-015). Keep old tables/migrations intact; remove AI runtime
+features per the user's clarification; keep dormant CSV/example
 modules unmounted for now. Do not delete uploaded files or rewrite old
 migrations as a shortcut. Existing vector migrations may still require pgvector;
 verify the test/dev database supports it until a dedicated migration addresses it.
@@ -84,7 +87,7 @@ Keep the existing import layout initially; a package-wide rename is outside T01.
 | `backend/workers/` | Split handlers here when future tasks need them |
 | `backend/integrations/` | Only implemented simulation, artifact, GitHub, Databricks adapters |
 | `templates/python-batch/` | Versioned generated-project assets and tests |
-| `frontend/pages/` | Split platform screens here as later tasks need them |
+| `frontend/` (replacement structure chosen in T04a) | React/TypeScript/Vite UI, package lock and browser tests; currently still Streamlit |
 | `tests/unit/`, `tests/integration/`, `tests/contract/`, `tests/e2e/` | Isolated test suites |
 | `scripts/` | Explicit seed/demo/check helpers as needed |
 | `.github/workflows/` | This platform's own CI, distinct from generated application CI |
