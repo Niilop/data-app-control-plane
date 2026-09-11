@@ -1,5 +1,10 @@
 # FastAPI LLM Template
 
+> This repository is being developed into a self-service Databricks data application
+> control plane. Start with [the development documentation](mdfiles/README.md) for
+> scope, architecture, contracts, and agent tasks. The platform plan is not yet
+> implemented; the sections below describe the existing template.
+
 A modular FastAPI backend template for building LLM-powered applications with RAG, persistent chat, async jobs, and multi-provider AI support.
 
 ---
