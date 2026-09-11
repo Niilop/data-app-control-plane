@@ -1,21 +1,27 @@
 # Testing and operation guide
 
-Status: T01a establishes 17 passing offline tests, project-local dev tools, and
-Python 3.11. Live PostgreSQL/container/CI work remains T01b. Historical auth/example
-scripts are under `tests/manual/` with names outside pytest discovery; obsolete RAG
-tests were removed.
+Status: T01a established 17 passing offline tests, project-local dev tools, and
+Python 3.11. T01b adds locked container builds, an optional bundled database
+profile, isolated PostgreSQL migration integration tests, and platform CI; see
+`### T01b commands` below for what has actually been run and what has not.
+Historical auth/example scripts are under `tests/manual/` with names outside
+pytest discovery; obsolete RAG tests were removed.
 
 ## Development environment
 
 - Linux/WSL2; use `uv` for all Python execution and project-local tools.
 - Prefer PostgreSQL from `~/code/devstack` with a dedicated application database
   and a separate test database. Discover available connection configuration without
-  printing credentials; do not modify shared services/databases.
+  printing credentials; do not modify shared services/databases. `~/code/devstack`
+  did not exist in the sandbox that implemented T01b; devstack integration is
+  documented but unverified there (see next-agent.md).
 - Legacy migrations include pgvector. Verify extension availability rather than
   silently replacing PostgreSQL with SQLite or editing the historical migrations.
 - `.env` is local and excluded from Git. Maintain `.env.example` with placeholders
   and descriptions only. Bind local services to loopback by default.
 - No Redis queue is required even if Redis is already running in devstack.
+- uv `0.12.11` is pinned across both Dockerfiles (via `ghcr.io/astral-sh/uv:0.12.11`)
+  and both GitHub Actions workflows, matching the version verified in T01a.
 
 ## Verified T01a commands
 
@@ -30,14 +36,46 @@ uv run --locked ruff format --check backend/core/config.py backend/main.py backe
 ```
 
 All passed in T01a. Mypy checks settings/API assembly initially; Ruff covers the
-listed new/modified code. Test collection is limited to `tests/unit`; T01b must add
-isolated integration test discovery/configuration. Do not add global exclusions to
-suppress new errors. In the development sandbox, TestClient's event-loop startup
-stalled; the same tests passed outside the sandbox with outbound-network guards
-still enabled. No providers or live databases were contacted by the suite.
+listed new/modified code. In the development sandbox, TestClient's event-loop
+startup stalled; the same tests passed outside the sandbox with outbound-network
+guards still enabled. No providers or live databases were contacted by the suite.
 
-The following startup/migration commands are documented but a live DB migration
-and real account login have not yet been verified; that evidence belongs to T01b.
+## T01b commands
+
+Run from the repository root (adds `tests/integration` to the Ruff scope and
+registers the `integration` pytest marker; `testpaths` still defaults to
+`tests/unit` only, so `pytest -q` is unaffected):
+
+```bash
+uv sync --locked --all-packages --group dev
+uv run --locked pytest -q
+uv run --locked mypy
+uv run --locked ruff check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit tests/integration
+uv run --locked ruff format --check backend/core/config.py backend/main.py backend/models backend/alembic/env.py backend/alembic/legacy_models.py frontend/app.py tests/conftest.py tests/unit tests/integration
+```
+
+**Actually run and passing** in the sandbox that implemented T01b: all four
+commands above (37 offline tests passed, up from 17; mypy and Ruff clean).
+
+**Not run** in that sandbox — no Docker daemon, no local PostgreSQL, and
+`~/code/devstack` absent there:
+
+```bash
+docker compose build
+docker compose up
+TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/disposable_test_db \
+  uv run --locked pytest tests/integration -q
+```
+
+The isolated migration tests were exercised only for their skip path (no
+`TEST_DATABASE_URL` set: 3 tests skip cleanly with a visible reason). They have
+not been run against a real PostgreSQL/pgvector server; that is first exercised
+for real by the `postgres-migration` job in `.github/workflows/ci.yml`, using a
+throwaway `pgvector/pgvector` service container. Treat that job's actual hosted
+result — not this description — as the evidence once the PR runs CI.
+
+The following startup/migration commands remain documented but a live DB
+migration and real account login are still not verified end to end.
 
 Current backend import style expects the backend directory on Python's import
 path. The intended initial startup commands, from `backend/`, are:

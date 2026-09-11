@@ -16,6 +16,9 @@ package = false
 testpaths = ["tests/unit"]
 pythonpath = ["backend"]
 addopts = "--strict-config --strict-markers"
+markers = [
+    "integration: requires a real, isolated PostgreSQL+pgvector database (TEST_DATABASE_URL); not collected by default testpaths",
+]
 
 [tool.ruff]
 target-version = "py311"

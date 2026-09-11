@@ -43,7 +43,12 @@ Use linked contracts for details; scope exclusions below prevent unrelated work.
 
 ## T01 — Reproducible local platform foundation
 
-**Status:** in progress (T01a complete; T01b not started). **Depends on:** none.
+**Status:** in progress (T01a complete and merged; T01b implemented on
+`build/t01b-containers-ci`, opened as a draft PR against `main` — offline
+checks passed locally, but Docker image builds, a live `docker compose up`
+smoke check, and the isolated PostgreSQL migration tests are unverified
+locally; see the T01b handoff below and `mdfiles/next-agent.md`). **Depends
+on:** none.
 
 Deliver T01 as two reviewable branches, in order:
 
@@ -126,6 +131,37 @@ Preserve any new unrelated local edits when committing this task.
 - **Next:** T01b locked container builds + devstack/optional DB Compose + isolated
   PostgreSQL migration smoke + CI. CSV/example modules remain dormant; new platform
   domain features start at T02 after T01b. Keep user `.gitignore` changes separate.
+
+### T01b handoff — 2026-09-11
+
+- **Status:** implemented on `build/t01b-containers-ci` (fast-forwarded from
+  merged main at `f4ab415`, which includes PR #4). Opened as a draft PR against
+  `main`. Not merged; T02 not started; no cloud resources touched.
+- **Implemented:** uv-locked, pinned (`0.12.11`) multi-stage backend/frontend
+  Dockerfiles (venv at `/opt/venv`, outside the Compose dev bind mount); a root
+  `.dockerignore`; the bundled Compose `db` service moved behind an opt-in
+  `local-db` profile with a configurable host port (default `5433`) and a
+  non-blocking `depends_on`, plus `host.docker.internal` for reaching devstack
+  from a container; isolated PostgreSQL+pgvector migration integration tests
+  (`tests/integration/test_migrations.py`, marked `integration`, schema-isolated,
+  gated on `TEST_DATABASE_URL`, skipped with a visible reason when unset); the
+  offline network guard in `tests/conftest.py` scoped to skip `integration`-marked
+  tests; a new `.github/workflows/ci.yml` with a locked lint/type/offline-test job
+  and an isolated migration job backed by a `pgvector/pgvector` service container.
+  `.github/workflows/agent-handoff.yml` is unchanged.
+- **Verified:** `uv sync --locked --all-packages --group dev`, `uv run --locked
+  pytest -q` (**37 passed**, up from T01a's 17), `uv run --locked mypy` (clean),
+  `uv run --locked ruff check`/`ruff format --check` over the documented scope
+  plus `tests/integration` (clean). `pytest tests/integration -q` exercised only
+  its skip path (`TEST_DATABASE_URL` unset): 3 skipped with a visible reason.
+- **Not verified:** Docker image builds, `docker compose up`, and a live
+  PostgreSQL/pgvector run of `tests/integration` — no Docker daemon, no local
+  PostgreSQL, and no `~/code/devstack` checkout existed in the implementing
+  sandbox. Compose/workflow YAML was reviewed manually, not validated with
+  `docker compose config` (no PyYAML available offline either). The
+  `postgres-migration` CI job is the first real exercise of the migration tests
+  against pgvector; its hosted result on the PR is the evidence, not this note.
+- **Full details:** see `mdfiles/next-agent.md`.
 
 ## T02 — Register an owned application
 

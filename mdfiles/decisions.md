@@ -97,6 +97,37 @@ outside payloads. Implement interfaces only as concrete integrations arrive.
 Unsupported organization mode fails closed rather than pretending to be available.
 Switching profiles neither migrates artifacts/data nor provisions resources.
 
+## ADR-011 — T01b container/CI approach
+
+**Accepted direction (T01b), 2026-09-11.** Backend/frontend images build in two
+stages: a builder that runs `uv sync --locked --package <backend|frontend>
+--no-dev` using the pinned `ghcr.io/astral-sh/uv:0.12.11` binary, and a runtime
+stage that copies only the resulting venv (to `/opt/venv`, outside `/app`, so it
+survives the Compose dev bind mount) plus that member's source. uv workspace
+resolution needs every member's `pyproject.toml` present even when syncing one
+package, so both are copied into the build context; only the selected member's
+source is copied into the final image.
+
+The bundled Compose `db` service sits behind an opt-in `local-db` profile with a
+configurable host port (default 5433) instead of always running on 5432, so it
+is never a mandatory dependency and cannot collide with devstack's PostgreSQL.
+`backend`'s `depends_on: db` uses `required: false` (Compose Specification) so
+startup does not block when the profile is inactive. A `host.docker.internal`
+gateway mapping lets a containerized backend reach a devstack PostgreSQL
+published on the host without hardcoding a network name devstack does not
+publish to this repository.
+
+Isolated PostgreSQL integration tests use a uniquely named, disposable **schema**
+per test (via `TEST_DATABASE_URL`, with `search_path` scoped through the
+connection's `options`), not a freshly created database, so the test role only
+needs ordinary schema privileges rather than `CREATEDB`. pgvector's extension is
+relocatable, so `CREATE EXTENSION IF NOT EXISTS vector` in migration 002 resolves
+correctly whether it already exists in `public` or gets created in the isolated
+schema. This is unverified against a real pgvector server in this sandbox (no
+local Postgres/Docker); CI's `pgvector/pgvector` service container is the first
+real exercise of it — treat that job's actual result as the evidence, not this
+description.
+
 ## Questions reserved for their implementation gates
 
 | Question | Needed by | Default until resolved |

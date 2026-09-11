@@ -1,16 +1,21 @@
 services:
+  # Optional, self-contained database. Disabled by default: start it only
+  # with `docker compose --profile local-db up` when you want a bundled DB
+  # instead of the existing devstack PostgreSQL. Its host port defaults to
+  # 5433 to avoid colliding with devstack's PostgreSQL on 5432.
   db:
     image: pgvector/pgvector:pg16
+    profiles: ["local-db"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,8 +29,12 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - DATA_DIR=/app/data
+    # Lets DATABASE_URL in .env reach a devstack PostgreSQL published on the
+    # host (e.g. postgresql://...@host.docker.internal:5432/...); unused and
+    # harmless when pointing at the bundled `db` service or a remote host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./backend:/app
       - ./data:/app/data
@@ -34,6 +43,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
+        required: false
 
   frontend:
     build:
