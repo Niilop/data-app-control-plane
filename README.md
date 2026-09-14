@@ -239,8 +239,8 @@ and are not mounted by the platform API. The registry is under `/api/v1`; see
 ```bash
 uv run --locked pytest -q
 uv run --locked mypy
-uv run --locked ruff check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
-uv run --locked ruff format --check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
+uv run --locked ruff check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/alembic/versions/008_prepared_revisions.py backend/services/delivery_service.py backend/services/template_service.py backend/integrations/artifact_store.py backend/api/endpoints/delivery.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
+uv run --locked ruff format --check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/alembic/versions/008_prepared_revisions.py backend/services/delivery_service.py backend/services/template_service.py backend/integrations/artifact_store.py backend/api/endpoints/delivery.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
 ```
 
 Unit tests (`tests/unit`, the default `testpaths`) block network calls. Startup and
@@ -333,3 +333,29 @@ resolved failure/cancellation, or request reconciliation with a reason. Running
 cancellation is intent until observed. Unknown outcomes retain their reservation;
 no force-success or blind reservation-release control exists. The probe alone is
 not a generated application, deployment, or proof of external connectivity.
+
+### Prepare a synthetic bundle (T05)
+
+From an isolated database at the merged 007 baseline, run the usual explicit
+`uv run --locked alembic upgrade head` from `backend/`. This adds
+`008_prepared_revisions`; it does not alter earlier migrations or account data.
+A database from the abandoned T05 branch at `008_bundle_generation` is a different
+history: do not stamp it or run these migrations against it. Preserve it and use a
+separate database, or prepare a reviewed data-preserving conversion first.
+
+Set `ARTIFACT_DIR` to the same persistent directory for API and worker. Compose
+sets `/app/data/artifacts` and mounts `./data` in both. Back up artifacts with the
+DB; retain unreferenced files until an explicit cleanup policy exists.
+
+With an existing developer role and a usable environment binding, open an
+application's **Preparation** tab. Generate, refresh to download the artifact,
+capture an immutable revision, then request **Validate offline** and refresh for
+the report. Operations shows progress and operator recovery. Offline validation
+checks approved content/static syntax only; it does not run code or establish
+workspace validity. Config/target changes require generating a fresh artifact.
+
+Check the bundled project's own lock/tests separately:
+
+```bash
+uv run --locked python scripts/check_generated_project.py
+```
