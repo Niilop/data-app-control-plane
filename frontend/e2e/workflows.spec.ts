@@ -552,12 +552,16 @@ test("template catalogue, bundle download, revision snapshot and offline validat
   expect(queued.kind).toBe("bundle_generation");
   expect(queued.execution_mode).toBe("local");
   await page.getByRole("tab", { name: "Operations", exact: true }).click();
-  await expect(
-    page.getByRole("cell", { name: /bundle generation/i }).first(),
-  ).toBeVisible();
   const localOperation = page.getByRole("button", {
     name: `View operation ${queued.id}`,
   });
+  const localOperationRow = page.getByRole("row").filter({
+    has: localOperation,
+  });
+  await expect(localOperationRow).toContainText("Bundle generation");
+  await expect(
+    localOperationRow.getByText("Local", { exact: true }),
+  ).toBeVisible();
   await localOperation.click();
   await expect(
     page.getByRole("dialog").getByText("Local", { exact: true }),

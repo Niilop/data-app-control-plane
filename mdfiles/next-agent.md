@@ -111,7 +111,11 @@ Frontend typecheck/lint/format were
 attempted but not run: `frontend/node_modules` was absent and `npm ci` refused the
 environment's Node 20.20.2 because the locked frontend requires Node >=24.21.0
 <25. Hosted CI and browser workflows have not yet run for these latest fixes. The
-original T05 verification from 2026-09-12 remains:
+browser regression was subsequently made deterministic by locating the operation
+row through the exact submitted operation ID and asserting its `Local` label.
+Prettier and `git diff --check` passed for that follow-up; the browser workflow
+remains unrun locally because Docker is unavailable. The original T05 verification
+from 2026-09-12 remains:
 
 - `uv run --locked pytest -q`: **188 passed** with network blocking enabled
   (125 previously + **63 new** delivery cases). Existing assertions and migration

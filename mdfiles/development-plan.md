@@ -437,6 +437,10 @@ local result before its fenced application, and verifies existing artifact bytes
 before deduplication. The full offline suite passed with **192 tests**, as did
 focused Ruff and full mypy; frontend checks were blocked because Node 20 cannot
 install this repository's required locked Node 24 toolchain.
+The CI follow-up also scopes the browser execution-mode assertions to the row
+identified by the submitted operation ID. This avoids selecting an unrelated
+bundle-generation row when the seeded application has several operations and
+verifies the same row is visibly labelled `Local` before opening its details.
 
 **Read:** [integrations](integrations.md), artifact/revision/validation contracts,
 T05 API rows. Inspect template-related code, worker handler patterns and the
