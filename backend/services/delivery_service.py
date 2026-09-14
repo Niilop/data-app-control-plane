@@ -123,12 +123,12 @@ def create_generation(
     """Queue deterministic local generation; the handler does the work, not the API."""
     with transaction(db):
         payload = data.model_dump(mode="json")
-        previous = replay(db, actor, "bundle_generation", application_id, key, payload)
-        if previous:
-            return previous
         application, binding, _ = check_delivery(
             db, actor, application_id, data.binding_id
         )
+        previous = replay(db, actor, "bundle_generation", application_id, key, payload)
+        if previous:
+            return previous
         try:
             template = get_template(data.template_name, data.template_version)
         except GenerationError as error:
@@ -283,13 +283,13 @@ def create_validation(
             "scope": "offline",
             "revision_id": str(revision_id),
         }
-        previous = replay(db, actor, "offline_validation", revision_id, key, payload)
-        if previous:
-            return previous
         revision = get_revision(db, actor, revision_id)
         _, binding, _ = check_delivery(
             db, actor, revision.application_id, revision.binding_id
         )
+        previous = replay(db, actor, "offline_validation", revision_id, key, payload)
+        if previous:
+            return previous
         operation = enqueue(
             db,
             actor,

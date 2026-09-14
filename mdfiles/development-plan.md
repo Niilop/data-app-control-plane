@@ -427,6 +427,10 @@ its own lock and passes its own tests with `uv --offline`. Local Docker Compose
 was migrated to head 008 with existing accounts preserved, and the artifact mount
 was confirmed shared between the API and worker containers. See `next-agent.md`
 for exact counts and what was not run. See ADR-017 for the decisions taken.
+The 2026-09-14 review follow-up moves generation and validation replay handling
+after current visibility/developer authorization and adds two revocation
+regressions; `uv run --locked pytest -q` passed locally with **190 tests**, and
+focused Ruff plus full mypy passed. Hosted CI for the follow-up was not run locally.
 
 **Read:** [integrations](integrations.md), artifact/revision/validation contracts,
 T05 API rows. Inspect template-related code, worker handler patterns and the

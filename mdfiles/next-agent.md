@@ -69,6 +69,10 @@ explicitly offline validation:
   because generation is deterministic). The worker rechecks the role each kind
   requires, so a revoked developer grant fails the operation with
   `authorization_changed` and writes no artifact.
+- Generation and validation idempotency replays recheck current application
+  visibility and the developer role before returning the original operation.
+  Losing access after an earlier submission therefore cannot expose its operation
+  metadata through a replay.
 - Handlers keep the T04 shape: read in a short transaction, compute outside one,
   then return result rows as an `apply` callback that `queue_service.finish` runs
   inside the fenced result transaction, so a lost lease discards them.
@@ -89,7 +93,12 @@ explicitly offline validation:
 
 ## Verification performed
 
-On 2026-09-12, from branch `feat/t05-bundle-generation`:
+On 2026-09-14, the review follow-up branch additionally ran
+`uv run --locked pytest -q`: **190 passed** with network blocking enabled. The two
+new cases revoke the developer grant before a generation replay and remove all
+application visibility before a validation replay; both are refused rather than
+returning the earlier operation. Focused Ruff lint/format and full mypy also
+passed. The original T05 verification from 2026-09-12 remains:
 
 - `uv run --locked pytest -q`: **188 passed** with network blocking enabled
   (125 previously + **63 new** delivery cases). Existing assertions and migration

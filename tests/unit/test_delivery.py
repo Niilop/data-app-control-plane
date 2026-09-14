@@ -6,6 +6,7 @@ import zipfile
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import delete
 from sqlalchemy.orm import Session, sessionmaker
 
 TEMPLATE = {"template_name": "python-batch", "template_version": "1.0.0"}
@@ -355,6 +356,37 @@ def test_repeated_key_returns_the_original_operation(delivery: tuple) -> None:
     assert conflict.json()["error"]["code"] == "idempotency_conflict"
 
 
+def test_generation_replay_rechecks_the_developer_role(delivery: tuple) -> None:
+    from models.platform import ApplicationRole
+
+    client, headers, engine, app_id, binding_id = delivery
+    key = str(uuid4())
+    body = {**TEMPLATE, "binding_id": binding_id, "package_name": "synthetic_sales"}
+    first = client.post(
+        f"/api/v1/applications/{app_id}/generations",
+        headers={**headers[2], "Idempotency-Key": key},
+        json=body,
+    )
+    assert first.status_code == 202
+    with Session(engine) as db:  # type: ignore[arg-type]
+        db.execute(
+            delete(ApplicationRole).where(
+                ApplicationRole.application_id == UUID(app_id),
+                ApplicationRole.user_id == 2,
+                ApplicationRole.role == "developer",
+            )
+        )
+        db.commit()
+
+    replayed = client.post(
+        f"/api/v1/applications/{app_id}/generations",
+        headers={**headers[2], "Idempotency-Key": key},
+        json=body,
+    )
+    assert replayed.status_code == 403
+    assert replayed.json()["error"]["code"] == "forbidden"
+
+
 def test_generation_is_local_work_not_simulated(delivery: tuple) -> None:
     client, headers, _, _, _ = delivery
     accepted = generate(delivery)
@@ -699,6 +731,42 @@ def test_validation_requires_a_developer_role(delivery: tuple) -> None:
     revision = capture(delivery).json()
     assert validate(delivery, revision["id"], actor=3).status_code == 403
     assert validate(delivery, revision["id"], actor=4).status_code == 404
+
+
+def test_validation_replay_rechecks_application_visibility(delivery: tuple) -> None:
+    from models.platform import Application, ApplicationRole
+
+    client, headers, engine, app_id, _ = delivery
+    generate(delivery)
+    revision = capture(delivery).json()
+    key = str(uuid4())
+    path = f"/api/v1/revisions/{revision['id']}/validations"
+    first = client.post(
+        path,
+        headers={**headers[2], "Idempotency-Key": key},
+        json={"scope": "offline"},
+    )
+    assert first.status_code == 202
+    with Session(engine) as db:  # type: ignore[arg-type]
+        application = db.get(Application, UUID(app_id))
+        assert application is not None
+        application.owner_user_id = 1
+        application.data_owner_user_id = 1
+        db.execute(
+            delete(ApplicationRole).where(
+                ApplicationRole.application_id == UUID(app_id),
+                ApplicationRole.user_id == 2,
+            )
+        )
+        db.commit()
+
+    replayed = client.post(
+        path,
+        headers={**headers[2], "Idempotency-Key": key},
+        json={"scope": "offline"},
+    )
+    assert replayed.status_code == 404
+    assert replayed.json()["error"]["code"] == "not_found"
 
 
 def test_validation_records_policy_drift_as_a_note(delivery: tuple) -> None:
