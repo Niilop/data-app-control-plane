@@ -88,6 +88,9 @@ Permit unrelated local work concurrently and make limits configurable later.
 - Pending cancellation: cancel before execution. Running cancellation: record
   intent, request provider cancellation when possible, then observe the outcome.
   Success may win a cancellation race; cancellation is not rollback.
+- Local generation/validation has no external effect to reconcile: cancellation
+  observed before its fenced result transaction suppresses the result callback,
+  so no artifact or validation row is published by the cancelled operation.
 - Recovery: operator resolves uncertain state with evidence and an audit event.
   A retry is a new linked operation with renewed policy checks; an uncertain
   external action cannot be retried until reconciliation resolves it.

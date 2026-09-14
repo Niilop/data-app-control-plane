@@ -32,7 +32,7 @@ export function Operations({
           <h2>Operations</h2>
           <p>Execution progress, attempts and recovery history.</p>
         </div>
-        <Badge tone="blue">Simulated</Badge>
+        <Badge tone="blue">Local and simulated</Badge>
       </div>
       <Paged<Operation>
         path={`/api/v1/applications/${applicationId}/operations`}
@@ -65,6 +65,9 @@ export function Operations({
                     </td>
                     <td>
                       <Status value={operation.status} />
+                      <Badge tone="blue">
+                        {label(operation.execution_mode)}
+                      </Badge>
                     </td>
                     <td>
                       {operation.attempt_count} / {operation.max_attempts}
@@ -113,7 +116,8 @@ function OperationDetail({
   const action =
     operation?.status === "needs_attention"
       ? "reconcile"
-      : ["failed", "cancelled"].includes(operation?.status || "")
+      : operation?.execution_mode === "simulated" &&
+          ["failed", "cancelled"].includes(operation.status)
         ? "retry"
         : ["queued", "running", "retry_wait", "reconciling"].includes(
               operation?.status || "",
@@ -135,7 +139,7 @@ function OperationDetail({
         <>
           <div className="operation-status">
             <Status value={operation.status} />
-            <Badge tone="blue">Simulated</Badge>
+            <Badge tone="blue">{label(operation.execution_mode)}</Badge>
             <button className="text-button" onClick={refresh}>
               Refresh operation
             </button>

@@ -62,7 +62,7 @@ def probe(item: Claim, cancelled: Event, lost: Event) -> Outcome:
 
 
 def local_work(
-    sessions: sessionmaker[Session], item: Claim
+    sessions: sessionmaker[Session], item: Claim, cancelled: Event, lost: Event
 ) -> tuple[Outcome, str | None, Apply | None]:
     """Deterministic local generation or offline validation; no provider, no user code.
 
@@ -71,9 +71,20 @@ def local_work(
     """
     if item.phase == "reconcile":
         return "safe_to_retry", "local_work_repeatable", None
+    if lost.is_set():
+        raise LostLease()
+    if cancelled.is_set():
+        return "cancelled", None, None
     try:
         with sessions() as db:
-            return HANDLERS[item.kind](db, item.operation_id)
+            result = HANDLERS[item.kind](db, item.operation_id)
+        if lost.is_set():
+            raise LostLease()
+        if cancelled.is_set():
+            # Discard the apply callback so cancellation can never publish a
+            # completed artifact or validation result.
+            return "cancelled", None, None
+        return result
     except GenerationError as error:
         # A template or parameter defect is terminal; retrying cannot change it.
         return "failed", error.code, None
@@ -115,7 +126,7 @@ def run_one(
             outcome: Outcome = probe(item, cancelled, lost)
             diagnostic = "probe_rejected" if outcome == "failed" else None
         elif item.kind in HANDLERS:
-            outcome, diagnostic, apply = local_work(sessions, item)
+            outcome, diagnostic, apply = local_work(sessions, item, cancelled, lost)
         else:
             outcome, diagnostic = "failed", "unsupported_handler"
     except LostLease:

@@ -475,6 +475,23 @@ def test_download_rejects_content_that_fails_verification(delivery: tuple) -> No
     assert response.json()["error"]["code"] == "artifact_digest_mismatch"
 
 
+def test_put_rejects_corrupted_content_instead_of_deduplicating(
+    delivery: tuple,
+) -> None:
+    from integrations import artifact_store
+    from services.policy_service import PolicyError
+
+    content = b"content-addressed artifact"
+    digest, _ = artifact_store.put(content)
+    path = artifact_store.artifact_root() / artifact_store.storage_key(digest)
+    path.write_bytes(b"corrupted")
+
+    with pytest.raises(PolicyError) as caught:
+        artifact_store.put(content)
+
+    assert caught.value.code == "artifact_digest_mismatch"
+
+
 def test_artifacts_survive_a_new_api_process(delivery: tuple) -> None:
     """Content lives in the configured mount, not in one process's memory."""
     from integrations import artifact_store
@@ -810,6 +827,43 @@ def test_local_work_cannot_be_retried_through_the_queue(delivery: tuple) -> None
     )
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "unsupported_retry"
+
+
+def test_running_local_work_honors_cancellation_before_applying_result(
+    delivery: tuple, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import worker
+    from models.operations import Operation
+    from services.delivery_service import run_generation
+
+    client, headers, engine, app_id, binding_id = delivery
+    response = client.post(
+        f"/api/v1/applications/{app_id}/generations",
+        headers={**headers[2], "Idempotency-Key": str(uuid4())},
+        json={
+            **TEMPLATE,
+            "binding_id": binding_id,
+            "package_name": "cancelled_generation",
+        },
+    )
+    operation_id = response.json()["operation_id"]
+
+    def cancel_after_render(db: Session, identifier: UUID) -> tuple:
+        result = run_generation(db, identifier)
+        cancelled = client.post(
+            f"/api/v1/operations/{operation_id}/cancel",
+            headers={**headers[2], "Idempotency-Key": str(uuid4())},
+        )
+        assert cancelled.status_code == 202
+        return result
+
+    monkeypatch.setitem(worker.HANDLERS, "bundle_generation", cancel_after_render)
+    assert worker.run_one(sessionmaker(engine), str(uuid4()))
+
+    with Session(engine) as db:
+        operation = db.get(Operation, UUID(operation_id))
+        assert operation.status == "cancelled"
+    assert artifacts(delivery) == []
 
 
 def test_revision_reads_follow_application_visibility(delivery: tuple) -> None:

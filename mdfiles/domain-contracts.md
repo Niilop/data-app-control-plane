@@ -243,3 +243,7 @@ developer grant fails the operation with `authorization_changed` and writes no
 artifact. Operations record `execution_mode` `local` for real work done on this
 machine and `simulated` only for work standing in for a provider; a database check
 constraint enforces the pairing with the operation kind in both directions.
+Operation views render that recorded mode rather than applying a blanket
+simulation label, and do not offer the unsupported operator retry command for
+local work. Cancellation observed before a local result is transactionally
+applied wins the race and discards that result callback.

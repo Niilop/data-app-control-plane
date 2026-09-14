@@ -73,6 +73,12 @@ explicitly offline validation:
   visibility and the developer role before returning the original operation.
   Losing access after an earlier submission therefore cannot expose its operation
   metadata through a replay.
+- The Operations UI renders the recorded `local` or `simulated` mode per row and
+  detail instead of globally mislabelling all work, and it hides retry for local
+  kinds because that API action is intentionally unsupported. Running local work
+  discards its result callback if cancellation is observed before the fenced
+  result transaction. Artifact writes verify an existing digest path before
+  reporting successful deduplication, so corrupted content fails closed.
 - Handlers keep the T04 shape: read in a short transaction, compute outside one,
   then return result rows as an `apply` callback that `queue_service.finish` runs
   inside the fenced result transaction, so a lost lease discards them.
@@ -98,7 +104,14 @@ On 2026-09-14, the review follow-up branch additionally ran
 new cases revoke the developer grant before a generation replay and remove all
 application visibility before a validation replay; both are refused rather than
 returning the earlier operation. Focused Ruff lint/format and full mypy also
-passed. The original T05 verification from 2026-09-12 remains:
+passed. The subsequent feedback fixes ran `tests/unit/test_delivery.py` (**67
+passed**), `tests/unit/test_operations.py` (**17 passed**), the full offline suite
+(**192 passed**), focused Ruff, and full mypy (**36 source files**) successfully.
+Frontend typecheck/lint/format were
+attempted but not run: `frontend/node_modules` was absent and `npm ci` refused the
+environment's Node 20.20.2 because the locked frontend requires Node >=24.21.0
+<25. Hosted CI and browser workflows have not yet run for these latest fixes. The
+original T05 verification from 2026-09-12 remains:
 
 - `uv run --locked pytest -q`: **188 passed** with network blocking enabled
   (125 previously + **63 new** delivery cases). Existing assertions and migration

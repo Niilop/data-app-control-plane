@@ -44,14 +44,15 @@ def put(content: bytes, settings: Settings | None = None) -> tuple[str, int]:
     """Store content under its own digest and return that digest and its size.
 
     Writing is atomic: a partially written file is never visible under its final
-    key. Identical content is stored once; existing content is left untouched
-    because artifact content is immutable.
+    key. Identical content is stored once, but existing content is verified before
+    it is treated as a successful deduplication.
     """
     if not content or len(content) > MAX_ARTIFACT_BYTES:
         raise PolicyError(422, "invalid_artifact", "Unsupported artifact size")
     digest = digest_bytes(content)
     destination = _path(digest, settings)
     if destination.exists():
+        get(digest, settings)
         return digest, len(content)
     destination.parent.mkdir(parents=True, exist_ok=True)
     handle, temporary = tempfile.mkstemp(dir=destination.parent, suffix=".partial")

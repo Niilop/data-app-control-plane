@@ -229,10 +229,12 @@ def finish(
         )
         assert attempt is not None
         code = diagnostic
-        if outcome in {"transient", "safe_to_retry"}:
-            if operation.cancel_requested:
-                status = "cancelled"
-            elif operation.attempt_count >= operation.max_attempts:
+        if operation.cancel_requested and outcome != "unknown":
+            # This final locked check closes the race between a handler's last
+            # cancellation check and result application.
+            status = "cancelled"
+        elif outcome in {"transient", "safe_to_retry"}:
+            if operation.attempt_count >= operation.max_attempts:
                 status, code = "failed", "retry_exhausted"
             else:
                 status = "retry_wait"

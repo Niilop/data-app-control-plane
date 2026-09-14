@@ -555,6 +555,20 @@ test("template catalogue, bundle download, revision snapshot and offline validat
   await expect(
     page.getByRole("cell", { name: /bundle generation/i }).first(),
   ).toBeVisible();
+  const localOperation = page.getByRole("button", {
+    name: `View operation ${queued.id}`,
+  });
+  await localOperation.click();
+  await expect(
+    page.getByRole("dialog").getByText("Local", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("dialog").getByRole("button", { name: "Retry operation" }),
+  ).not.toBeVisible();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Close dialog" })
+    .click();
 
   await page.getByRole("tab", { name: "Revisions", exact: true }).click();
   const revision = (

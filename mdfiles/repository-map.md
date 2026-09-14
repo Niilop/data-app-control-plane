@@ -131,13 +131,13 @@ main resolves the earlier local-only instruction and ignore-file uncertainty.
 | `backend/templates/python-batch/1.0.0/template.json` | Manifest: metadata, pinned tool versions, parameter contract, required files and the source-to-target allowlist |
 | `backend/templates/python-batch/1.0.0/files/` | Reviewed assets with `@@name@@` placeholders; stdlib-only project, bundle/job definitions, workflows and a prepared `uv.lock`. Kept under `backend/` so the existing image and dev bind mount carry it |
 | `backend/services/template_service.py` | Catalogue loading and content digests, placeholder rendering, archive-entry safety, deterministic uncompressed archives and safe archive reads |
-| `backend/integrations/artifact_store.py` | Content-addressed local storage: atomic writes, deduplication, digest verification on every read |
+| `backend/integrations/artifact_store.py` | Content-addressed local storage: atomic writes, deduplication only after verifying existing bytes, and digest verification on every read |
 | `backend/services/delivery_service.py` | Template registration, generation/revision/validation commands with audit, and the two worker handlers |
 | `backend/services/offline_validation.py` | Offline checks (parse-only) and the explicitly scoped JSON report |
 | `backend/models/delivery.py`, `delivery_schemas.py` | Template/artifact/revision/validation ORM; closed generation and revision inputs and explicit responses |
 | `backend/alembic/versions/008_bundle_generation.py` | Add the four tables and widen the operation kind/execution-mode check; 001–007 unchanged |
 | `backend/api/endpoints/delivery.py` | Templates, generation, authorized artifact download, revisions and offline validation |
-| `backend/services/operation_service.py`, `queue_service.py`, `worker.py` | Unreserved local kinds, kind-aware worker authorization, fenced handler result writes and explicit local dispatch |
+| `backend/services/operation_service.py`, `queue_service.py`, `worker.py` | Unreserved local kinds, kind-aware worker authorization, cancellation-aware fenced result writes and explicit local dispatch |
 | `backend/core/config.py`, `docker-compose.yaml` | `ARTIFACT_DIR` setting and the artifact mount shared by API and worker |
 | `frontend/src/pages/delivery.tsx`, `src/api.ts`, `src/ReferenceSelect.tsx` | Bundles and Revisions tabs, generation and capture dialogs, artifact download and validation reports |
 | `scripts/check_generated_project.py` | Acceptance check: the generated project installs from its own lock and passes its own tests, offline |

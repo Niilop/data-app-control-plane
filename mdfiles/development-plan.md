@@ -431,6 +431,12 @@ The 2026-09-14 review follow-up moves generation and validation replay handling
 after current visibility/developer authorization and adds two revocation
 regressions; `uv run --locked pytest -q` passed locally with **190 tests**, and
 focused Ruff plus full mypy passed. Hosted CI for the follow-up was not run locally.
+The subsequent review follow-up renders each operation's recorded execution mode,
+hides unsupported retry controls for local work, makes cancellation suppress a
+local result before its fenced application, and verifies existing artifact bytes
+before deduplication. The full offline suite passed with **192 tests**, as did
+focused Ruff and full mypy; frontend checks were blocked because Node 20 cannot
+install this repository's required locked Node 24 toolchain.
 
 **Read:** [integrations](integrations.md), artifact/revision/validation contracts,
 T05 API rows. Inspect template-related code, worker handler patterns and the
