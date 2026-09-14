@@ -237,6 +237,23 @@ Use scripted adapters to reproduce failures deterministically; do not disguise
 scripted responses as external verification. Human review applies to identity and
 infrastructure changes before activation.
 
+## Terraform verification (planned T09a)
+
+Once `infra/` exists, record the pinned Terraform/provider versions and run
+`terraform fmt -check -recursive infra`, then `terraform init -backend=false`
+and `terraform validate` in the sandbox root. Initialization may download providers;
+it is not part of the offline application suite and does not prove cloud access.
+Add focused module/input tests where they establish behavior, using mocked
+providers when supported. Review the separate workflow's trust, plan approval,
+state serialization and credential boundaries against the T09a integration contract.
+
+After separately authorized activation, record the reviewed plan and apply result,
+nonsecret resource references, a subsequent no-change plan, and observed locking/
+recovery behavior. A failed or unrun apply is not infrastructure delivery evidence.
+Document the backend bootstrap, any resources retained, costs observed, and cleanup
+results; protect raw state and plan artifacts rather than publishing them as portfolio
+evidence. T10 independently verifies DAB deployment and the synthetic job output.
+
 ## Required regression scenarios by introduction point
 
 | Scenario | First task |
@@ -250,6 +267,7 @@ infrastructure changes before activation.
 | Unknown job or invalid parameters rejected; run/deployment outcomes independent | T07 |
 | Ref drift and source provenance; private repo/rate-limit errors | T08 |
 | Dispatch timeout, late/duplicate run discovery, manifest mismatch, cancellation races | T09 |
+| Terraform configuration/input validation; privileged workflow isolation; separately recorded plan/apply/locking evidence | T09a |
 | Genuine deployment/run output; no silent fallback; bounded external execution | T10 |
 | Access request escalation denial, effective revocation, archive preservation | T11 |
 | Repeatable load/recovery report and isolated restore | T12 |

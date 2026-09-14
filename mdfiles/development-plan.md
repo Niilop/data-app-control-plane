@@ -1,7 +1,8 @@
 # Development plan and agent task ledger
 
-Status: **T01–T04 complete and merged; T04a implemented, pending review/merge**.
-T05 is next after T04a merges; later tasks have not started.
+Status on updated main (2026-09-14): **T01–T04a merged**. T05 is proposed
+separately in PR #11 and awaits review/merge; inspect it before starting duplicate
+work. T09a below is newly planned; later implementation tasks have not started.
 This plan is implementation-ready guidance,
 not a claim of implemented capabilities. Task order follows dependencies rather
 than estimated calendar dates. Do not implement the entire roadmap in one turn.
@@ -28,7 +29,7 @@ merge rules. The handoff describes proposed code state rather than merge status.
 
 ```text
 T01 -> T02 -> T03 -> T04 -> T04a -> T05 -> T06 -> T07
-T07 -> T08 -> T09 -> T10
+T07 -> T08 -> T09 -> T09a -> T10
 T07 -> T11
 T07 + T09 + T11 -> T12
 T10 + T12 -> T13 organizational pilot design
@@ -36,8 +37,19 @@ T10 + T12 -> T13 organizational pilot design
 
 Complete review/merge of T04a before adding T05 feature screens to React. Complete T11 after T07 for the full offline
 demonstration, then T08–T09 for real
-GitHub integration. T10 can wait for an available workspace; continue recovery
+GitHub integration. T09a then prepares a small, administrator-run Terraform sandbox
+foundation; its live provisioning gate requires separate authorization. T10 consumes
+the prepared environment. Terraform is not a prerequisite for the local demo or
+T12's scripted recovery evidence. T10 can wait for an available workspace; continue recovery
 tests using scripted provider failures without pretending the real gate passed.
+
+Planning update (2026-09-14): T09a and ADR-018 add Terraform alongside DAB for
+portfolio infrastructure-as-code evidence. Documentation only; no Terraform
+configuration, workflow, installation or provisioning is implemented by this update.
+Verification: `git diff --check` and a uv-run stdlib check of nine changed Markdown
+files passed (47 local links/anchors, code fences, handoff sections and task order).
+Application suites and Terraform/provider commands were not run for this prose-only
+change. T09a implementation and its live evidence remain pending.
 
 Every task includes documentation updates and relevant tests. Common requirements:
 read [repository-map.md](repository-map.md), inspect affected code, preserve
@@ -416,7 +428,8 @@ current application. Do not expand Streamlit with new feature screens.
 
 ## T05 — Generate a bundle and capture a revision
 
-**Status:** not started. **Depends on:** T04a (frontend) and T04 (worker).
+**Status:** proposed separately in PR #11, pending review/merge; not implemented
+on this documentation branch. **Depends on:** T04a (frontend) and T04 (worker).
 
 **Read:** [integrations](integrations.md), artifact/revision/validation contracts,
 T05 API rows. Inspect template-related code, worker handler patterns and the
@@ -523,16 +536,75 @@ manifest, API outage, restart, and cancellation race. No ambiguous dispatch is
 blindly repeated, stale worker cannot release the reservation, and unrelated
 latest runs are never misattributed. Credentials do not appear in logs/API/DB payloads.
 
+## T09a — Prepare a Terraform sandbox foundation
+
+**Status:** not started. **Depends on:** T09. Local implementation and checks can
+finish while the separately authorized infrastructure activation gate is pending.
+
+**Read:** ADR-018 in [decisions](decisions.md), infrastructure ownership in
+[architecture](architecture.md), Terraform contract in [integrations](integrations.md),
+and Terraform verification in [testing and operation](testing-and-operation.md).
+Verify current official provider/backend/authentication documentation during implementation.
+
+**Implement:** a small `infra/` root for one sandbox and one reusable module for
+shared resources the T10 application actually needs. Default to referencing an
+existing Databricks workspace; choose the smallest useful resource set against
+the available workspace/compute model. For example, a cluster policy is appropriate
+only if the selected compute uses it. Workspace/network provisioning is an optional
+separately scoped follow-up, not a requirement to demonstrate Terraform.
+
+Include pinned Terraform/provider versions, committed `.terraform.lock.hcl`, typed
+and validated inputs, naming/tags, nonsecret example configuration and an allowlist
+of nonsecret outputs for administrator registration in the control plane. Document
+resource ownership, prerequisites, remote state/locking and bootstrap, scoped
+authentication (prefer supported OIDC), cost exposure, setup and cleanup in
+`infra/README.md`. Keep credentials, state, saved plans and private variable files
+out of Git and application payloads.
+
+Add `.github/workflows/terraform.yml` separate from application delivery: unprivileged
+format/validation checks on PRs and explicitly enabled administrator-run plan/apply
+for trusted code. Review the exact saved plan before applying it, serialize by state,
+and document the approval mechanism supported by the actual GitHub account. No
+automatic apply on merge and no privileged execution of untrusted PR code.
+
+**Exclude:** Terraform execution/state handling in the API or worker, new operation
+kinds or UI, DAB replacement, Terraform ownership of application jobs/artifacts,
+control-plane cloud hosting, enterprise landing zones, multi-cloud/multi-environment
+frameworks, broad identity/data grants, and external activation without authorization.
+
+**Acceptance:**
+
+- Formatting and provider-backed configuration validation pass without cloud
+  credentials; provider installation requirements are recorded separately from
+  offline application tests. Test meaningful input/module behavior where applicable.
+- Every managed resource has one owner (Terraform or DAB). Nonsecret outputs map to
+  the existing environment/binding concept without giving the backend state access.
+- Workflow review establishes that PR checks have no infrastructure credentials,
+  apply requires deliberate authorization for the reviewed plan, and state locking
+  and recovery instructions cover concurrent/interrupted execution.
+- With separate authorization, record a real plan/apply and a subsequent no-change
+  plan, resource references, tool versions, and cleanup/retention evidence. Without
+  it, mark live plan/apply, locking and cleanup verification pending; validation is
+  not evidence of provisioned infrastructure.
+
+**Next:** T10 uses a reviewed, available environment. T09a configuration can be
+complete before activation; lack of an account or budget does not block T11/T12.
+
 ## T10 — Real Databricks sandbox deployment and job
 
-**Status:** not started. **Depends on:** T09.
+**Status:** not started. **Depends on:** T09 and T09a configuration/ownership contract.
 
 **External prerequisites:** an existing authorized workspace, supported compute,
 reviewed limited identity, cost/timeout configuration, and explicit user permission
 to activate execution. Lack of these blocks this integration gate only.
+The administrator supplies reviewed nonsecret references from the T09a foundation;
+any Terraform-managed resources required by the job must have been applied and
+verified. Referenced pre-existing resources remain externally owned. This task does
+not run Terraform or assume configuration validation provisioned the environment.
 
 **Read:** full [integration contract](integrations.md), ADR-005/007/008 in
-[decisions](decisions.md). Verify current Azure Databricks docs for the actual account.
+[decisions](decisions.md), ADR-018 and the T09a infrastructure handoff.
+Verify current Azure Databricks docs for the actual account.
 
 **Implement:** trusted workflow validates/deploys exact captured source/config and
 publishes genuine deployment references; restricted Databricks run submit/observe

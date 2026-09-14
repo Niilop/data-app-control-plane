@@ -3,6 +3,49 @@
 Status: planned. Verify API/tool versions and provider capabilities during each
 integration task; pin the versions tested. Sources below were consulted 2026-09-11.
 
+## Terraform sandbox contract (planned T09a)
+
+Keep Terraform in this control-plane repository's `infra/`, with a dedicated
+`.github/workflows/terraform.yml`. Generated application repositories keep DAB
+and their existing CI/deployment contract. Terraform provisions shared sandbox
+resources; DAB owns application code, jobs and pipelines. Never manage the same
+resource with both. This follows [Databricks' IaC guidance](https://docs.databricks.com/aws/en/lakehouse-architecture/deployment-guide/iac)
+(consulted 2026-09-14); verify provider capabilities at implementation time.
+
+Start with one sandbox root and one useful reusable module, referencing an
+existing authorized workspace. Select a small resource set needed by T10, such
+as an applicable compute policy; do not require a new workspace or an enterprise
+network design. Record referenced versus managed resources and their cleanup owner.
+
+- Pin/test tool and provider versions and commit the provider lock file. Supply
+  nonsecret example inputs; ignore local state, `.terraform/`, saved plans and
+  private variable files. Do not use Terraform to transport credential values.
+- Use a restricted remote backend with locking for real operation. Document
+  backend/identity bootstrap as an administrator prerequisite, state isolation by
+  sandbox, backup/recovery, and how to handle an interrupted apply. Backend
+  bootstrap and its cost are not implicitly authorized by adding configuration.
+- PR checks format and validate configuration without cloud credentials. Provider
+  installation can need registry access; these checks are separate from the
+  platform's offline test suite. Cloud-backed plans run only on trusted code with
+  an explicitly configured identity; prefer supported OIDC with scoped trust.
+- Apply is deliberately enabled by an administrator after reviewing the exact
+  saved plan for a recorded commit, inputs and target state. Restrict plan artifact
+  access/retention, since plans and state may contain sensitive values. Serialize
+  operations by state; do not automatically apply merges or run privileged PR code.
+  Implement approval using verified account features, documenting single-admin
+  trust limitations rather than assuming paid protection features exist.
+- Only explicitly allowlisted nonsecret outputs (workspace/resource identifiers)
+  pass to administrator environment registration. No automatic state ingestion,
+  Terraform executor or infrastructure credentials in the API/worker is added.
+- Document cost/stop/cleanup procedures. Stop affected application activity before
+  infrastructure changes or destruction; local operation reservations do not lock
+  the infrastructure workflow. Remove only owned resources after authorization,
+  preserving referenced workspaces, shared data and the state needed for recovery.
+
+Configuration checks, live plan/apply, a subsequent no-change plan, and actual
+cleanup/retention observations are separate evidence. Unavailable accounts/budgets
+leave the real gate pending while local platform development continues.
+
 ## Generated application contract
 
 ```text
@@ -120,7 +163,10 @@ Verify the Azure workspace's supported authentication and compute configuration
 when one is available. No identity setup or paid execution is authorized by this
 documentation task.
 
-Register existing workspace/resources only. Select one supported compute option
+The control plane registers existing workspace/resource references only; an
+administrator may prepare required shared resources separately through T09a.
+Registration does not run Terraform or prove that a resource exists.
+Select one supported compute option
 after inspecting actual availability/costs; configure timeouts, limited concurrency,
 and small synthetic inputs. No automatic schedule or production dataset. Real
 job results must contain the provider run ID and verifiable output, not a fabricated

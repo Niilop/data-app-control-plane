@@ -6,11 +6,17 @@ implementation; it does not imply that its PR has merged.
 
 ## Implemented state
 
-T01–T04 are merged. T04 PR #9 was confirmed merged at
-`9a36e56aac10a3b8c87cafbdc0f75f85b7752ff1`. T04a is implemented from that main and
-awaits review/merge in [PR #10](https://github.com/Niilop/data-app-control-plane/pull/10).
-T05 has not started. AI/chat/RAG/LLM/inference remain removed;
+Updated main on 2026-09-14 contains T01–T04a; T04a merged as `6503ec1` via PR #10.
+T05 is proposed separately in [PR #11](https://github.com/Niilop/data-app-control-plane/pull/11)
+and is not in this documentation branch's main baseline. Inspect its current
+status before continuing; do not recreate its implementation. AI/chat/RAG/LLM/inference remain removed;
 historical tables and all migrations through `007_durable_operations` are retained.
+
+The Terraform planning update adds T09a between T09 and T10, plus ADR-018 and the
+affected scope/architecture/integration/testing/map contracts. It adds no Terraform
+configuration or runtime behavior. DAB remains the application delivery tool;
+infrastructure is a separate administrator responsibility. No external activation
+is authorized by this documentation change.
 
 The platform provides development accounts/admin bootstrap, teams/memberships,
 owned applications, direct/team roles, versioned metadata, simulated environment
@@ -48,7 +54,15 @@ T04a replaces Streamlit with React + TypeScript + Vite:
 
 ## Verification performed
 
-On 2026-09-11/12:
+For the 2026-09-14 documentation update, `git diff --check` passed. A stdlib check
+run through uv passed for all nine changed Markdown files: 47 local links/anchors,
+balanced code fences, the six handoff sections and T09a task ordering. Manual
+review checked resource ownership and configuration-versus-activation boundaries.
+Updated `origin/main` is `6503ec1`; GitHub confirmed PR #11 is open and draft.
+Application tests and Terraform/provider commands were not run for this prose-only
+change. No infrastructure configuration, installation or activation occurred.
+
+Historical T04a verification on 2026-09-11/12:
 
 - `uv sync --locked --all-packages --group dev` passed after lock cleanup.
 - `uv run --locked pytest -q`: **125 passed** with network blocking enabled.
@@ -87,13 +101,16 @@ On 2026-09-11/12:
   the updated version before saving. Handoff CI run 34649546592 also passed.
   PostgreSQL integration tests were not rerun locally. This final follow-up changes
   documentation only; application checks were not rerun locally for that edit.
-  Inspect current CI before merge; this PR is not claimed merged.
+  These are historical T04a checks, not verification of the Terraform plan.
 
 
 ## Remaining work and limitations
 
-- Review T04a and current CI before merge, particularly browser identity/session
-  changes. It is not claimed merged. T05 must wait for that merge.
+- Review existing T05 PR #11 and its current evidence before merge. This
+  documentation branch does not include its implementation or reverify its checks.
+- T09a is planned only. Provider/resource choice, backend bootstrap, credentials,
+  live plans/applies and cleanup remain future work; the local demo and T12's
+  scripted recovery work do not depend on infrastructure activation.
 - Development logout clears the cookie but does not revoke copied JWTs before
   expiry. TLS termination/proxy trust, organization SSO and global revocation remain
   later work. Supported Compose development is loopback HTTP; direct HTTPS cookies
@@ -108,24 +125,29 @@ On 2026-09-11/12:
 - Devstack integration remains unverified; `~/code/devstack` was absent. Existing
   local Compose uses the bundled pgvector/pg16 database. Preserve `.env`/volumes.
 - No template generation, artifacts, revisions, approvals, provider adapters or
-  deployments exist. Unknown probes retain reservations until a supported outcome;
+  deployments exist in the recorded main baseline. Unknown probes retain
+  reservations until a supported outcome;
   no force-success API or exactly-once external execution claim exists.
 
 ## Next task
 
-After confirming T04a is merged on updated main, implement **T05 — Generate a
-bundle and capture a revision** on its own branch. Read the complete task and
-contracts first. Add one versioned Python batch template, deterministic safe archive
-creation, digest-checked local artifacts, generation/download React UI, immutable
-revision snapshots and offline validation through the durable worker. Generation
-requires no network; lock and test the generated project in isolation. Do not begin
-T06, publish repositories, deploy real bundles, execute adopted arbitrary repository
-code, or activate providers. Preserve current policy/audit/version/idempotency rules.
+Inspect updated main and existing PR #11 for **T05 — Generate a bundle and capture
+a revision**; continue/review that work if outstanding rather than recreating it.
+If T05 has merged, use its current handoff for T06. Read the complete task and
+contracts first and implement only the assigned bounded slice. Do not advance
+beyond it, publish repositories, deploy real bundles, execute adopted arbitrary
+repository code, or activate providers. Preserve current
+policy/audit/version/idempotency rules.
+
+Keep T09a scheduled after T09 and before T10; do not start Terraform with T05/T06.
+When integrating the T05 handoff, retain this roadmap decision and its explicit
+separation from application deployment. ADR-017 is used by T05's existing branch;
+the Terraform decision uses ADR-018 to avoid an identifier collision.
 
 ## Files to read first
 
 - `AGENTS.md`, `mdfiles/README.md`, T05 in `mdfiles/development-plan.md`, ADR-015/016
-  in `mdfiles/decisions.md`.
+  and ADR-018 in `mdfiles/decisions.md`.
 - `mdfiles/integrations.md`, artifact/revision/validation rules in
   `mdfiles/domain-contracts.md`, T05 API rows, `mdfiles/architecture.md` and
   `mdfiles/repository-map.md`.
@@ -140,10 +162,11 @@ code, or activate providers. Preserve current policy/audit/version/idempotency r
 ## Suggested agent prompt
 
 Read AGENTS.md, mdfiles/README.md and mdfiles/next-agent.md. Inspect Git status,
-preserve unrelated work, verify T04a is merged into updated main, and create the
-next task branch if needed. Implement T05 only: safe deterministic template/archive
-generation, local artifacts/digests/downloads, immutable revisions and explicitly
-offline validation, with React UI and the existing durable worker. Preserve accounts,
-data and policy/version/audit/idempotency contracts. Explain the plan, run checks,
-update handoff/contracts/map, and open a draft PR. Do not merge, start T06, publish
-repositories, activate providers or execute arbitrary adopted repository code.
+preserve unrelated work, verify prerequisites on updated main and inspect existing
+T05 PR #11 before creating a task branch. Continue/review T05 only if outstanding;
+if merged, follow its updated handoff for the next bounded assignment. Preserve
+accounts, data and policy/version/audit/idempotency contracts. Explain the plan,
+run checks, update handoff/contracts/map, and open a draft PR. Do not merge, advance
+beyond the assigned task, publish repositories, activate providers or execute
+arbitrary adopted repository code.
+Retain the planned T09a Terraform foundation before T10; do not implement it now.

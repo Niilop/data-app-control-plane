@@ -89,6 +89,8 @@ Keep the existing import layout initially; a package-wide rename is outside T01.
 | `tests/unit/`, `tests/integration/`, `tests/contract/`, `tests/e2e/` | Isolated test suites |
 | `scripts/` | Explicit seed/demo/check helpers as needed |
 | `.github/workflows/` | This platform's own CI, distinct from generated application CI |
+| `infra/README.md`, `infra/sandbox/`, `infra/modules/sandbox-foundation/` | T09a only: administrator runbook, one Terraform root and a focused reusable module; no infrastructure code exists yet |
+| `.github/workflows/terraform.yml` | T09a only: separate Terraform validation and explicitly enabled administrator plan/apply; never dispatched by the API/worker |
 
 Keep this table aligned with the actual implementation after every completed task.
 Do not create empty architectural scaffolding for all proposed paths upfront.

@@ -1,14 +1,15 @@
 # Data application control plane: agent entry point
 
-Documentation baseline: 2026-09-12. Implementation status: **T01–T04 merged;
-T04a React frontend implemented, pending review/merge.** The platform includes
+Documentation baseline: 2026-09-14. Implementation status on main: **T01–T04a merged;
+T05 proposed separately in PR #11, pending review/merge.** The platform includes
 owned applications, team/role administration, simulated environment bindings,
 durable operation history and recovery. React + TypeScript + Vite now replaces
 Streamlit; Docker serves the UI with nginx on localhost:8501. Existing accounts
 and database history are preserved. Local simulation must remain explicit.
 See [next-agent.md](next-agent.md) for verification and current limitations.
-The next bounded task after T04a merges is **T05: Generate a bundle and capture a
-revision**. No generation, provider deployment or organization identity exists yet.
+The next bounded task is **T05: Generate a bundle and capture a revision**; inspect
+its existing PR before creating duplicate work. No generation, provider deployment
+or organization identity exists on this documentation branch.
 
 **Resume here:** [next-agent.md](next-agent.md). Verify prerequisite changes
 on updated `main` before creating or continuing any task branch; the handoff
@@ -23,6 +24,14 @@ Actions supplies CI/CD; Databricks executes data processing.
 The first useful product runs locally for one developer. No Azure-hosted control
 plane, paid subscription, or Databricks credentials are prerequisites for local
 development. Real external execution is an explicitly enabled integration gate.
+
+Terraform is planned as **T09a**, after GitHub workflow integration and before
+T10's real Databricks deployment. It prepares a small sandbox foundation through
+a separate administrator workflow; DAB remains the application deployment tool.
+The API/worker will not run Terraform or manage its state. See
+[development plan](development-plan.md#t09a--prepare-a-terraform-sandbox-foundation)
+and ADR-018 in [decisions](decisions.md). No infrastructure is implemented or
+activated by this planning update, and the local demo has no Terraform dependency.
 
 ## Reading path
 
@@ -63,8 +72,9 @@ Use this prompt (see [next-agent.md](next-agent.md) for the current, more
 specific version):
 
 > Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Inspect Git
-> status and verify T04a is merged into updated main. Create the next task branch
-> if needed and implement T05 only, using the React frontend and existing durable
+> status, verify prerequisites on updated main, and inspect existing T05 PR #11
+> before creating duplicate work. Continue T05 only if still outstanding, using
+> the React frontend and existing durable
 > worker contracts. Preserve accounts, data and unrelated work. Run the required
 > checks, update the handoff/contracts/map, and open a draft PR. Do not merge,
 > begin T06, publish repositories, or activate external providers.
