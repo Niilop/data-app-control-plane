@@ -36,7 +36,7 @@ PostgreSQL triggers protect artifacts/revisions/reports/template content against
 SQL mutation. Validation checks exact approved archive content and static Python/
 TOML syntax without executing source. Reports always say offline, never workspace.
 React's Preparation tab covers generation/download/capture/report workflows and
-links operation IDs to the existing Operations tab for progress/recovery.
+shows operation IDs for lookup in the existing Operations tab.
 
 ## Verification performed
 
@@ -63,8 +63,15 @@ Local checks on 2026-09-14:
 - Native Chromium initially could not launch because WSL lacks libnspr4.so.
   After the user started Docker Desktop, container checks succeeded. The existing
   application DB, accounts, Compose services and old T05 migration were untouched.
-- Current hosted CI is not yet claimed passed; inspect the draft's latest checks.
-  No provider connectivity, repository publication or deployment was performed.
+- Hosted [Platform CI run 34871267493](https://github.com/Niilop/data-app-control-plane/actions/runs/34871267493) passed at implementation commit
+  `8081f6a3640e4fb81b10e00175a810ee402cdc7e`. Actual logs confirm 147 offline tests
+  (16.94s), 17 PostgreSQL tests (27.61s, no skips), 10 browser workflows (34.2s),
+  generated-project locked offline installation/tests, nginx smoke and lint/types.
+  The handoff check also passed. This evidence follow-up changes documentation
+  only; application tests were not rerun locally for it. Inspect current PR checks.
+- Draft [PR #13](https://github.com/Niilop/data-app-control-plane/pull/13) is open
+  and unmerged. Disposable test containers/network were cleaned up. No provider
+  connectivity, repository publication or deployment was performed.
 
 ## Remaining work and limitations
 

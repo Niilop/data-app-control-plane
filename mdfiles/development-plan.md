@@ -434,7 +434,11 @@ Mypy passed for 34 modules. Frontend lint/format/types/build and 10 Chromium
 workflows passed in Docker; isolated production nginx smoke passed. Screenshot
 review prompted a small spacing/control styling follow-up, and the preparation
 workflow passed again. Ruff passed over the 58-file CI scope. Current hosted
-check evidence is in next-agent.md. Existing application data was untouched.
+check evidence is in next-agent.md. Hosted [Platform CI run 34871267493](https://github.com/Niilop/data-app-control-plane/actions/runs/34871267493)
+passed at `8081f6a`; actual logs confirm all 147 offline, 17 PostgreSQL and 10
+browser tests plus generated-project/nginx/lint/type checks. The evidence-only
+follow-up changes documentation, not application code. Draft PR #13 remains
+unmerged. Existing application data was untouched.
 
 **Next:** review T05 and CI, then merge by the user. T06 is a separate assignment.
 
