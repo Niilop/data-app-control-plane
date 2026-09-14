@@ -1,13 +1,13 @@
 # Repository map
 
-Inspected 2026-09-11. Paths below are current unless labelled proposed. Recheck
+Updated for T05 on 2026-09-14. Paths below are current unless labelled proposed. Recheck
 affected files before editing; avoid a full repository crawl for each task.
 
 ## Current implementation
 
 | Path | Responsibility / relevant limitation |
 |---|---|
-| `backend/main.py` | FastAPI assembly; auth/system and T02/T03 registry and T04 operation routes, request IDs and safe error handlers; no AI routes |
+| `backend/main.py` | FastAPI assembly; auth/system and T02/T03 registry and T04 operation and T05 preparation routes, request IDs and safe error handlers; no AI routes |
 | `backend/core/config.py` | Cached settings; explicit simulated executor, local-only profile gate, DB/auth settings, sanitized validation errors and SQL debug off |
 | `backend/core/database.py` | Synchronous engine/session and typed DeclarativeBase; settings constructed on import |
 | `backend/core/logging.py` | Basic Python logging, no structured audit/correlation |
@@ -124,3 +124,18 @@ main resolves the earlier local-only instruction and ignore-file uncertainty.
 | `tests/browser_server.py` | Disposable SQLite API/worker fixtures; no developer database or fixture endpoints |
 | `tests/Dockerfile.browser`, `tests/Dockerfile.browser.dockerignore` | Isolated Chromium/Node/uv verification image with restricted build context |
 | `tests/compose.browser.yaml`, `frontend/e2e/nginx-smoke.mjs` | Disposable production nginx/API browser smoke; no application DB volume or credentials |
+
+### T05 preparation
+
+| Path | Responsibility |
+|---|---|
+| `backend/templates/python_batch_v1/` | Versioned dependency-free synthetic batch, lock, tests and bundle skeleton |
+| `backend/services/template_service.py` | Canonical archives, manifest, bounded safe paths and approved rendering |
+| `backend/integrations/artifact_store.py` | Atomic local storage, digest/regular-file checks, bounded reads |
+| `backend/models/delivery.py`, `delivery_schemas.py` | Templates, artifact metadata, generation provenance, revisions and reports |
+| `backend/alembic/versions/008_prepared_revisions.py` | New tables/catalogue, offline queue kinds, immutable PostgreSQL triggers |
+| `backend/services/delivery_service.py`, `backend/api/endpoints/delivery.py` | Authorized commands, snapshots, static validation and filtered downloads |
+| `backend/services/queue_service.py`, `backend/worker.py` | Fenced preparation dispatch, completion and safe local recovery |
+| `frontend/src/pages/preparation.tsx` | Generation, capture, downloads and offline report UI |
+| `scripts/check_generated_project.py` | Disposable offline lock installation and generated stdlib tests |
+| `tests/unit/test_delivery.py`, `tests/integration/test_delivery.py` | Integrity, policy, failure, fencing, concurrent publication and immutable SQL |

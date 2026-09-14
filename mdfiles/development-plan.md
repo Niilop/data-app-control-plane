@@ -1,7 +1,8 @@
 # Development plan and agent task ledger
 
-Status: **T01–T04 complete and merged; T04a implemented, pending review/merge**.
-T05 is next after T04a merges; later tasks have not started.
+Status: **T01–T04a complete and merged; T05 implemented, pending review/merge.**
+T04a PR #10 merged at `6503ec152a7bcfbb3310e45c08f5fab78dea27d6`.
+Later tasks have not started.
 This plan is implementation-ready guidance,
 not a claim of implemented capabilities. Task order follows dependencies rather
 than estimated calendar dates. Do not implement the entire roadmap in one turn.
@@ -323,7 +324,7 @@ expose an arbitrary task-execution API. Add liveness/readiness and queue telemet
 
 ## T04a — Replace Streamlit with React
 
-**Status:** implemented, pending review/merge. **Depends on:** T04 (merged).
+**Status:** merged via PR #10. **Depends on:** T04 (merged).
 
 **Delivered:** clean light React/TypeScript/Vite interface for accounts, applications,
 ownership/roles, teams/memberships, environments/bindings, audit and operation
@@ -416,7 +417,31 @@ current application. Do not expand Streamlit with new feature screens.
 
 ## T05 — Generate a bundle and capture a revision
 
-**Status:** not started. **Depends on:** T04a (frontend) and T04 (worker).
+**Status:** implemented on `feat/t05-fresh-generation`, pending review/merge.
+**Depends on:** T04a (frontend) and T04 (worker), both merged.
+
+**Delivered:** dependency-free Python batch template `python-batch:1.0.0`, canonical
+ZIP and SHA-256 content store, generation provenance, explicit immutable revision
+capture, static offline reports, API and React Preparation tab. Existing leases,
+reservations, operator recovery, developer policy checks, idempotency and audit are
+preserved. Migration `008_prepared_revisions` extends the merged 007 baseline;
+001–007 are unchanged. ADR-017 explains scope and durability.
+
+**Verification:** 147 offline Python tests passed; 17 PostgreSQL integration tests
+passed with no skips on a disposable pgvector/pg16 container. Generated project
+installed from its lock using a fresh offline cache and passed its two stdlib tests.
+Mypy passed for 34 modules. Frontend lint/format/types/build and 10 Chromium
+workflows passed in Docker; isolated production nginx smoke passed. Screenshot
+review prompted a small spacing/control styling follow-up, and the preparation
+workflow passed again. Ruff passed over the 58-file CI scope. Current hosted
+check evidence is in next-agent.md. Hosted [Platform CI run 34871267493](https://github.com/Niilop/data-app-control-plane/actions/runs/34871267493)
+passed at `8081f6a`; actual logs confirm all 147 offline, 17 PostgreSQL and 10
+browser tests plus generated-project/nginx/lint/type checks. The evidence-only
+follow-up changes documentation, not application code. Draft PR #13 remains
+unmerged. Existing application data was untouched.
+
+**Next:** review T05 and CI, then merge by the user. T06 is a separate assignment.
+
 
 **Read:** [integrations](integrations.md), artifact/revision/validation contracts,
 T05 API rows. Inspect template-related code, worker handler patterns and the

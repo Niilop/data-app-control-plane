@@ -275,3 +275,22 @@ throughput. Logs/results must be scrubbed of credentials and sensitive data.
 For real sandbox sessions, document start/stop steps and verify resource termination
 or known ongoing resources afterward. Archiving the registry entry is not cleanup
 of paid external resources.
+
+## T05 verification
+
+T05 adds `scripts/check_generated_project.py` to CI. It renders only the approved
+local template into a disposable project, creates a fresh cache, installs its lock
+with uv offline and runs its stdlib tests. Worker validation itself executes no code.
+The new unit/API tests cover closed input, traversal, archive types, corruption,
+private downloads, immutable snapshots, policy changes, command replay, fenced
+recovery, cancellation/retry and atomic audit failures. PostgreSQL tests check
+immutable SQL triggers and concurrent command/artifact completion on real locks.
+Browser tests use a disposable worker restricted to preparation kinds so existing
+probe recovery fixtures remain stable. No fixture endpoint is exposed by the app.
+
+Local 2026-09-14 evidence: 147 offline tests, 17 PostgreSQL tests (no skips), 10
+Chromium workflows and isolated production nginx smoke passed. Mypy passed for
+34 modules and the generated project's 2 tests passed after locked offline install.
+See next-agent.md for final changes, current checks and limitations. Existing live
+application DB migration/startup were deliberately not performed: the abandoned
+T05 branch used a different migration history.

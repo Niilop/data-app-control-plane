@@ -156,7 +156,7 @@ def audit(
         operation.id,
         {
             "operation_id": str(operation.id),
-            "execution_mode": "simulated",
+            "execution_mode": operation.execution_mode,
             **(details or {}),
         },
         operation.application_id,
@@ -260,8 +260,9 @@ def command(
                             QueueProbe.operation_id == operation.id
                         )
                     )
-                    assert probe is not None
-                    probe.result = "cancelled"
+                    if operation.kind == "queue_probe":
+                        assert probe is not None
+                        probe.result = "cancelled"
                     release(db, operation)
         elif action == "retry":
             if operation.status not in {"failed", "cancelled"}:
@@ -270,12 +271,17 @@ def command(
                     "unsafe_retry",
                     "Only resolved failures or cancellations can be retried",
                 )
-            binding = check_execution(
-                db, actor, operation.application_id, operation.binding_id
-            )
-            result = enqueue(
-                db, actor, binding, operation.payload, request_id, operation.id
-            )
+            if operation.kind == "queue_probe":
+                binding = check_execution(
+                    db, actor, operation.application_id, operation.binding_id
+                )
+                result = enqueue(
+                    db, actor, binding, operation.payload, request_id, operation.id
+                )
+            else:
+                from services.delivery_service import retry_operation
+
+                result = retry_operation(db, actor, operation, request_id)
         elif action == "reconcile":
             if operation.status != "needs_attention":
                 raise PolicyError(

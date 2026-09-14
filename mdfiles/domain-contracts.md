@@ -196,3 +196,33 @@ Worker observations retain the original requester as audit actor, plus operation
 ID, worker UUID and fencing token in safe details. Recovery actions record the
 acting operator. The initial probe does not implement external workspace limits,
 provider cancellation or exactly-once external execution.
+
+## T05 implemented preparation contract
+
+One approved `TemplateVersion` uses the immutable ID `python-batch:1.0.0`, content
+SHA-256 and closed parameter schema. Its active flag may be disabled; content
+changes require a new version. Only `package_name` is accepted (prefix `batch_`,
+then a lowercase letter and bounded lowercase letters/digits/underscores).
+Application slug and target/config come from the existing registry and binding.
+
+`Generation` records application, operation, template, parameters and the complete
+binding/environment snapshot. A successful fenced completion associates an
+`Artifact` by SHA-256, size and media type. Provenance/access is through generation
+or report associations, not possession of the digest. Identical bytes may be shared
+across applications without granting one application access to another's history.
+
+Generation and validation require an explicit developer role, including for admins.
+They reserve their binding using the existing queue reservation. Snapshot versions,
+active account/roles, lifecycle, environment policy and approved template are
+rechecked before execution and successful completion. Operation mode is `offline`;
+the captured target's mode remains `simulated`. Recovery requires operator; retry
+also checks developer and the original binding version, preserving source inputs.
+
+Revision creation requires a completed generation owned by the application and an
+unchanged complete binding snapshot. It records generated source, artifact/template
+digests, config digest/snapshot, policy snapshot and requester; no update/delete API
+exists. PostgreSQL rejects updates/deletes to revisions, artifacts and validation
+reports. Validation reports are append-only and bind an exact revision with
+`scope=offline`, validator `static-v1`, passed/failed result, report digest and time.
+A successfully completed validation operation may produce a failed check report;
+operation success is completion of the check, not workspace or deployment success.

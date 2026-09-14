@@ -477,3 +477,93 @@ test("pagination, network failure, expired session and narrow keyboard navigatio
     page.getByText("Your session has ended. Sign in to continue."),
   ).toBeVisible();
 });
+
+test("generate, download, capture and validate an immutable revision offline", async ({
+  page,
+}) => {
+  await login(page);
+  const app = await existing(page);
+  const environment = await request(page, "/api/v1/environments", "POST", {
+    name: "Preparation browser",
+    workspace_ref: "simulated://preparation",
+    allowed_executor: "simulated",
+    allowed_bundle_targets: ["prepare"],
+  });
+  await request(page, `/api/v1/applications/${app.id}/bindings`, "POST", {
+    environment_id: environment.id,
+    bundle_target: "prepare",
+  });
+  await page.goto(`/applications/${app.id}`);
+  await page.getByRole("tab", { name: "Preparation", exact: true }).click();
+  const binding = page
+    .getByRole("listitem")
+    .filter({ hasText: "Preparation browser / prepare" });
+  await binding.getByRole("button", { name: "Generate bundle" }).click();
+  await page
+    .getByRole("dialog")
+    .getByLabel("Python package name")
+    .fill("batch_browser");
+  await page.getByRole("button", { name: "Queue generation" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect
+    .poll(async () => {
+      const rows = await request(
+        page,
+        `/api/v1/applications/${app.id}/generations`,
+      );
+      return rows.items.some(
+        (g: { artifact_digest: string | null }) => g.artifact_digest,
+      );
+    })
+    .toBeTruthy();
+  await page.reload();
+  await page.getByRole("tab", { name: "Preparation", exact: true }).click();
+  const generation = page
+    .getByRole("listitem")
+    .filter({ hasText: "batch_browser / prepare" });
+  const download = page.waitForEvent("download");
+  await generation.getByRole("link", { name: "Download bundle" }).click();
+  expect((await download).suggestedFilename()).toMatch(/^[a-f0-9]{64}\.zip$/);
+  await generation.getByRole("button", { name: "Capture revision" }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Capture revision" })
+    .click();
+  await page.getByRole("button", { name: "View revision" }).first().click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByText("Config SHA-256:", { exact: false }),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Validate offline" }).click();
+  await expect
+    .poll(async () => {
+      const rows = await request(
+        page,
+        `/api/v1/applications/${app.id}/revisions`,
+      );
+      const reports = await request(
+        page,
+        `/api/v1/revisions/${rows.items[0].id}/validations`,
+      );
+      return reports.items[0]?.result;
+    })
+    .toBe("passed");
+  await page.reload();
+  await page.getByRole("tab", { name: "Preparation", exact: true }).click();
+  await page.getByRole("button", { name: "View revision" }).first().click();
+  await expect(
+    page.getByText("Offline checks passed", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Download offline report" }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "test-results/preparation-desktop.png",
+    fullPage: false,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "test-results/preparation-mobile.png",
+    fullPage: false,
+  });
+});

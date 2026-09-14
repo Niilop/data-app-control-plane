@@ -36,6 +36,9 @@ from worker import run_one  # noqa: E402
 
 def run() -> None:
     with TemporaryDirectory(prefix="control-plane-browser-") as directory:
+        from core.config import get_settings
+
+        get_settings().artifact_dir = str(Path(directory) / "artifacts")
         engine = create_engine(
             f"sqlite:///{directory}/browser.db",
             connect_args={"check_same_thread": False},
@@ -66,9 +69,28 @@ def run() -> None:
                 "queue_probes",
                 "operation_commands",
                 "worker_heartbeats",
+                "template_versions",
+                "artifacts",
+                "generations",
+                "deployment_revisions",
+                "validation_results",
             }
         ]
         Base.metadata.create_all(engine, tables=tables)
+        from models.delivery import TemplateVersion
+        from models.delivery_schemas import TemplateParameters
+        from services.template_service import TEMPLATE_ID, template_digest
+
+        with Session(engine) as seed:
+            seed.add(
+                TemplateVersion(
+                    id=TEMPLATE_ID,
+                    content_digest=template_digest(),
+                    parameter_schema=TemplateParameters.model_json_schema(),
+                    active=True,
+                )
+            )
+            seed.commit()
         with Session(engine) as db:
             password = hash_password("Browser-test-password1!")
             for identifier, name in enumerate(
@@ -182,12 +204,30 @@ def run() -> None:
                     assert run_one(sessionmaker(engine), str(uuid4()))
                     if scenario == "unknown":
                         assert run_one(sessionmaker(engine), str(uuid4()))
-        uvicorn.run(
-            app,
-            host=os.environ.get("BROWSER_TEST_HOST", "127.0.0.1"),
-            port=int(os.environ.get("BROWSER_TEST_PORT", "8001")),
-            log_level="warning",
-        )
+        from threading import Event, Thread
+
+        stopped = Event()
+
+        def prepare_work() -> None:
+            while not stopped.wait(0.1):
+                run_one(
+                    sessionmaker(engine),
+                    "browser-preparation",
+                    kinds=("generate_bundle", "validate_offline"),
+                )
+
+        thread = Thread(target=prepare_work, daemon=True)
+        thread.start()
+        try:
+            uvicorn.run(
+                app,
+                host=os.environ.get("BROWSER_TEST_HOST", "127.0.0.1"),
+                port=int(os.environ.get("BROWSER_TEST_PORT", "8001")),
+                log_level="warning",
+            )
+        finally:
+            stopped.set()
+            thread.join(timeout=10)
         engine.dispose()
 
 

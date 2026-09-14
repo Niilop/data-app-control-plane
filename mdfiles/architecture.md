@@ -166,3 +166,14 @@ recent worker presence; admin telemetry describes queue age/counts/expired lease
 Neither heartbeat freshness nor local simulation asserts provider readiness.
 Future T05 handlers must extend the closed dispatch/schema and fenced related
 result transaction without executing adopted repository code in this worker.
+
+## T05 local preparation path
+
+Generation and offline validation are explicit fixed handlers in the existing
+worker. API transactions enqueue/version-check/audit; worker completion rechecks
+current policy and writes artifact/report associations under the existing lease
+fence. Immutable files are atomically linked into a shared content-addressed local
+store before completion. Crashes may leave unreferenced bytes but cannot expose an
+uncommitted generation through the API. Safe local reconciliation schedules retry;
+unknown simulated probe semantics remain unchanged. No subprocess or network calls
+occur in either preparation handler. API and worker mount the same ARTIFACT_DIR.

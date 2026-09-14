@@ -31,3 +31,6 @@ dist/
 playwright-report/
 test-results/
 *.tsbuildinfo
+
+# Local generated artifacts are never source or shared agent context.
+/data/artifacts/
