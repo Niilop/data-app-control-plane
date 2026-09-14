@@ -17,6 +17,10 @@ access; external access automation is introduced explicitly by integration.
 - Keep the core usable when GitHub or Databricks is unreachable. Show last
   observed external state and its observation time.
 - Keep business policies independent of hosting and provider credentials.
+- Add a focused Terraform foundation in T09a, before real Databricks integration,
+  to demonstrate infrastructure as code. Administrators provision shared sandbox
+  resources separately; DAB continues to package and deploy application workloads.
+  Terraform is not part of the API/worker runtime or the local demonstration.
 
 ## Working assumptions for implementation
 
@@ -76,7 +80,7 @@ and synthetic-data job; simulation is never presented as proof of that gate.
 | Revision-scoped deployment approvals | Enterprise change-management integration |
 | One Python bundle template and GitHub workflows | Template marketplace and multiple workload types |
 | Durable PostgreSQL operations | Redis queue, Service Bus, distributed microservices |
-| Existing environment/resource references | Workspace creation and Terraform execution |
+| Existing environment/resource references; separate Terraform sandbox foundation in T09a | Control-plane Terraform orchestration and full workspace/network provisioning |
 | Platform access request/revoke flow | Automated Git, workspace, and data grants |
 | Local audit history and measured recovery | Protected audit export and enterprise retention |
 | Explicit sandbox integration | Autonomous production deployment and billing automation |
@@ -87,8 +91,12 @@ and synthetic-data job; simulation is never presented as proof of that gate.
   through the UI with no external credentials.
 - **GitHub integration:** T08–T09; generated CI executes and exact-source workflow
   results are reconciled without a public local API.
+- **Infrastructure foundation:** T09a; reviewed Terraform configuration and a
+  separate administrator workflow. Track configuration validation separately from
+  an authorized real apply, subsequent no-change plan and cleanup evidence.
 - **Real sandbox:** T10; genuine external deployment/run IDs and synthetic result
-  are visible. Requires a workspace and explicit execution authorization.
+  are visible. Consumes T09a's environment references and requires an available
+  workspace, any required provisioned resources, and explicit execution authorization.
 - **Recovery evidence:** T12; duplicates, lost leases, restarts, ambiguous dispatch,
   access revocation, and conflicting deployments are demonstrated.
 - **Organizational pilot:** T13 design and subsequent approved implementation;

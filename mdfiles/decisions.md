@@ -77,7 +77,8 @@ environment protection features without a reviewed design and actual requirement
 
 **Open; blocks real execution only.** No workspace, compute entitlement, repository
 visibility, Actions allowance, or cloud budget is assumed. Verify actual provider
-limits/pricing and supported Azure Databricks authentication/compute during T10.
+limits/pricing and supported Azure Databricks authentication/compute during T09a
+infrastructure activation and T10 workload activation. ADR-018 keeps those gates separate.
 Prepare code locally first; activate externally only with explicit authorization.
 Prefer federation when supported and reviewed. No scheduled workloads or production
 data for the first demonstration. Do not promise the real path is free.
@@ -253,7 +254,8 @@ identity redesign are part of the migration. T05 depends on T04a completion.
 |---|---|---|
 | Which GitHub repository/account and visibility? | T08 real verification | Mocked adapter + local generated download |
 | How will GitHub authentication be supplied? | T08 real verification | Credential reference only; no token in task payload |
-| Which workspace, compute, output location, and spending exposure? | T10 activation | Simulation; real gate pending |
+| Which sandbox resources, state backend/bootstrap, infrastructure identity and spending exposure? | T09a activation | Reviewed configuration only; no provisioning |
+| Which workspace, compute, output location, and spending exposure? | T09a/T10 activation | Simulation; real gate pending |
 | Which approval enforcement/identity model and hosting does a company need? | T13 | No organization-readiness claim |
 | Should users create new repositories or request external/data access? | Later scope | Existing repos and platform access only |
 
@@ -302,3 +304,40 @@ fixtures; PostgreSQL migration/concurrency tests remain separate and mandatory i
 CI. A Docker test image packages Chromium's OS libraries for hosts without them.
 This avoids requiring a host-global browser dependency installation. Browser tests
 cover UI behavior rather than reimplementing backend policy in mocks.
+
+## ADR-018 — Terraform for a small, separately operated sandbox foundation
+
+**Accepted user direction, 2026-09-14; planned, not implemented.** Add Terraform
+to this project's portfolio scope alongside DAB. A focused infrastructure slice
+demonstrates reproducible provisioning, state management, plan review and cleanup
+as part of the same application's delivery story. DAB remains responsible for
+application packaging and deployment. This aligns with
+[Databricks' IaC guidance](https://docs.databricks.com/aws/en/lakehouse-architecture/deployment-guide/iac)
+(consulted 2026-09-14).
+
+Schedule **T09a after T09 and before T10**, preserving the local demo's existing
+task order. Start with `infra/`, one sandbox root, one useful reusable module and a
+separate administrator-controlled GitHub workflow. Reference an existing workspace
+by default and manage only shared resources the actual sandbox job needs. Creating
+a full workspace/network foundation or hosting this control plane in the cloud
+requires a separately bounded follow-up.
+
+Terraform and DAB must not own the same resource. Only allowlisted nonsecret
+references cross into environment registration; the API/worker never runs
+Terraform, reads its state, or orchestrates infrastructure approvals. State,
+identity/bootstrap, plan/apply review, concurrency and cleanup belong to the
+administrator workflow/runbook. This adds operational setup without a new runtime
+service or application workflow.
+
+Pin/test tools and providers, use locked remote state for real operation, prefer
+supported scoped OIDC, and apply only a deliberately approved saved plan. Keep
+untrusted PR checks unprivileged. Configuration checks and genuine provisioning
+evidence are separate; account, budget or authorization gaps leave live activation
+pending without blocking local work. The task does not authorize infrastructure,
+identity changes or paid workloads merely by being scheduled.
+
+This narrows the earlier blanket deferral of Terraform execution to allow separate
+administrator provisioning; control-plane Terraform orchestration stays deferred.
+Affected contracts: product scope, architecture, integrations, development plan,
+testing/operation, repository map and handoff. ADR-017 is reserved for the existing
+T05 implementation branch; it is intentionally not assigned to this decision.

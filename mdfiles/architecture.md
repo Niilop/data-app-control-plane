@@ -40,6 +40,28 @@ Keep a modular monolith with shared Python services, not independently deployed
 business microservices. Retain synchronous database sessions and use short-lived
 transactions; never keep a database transaction open during a network/subprocess call.
 
+## Infrastructure ownership (planned T09a)
+
+Terraform lives in `infra/` and runs through a separate administrator-controlled
+GitHub Actions workflow. It provisions the small shared sandbox foundation;
+application workflows continue to use DAB for code, jobs and pipelines. Each
+resource has exactly one owner. Terraform does not manage DAB's application
+resources, and bundles reference shared resources instead of recreating them.
+
+Infrastructure provisioning is an environment prerequisite, outside the runtime
+diagram above. The API and worker never execute Terraform, store/read its state,
+or dispatch its workflow. An administrator registers an allowlisted set of
+nonsecret output references through the existing environment/binding model when
+real bindings are supported. Profile changes and application archive do not
+provision or destroy infrastructure.
+
+Keep remote state, locking, infrastructure identity, plan review and cleanup in
+the administrator workflow/runbook. Infrastructure approval is separate from a
+revision-scoped application approval. Shared resource changes require coordination
+with application deployment/run activity; application queue reservations do not
+lock Terraform. No new service, queue kind, schema or UI is implied by T09a.
+See ADR-018 and the [integration contract](integrations.md).
+
 ## Command transaction
 
 For deployment submission, validate the actor, binding, revision, approval, and
