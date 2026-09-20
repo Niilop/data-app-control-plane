@@ -263,6 +263,10 @@ def command(
                     if operation.kind == "queue_probe":
                         assert probe is not None
                         probe.result = "cancelled"
+                    if operation.kind == "deploy_simulated":
+                        from services.deployment_service import observe
+
+                        observe(db, operation, "cancelled")
                     release(db, operation)
         elif action == "retry":
             if operation.status not in {"failed", "cancelled"}:
@@ -277,6 +281,18 @@ def command(
                 )
                 result = enqueue(
                     db, actor, binding, operation.payload, request_id, operation.id
+                )
+            elif operation.kind == "deploy_simulated":
+                from services.deployment_service import enqueue as enqueue_deployment
+                from services.deployment_service import input_for
+
+                result = enqueue_deployment(
+                    db,
+                    actor,
+                    operation.application_id,
+                    input_for(operation),
+                    request_id,
+                    operation.id,
                 )
             else:
                 from services.delivery_service import retry_operation

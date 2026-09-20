@@ -150,3 +150,13 @@ Run `uv run --locked python scripts/check_generated_project.py` to install from 
 generated lock in a fresh offline cache and run its tests in a disposable directory.
 The worker only checks approved content and static syntax. This does not establish
 Databricks bundle schema validity or workspace/compute readiness.
+
+## T06 implemented simulation boundary
+
+The only deployment executor is the explicit `local` / `simulated` combination.
+Its closed success/partial-failure fixture emits `simulated://deployment/...`
+references and `execution_mode=simulated` on every resource observation. It performs
+no GitHub, Databricks, Terraform, source execution or infrastructure calls. The
+approval binds offline evidence only; this cannot authorize a future real executor.
+Adding real execution requires a new scope/policy and the later integration gates.
+Local DB/host administrators remain trusted; this is not an organizational gate.

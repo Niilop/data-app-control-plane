@@ -125,6 +125,8 @@ def test_capabilities_follow_current_direct_and_team_roles(registry: tuple) -> N
         "manage_access": True,
         "manage_bindings": True,
         "operate": False,
+        "approve": False,
+        "deploy": False,
     }
     assert (
         client.get(path + "/capabilities", headers=headers[2]).json()["edit_metadata"]

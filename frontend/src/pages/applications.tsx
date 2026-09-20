@@ -30,6 +30,7 @@ import { ReferenceSelect } from "../ReferenceSelect";
 import { useData, usePage, useResource, useSession } from "../state";
 import type { Application, Capabilities, Role } from "../types";
 import { AuditList, Bindings } from "./administration";
+import { Deployments } from "./deployments";
 import { Preparation } from "./preparation";
 import { Operations } from "./operations";
 
@@ -391,6 +392,7 @@ function ApplicationContent({ id }: { id: string }) {
           "Environments",
           "Access",
           "Preparation",
+          "Deployments",
           "Operations",
           "Activity",
         ].map((name) => (
@@ -408,6 +410,7 @@ function ApplicationContent({ id }: { id: string }) {
                 "Environments",
                 "Access",
                 "Preparation",
+                "Deployments",
                 "Operations",
                 "Activity",
               ];
@@ -529,8 +532,11 @@ function ApplicationContent({ id }: { id: string }) {
           <Preparation
             applicationId={id}
             canDevelop={!!caps?.edit_metadata && !permissions.loading}
+            canApprove={!!caps?.approve && !permissions.loading}
+            canDeploy={!!caps?.deploy && !permissions.loading}
           />
         )}
+        {tab === "Deployments" && <Deployments applicationId={id} />}
         {tab === "Operations" && (
           <Operations applicationId={id} canOperate={!!caps?.operate} />
         )}

@@ -171,6 +171,8 @@ class AuditResponse(Record):
 
 
 class ApplicationCapabilities(BaseModel):
+    approve: bool
+    deploy: bool
     """Current UI affordances; never a substitute for mutation authorization."""
 
     edit_metadata: bool

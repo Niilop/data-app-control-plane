@@ -329,3 +329,34 @@ PostgreSQL triggers enforce immutable revision/artifact/report rows and template
 content, in addition to API/ORM safeguards. Migration 008_prepared_revisions extends
 merged 007. The abandoned branch's different 008 is not silently stamped or replaced
 on an existing database; use an isolated database or a separately reviewed conversion.
+
+## ADR-018 — Exact local approval and simulated deployment
+
+**T06, 2026-09-20; proposed for review with the implementation.** Extend merged
+`008_prepared_revisions` with `009_simulated_deployments`; do not modify migration
+history or convert the abandoned branch's database. Approvals are append-only
+SQL-protected evidence. Canonical scope includes exact immutable revision/artifact,
+template/config/policy/target/mode and one passed offline validation report.
+The latest decision for the same scope supersedes earlier decisions; different
+validation reports never retroactively change existing evidence.
+
+Require explicit approver permission and combined developer/operator submission.
+Local self-approval must be both environment-enabled and explicitly acknowledged;
+check independence against both revision requester and deployment submitter.
+Recheck current roles/active actors and scope at submission, execution and success,
+including after waiting for policy locks. The audit records the local exception.
+Platform admins do not implicitly inherit execution or approval permissions.
+
+Reuse the existing PostgreSQL command keys, binding reservations, lease/fence,
+attempts and recovery services. A pure simulated executor returns fixed success or
+partial-failure observations; API inputs expose these only with mandatory simulated
+mode. It has no externally observable side effect, so reconciliation can establish
+safe retry. Preserve unknown/reservation behavior when policy prevents observation.
+Manual retry creates a new deployment rather than mutating a terminal attempt.
+
+Keep last successful deployment as a query over per-binding history, separate from
+latest attempt. Atomic first-success activation increments the application version;
+failure retains observations and does not alter previous success. Simulation and
+offline validation are never evidence of external provisioning or data-job success.
+No dependencies, provider credentials, real adapter, T07 run model or Terraform
+are introduced. Enterprise trust enforcement remains ADR-007's later review gate.

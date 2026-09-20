@@ -36,6 +36,8 @@ export interface Application extends RecordBase {
   created_by: number;
 }
 export interface Capabilities {
+  approve: boolean;
+  deploy: boolean;
   edit_metadata: boolean;
   manage_access: boolean;
   manage_bindings: boolean;

@@ -1,12 +1,11 @@
 # Data application control plane: agent entry point
 
-Documentation baseline: 2026-09-14. **T01–T04a are merged. T05 is implemented
-on a fresh branch, pending review/merge.** Preparation now includes a
-versioned synthetic Python batch template, digest-verified local downloads,
-immutable revisions, and explicitly offline static validation through the durable
-worker. React uses the existing cookie session and application permissions.
-T06 remains unstarted. No repository publication, approvals, deployment or external
-provider activation is included. See [next-agent.md](next-agent.md) for evidence.
+Documentation baseline: 2026-09-20. **T01–T05 are merged. T06 is implemented,
+pending review/merge.** T05 PR #13 merged at
+`8e419050c5069b97ac5b582e02378f77658f3e99`. React now covers exact-scope approval,
+explicitly simulated deployment, history and last success through the durable worker.
+No provider activation or external deployment is included. T07 remains unstarted.
+See [next-agent.md](next-agent.md) for evidence and database isolation requirements.
 
 **Resume here:** [next-agent.md](next-agent.md). Verify prerequisite changes
 on updated `main` before creating or continuing any task branch; the handoff
@@ -62,8 +61,9 @@ specific version):
 
 > Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Inspect Git
 > status, preserve unrelated work, and verify prerequisites on updated main.
-> Review and finish the T05 draft before merging. Begin T06 only when assigned
-> after T05 is merged. Do not publish repositories or activate providers.
+> Review the T06 draft and its checks. Leave merging to the user. T07 is a
+> separate assignment after T06 merges. Preserve the old T05 database, branch
+> and stash; do not publish repositories or activate providers.
 
 
 

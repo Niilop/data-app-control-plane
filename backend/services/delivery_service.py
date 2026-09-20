@@ -114,7 +114,7 @@ def enqueue(
         binding_id=binding.id,
         binding_version=binding.version,
         kind=kind,
-        execution_mode="offline",
+        execution_mode="simulated" if kind == "deploy_simulated" else "offline",
         requested_by=actor.id,
         request_id=request_id,
         payload=payload,

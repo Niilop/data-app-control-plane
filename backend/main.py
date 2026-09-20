@@ -35,6 +35,7 @@ def create_app() -> FastAPI:
         applications,
         auth,
         delivery,
+        deployments,
         environments,
         operations,
         teams,
@@ -46,6 +47,7 @@ def create_app() -> FastAPI:
     app.include_router(environments.router)
     app.include_router(operations.router)
     app.include_router(delivery.router)
+    app.include_router(deployments.router)
 
     @app.get("/")
     def root(settings: Settings = Depends(get_settings)) -> dict[str, str]:

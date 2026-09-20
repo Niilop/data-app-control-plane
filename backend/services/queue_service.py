@@ -104,6 +104,10 @@ def claim(
         if phase == "execute":
             operation.attempt_count += 1
         operation.status = "reconciling" if phase == "reconcile" else "running"
+        if operation.kind == "deploy_simulated":
+            from services.deployment_service import observe
+
+            observe(db, operation, operation.status)
         operation.worker_id = worker_id
         operation.heartbeat_at = now(db)
         operation.lease_expires_at = operation.heartbeat_at + timedelta(
@@ -188,11 +192,30 @@ def authorize(db: Session, item: Claim) -> None:
                 operation.binding_id,
                 operation.binding_version,
             )
+        elif operation.kind == "deploy_simulated":
+            from services.deployment_service import (
+                authorize_operation as authorize_deployment,
+            )
+
+            authorize_deployment(db, actor, operation)
         else:
             from services.delivery_service import authorize_operation
 
             authorize_operation(db, actor, operation)
-        # Policy locks can wait; recheck the lease after acquiring them.
+        if operation.kind == "deploy_simulated":
+            audit(
+                db,
+                actor,
+                operation,
+                operation.request_id,
+                "deployment.authorized",
+                {
+                    "worker_id": item.worker_id,
+                    "fencing_token": item.token,
+                    "approval_id": operation.payload["approval_id"],
+                },
+            )
+        # Policy locks and audit can wait; recheck the lease after acquiring them.
         owned(db, item)
 
 
@@ -203,6 +226,7 @@ def finish(
     *,
     diagnostic: str | None = None,
     delivery_result: tuple[str, int, str, str] | None = None,
+    deployment_resources: list[dict] | None = None,
 ) -> None:
     """Operation, attempt, related result, reservation and audit commit together."""
     with db.begin():
@@ -236,7 +260,27 @@ def finish(
             operation.available_at = timestamp
         else:
             status = outcome
-        if status == "succeeded" and operation.kind != "queue_probe":
+        if operation.kind == "deploy_simulated":
+            from services.deployment_service import (
+                authorize_operation as authorize_deployment,
+            )
+            from services.deployment_service import observe
+
+            actor = db.get(User, operation.requested_by)
+            assert actor is not None
+            if status == "succeeded":
+                try:
+                    authorize_deployment(db, actor, operation)
+                except PolicyError:
+                    status, code = "failed", "authorization_changed"
+                else:
+                    if deployment_resources is None:
+                        raise ValueError("Missing simulated deployment observations")
+            observe(db, operation, status, deployment_resources)
+        if status == "succeeded" and operation.kind in {
+            "generate_bundle",
+            "validate_offline",
+        }:
             from services.delivery_service import authorize_operation, record_result
 
             actor = db.get(User, operation.requested_by)

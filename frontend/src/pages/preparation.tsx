@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ApprovalControls, RevisionApprovals } from "./deployments";
 import { api } from "../api";
 import {
   ActionForm,
@@ -51,9 +52,13 @@ type Template = { id: string; content_digest: string; active: boolean };
 export function Preparation({
   applicationId,
   canDevelop,
+  canApprove,
+  canDeploy,
 }: {
   applicationId: string;
   canDevelop: boolean;
+  canApprove: boolean;
+  canDeploy: boolean;
 }) {
   const [binding, setBinding] = useState<Binding | null>(null);
   const [capture, setCapture] = useState<Generation | null>(null);
@@ -260,6 +265,15 @@ export function Preparation({
                     <small>
                       {v.validator_version} · {date(v.observed_at)}
                     </small>
+                    {v.result === "passed" && (
+                      <ApprovalControls
+                        revisionId={selected.id}
+                        bindingId={selected.binding_snapshot.binding_id}
+                        validationId={v.id}
+                        canApprove={canApprove}
+                        canDeploy={canDeploy}
+                      />
+                    )}
                     <ArtifactLink
                       digest={v.report_digest}
                       label="Download offline report"
@@ -269,6 +283,12 @@ export function Preparation({
               </ul>
             )}
           </Paged>
+          <RevisionApprovals
+            revisionId={selected.id}
+            bindingId={selected.binding_snapshot.binding_id}
+            applicationId={applicationId}
+            canDeploy={canDeploy}
+          />
           {canDevelop && (
             <ActionForm
               submitLabel="Validate offline"

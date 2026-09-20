@@ -567,3 +567,184 @@ test("generate, download, capture and validate an immutable revision offline", a
     fullPage: false,
   });
 });
+
+test("approve exact scope, simulate deployment and retain last success after partial failure", async ({
+  page,
+}) => {
+  await login(page);
+  const app = await existing(page);
+  await request(page, `/api/v1/applications/${app.id}/roles`, "POST", {
+    user_id: 1,
+    role: "approver",
+  });
+  const environment = await request(page, "/api/v1/environments", "POST", {
+    name: "Deployment browser",
+    workspace_ref: "simulated://deployment-browser",
+    allowed_executor: "simulated",
+    allowed_bundle_targets: ["deploy"],
+    allow_self_approval: true,
+  });
+  const bound = await request(
+    page,
+    `/api/v1/applications/${app.id}/bindings`,
+    "POST",
+    {
+      environment_id: environment.id,
+      bundle_target: "deploy",
+    },
+  );
+  await page.goto(`/applications/${app.id}`);
+  await page.getByRole("tab", { name: "Preparation", exact: true }).click();
+  await page
+    .getByRole("listitem")
+    .filter({ hasText: "Deployment browser / deploy" })
+    .getByRole("button", { name: "Generate bundle" })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByLabel("Python package name")
+    .fill("batch_deployment");
+  await page.getByRole("button", { name: "Queue generation" }).click();
+  await expect
+    .poll(
+      async () =>
+        (
+          await request(page, `/api/v1/applications/${app.id}/generations`)
+        ).items.find(
+          (g: { parameters: { package_name: string } }) =>
+            g.parameters.package_name === "batch_deployment",
+        )?.artifact_digest,
+    )
+    .toBeTruthy();
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await page
+    .getByRole("listitem")
+    .filter({ hasText: "batch_deployment / deploy" })
+    .getByRole("button", { name: "Capture revision" })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Capture revision" })
+    .click();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  const revision = (
+    await request(page, `/api/v1/applications/${app.id}/revisions`)
+  ).items.find((r: { binding_id: string }) => r.binding_id === bound.id);
+  await page
+    .getByRole("listitem")
+    .filter({ hasText: revision.id })
+    .getByRole("button", { name: "View revision" })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Validate offline" }).click();
+  await expect
+    .poll(
+      async () =>
+        (await request(page, `/api/v1/revisions/${revision.id}/validations`))
+          .items[0]?.result,
+    )
+    .toBe("passed");
+  await page.reload();
+  await page.getByRole("tab", { name: "Preparation", exact: true }).click();
+  await page
+    .getByRole("listitem")
+    .filter({ hasText: revision.id })
+    .getByRole("button", { name: "View revision" })
+    .click();
+  await expect(
+    dialog.getByText("Scope SHA-256:", { exact: false }),
+  ).toBeVisible();
+  await dialog
+    .getByText(
+      "Review source, template, configuration, target, policy and report",
+    )
+    .click();
+  await expect(dialog.locator("pre")).toContainText(revision.artifact_digest);
+  await dialog
+    .getByLabel("Decision reason")
+    .fill("Review exact synthetic revision for local simulation");
+  await dialog.getByRole("button", { name: "Record decision" }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "Local self-approval requires",
+  );
+  await dialog.getByRole("checkbox").check();
+  await dialog.getByRole("button", { name: "Record decision" }).click();
+  await expect(
+    dialog.getByText("Local self-approval acknowledged", { exact: false }),
+  ).toBeVisible();
+  await page.screenshot({ path: "test-results/approval-desktop.png" });
+  // Commit once then lose the response; UI retries the same command key.
+  const keys: string[] = [];
+  await page.route(
+    `**/api/v1/applications/${app.id}/deployments`,
+    async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      keys.push(route.request().headers()["idempotency-key"]);
+      const response = await route.fetch();
+      if (keys.length === 1) await route.abort("failed");
+      else await route.fulfill({ response });
+    },
+  );
+  await dialog
+    .getByRole("button", { name: "Submit simulated deployment" })
+    .click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "Unable to reach the API",
+  );
+  await dialog
+    .getByRole("button", { name: "Submit simulated deployment" })
+    .click();
+  expect(keys).toHaveLength(2);
+  expect(keys[0]).toBe(keys[1]);
+  await expect
+    .poll(
+      async () =>
+        (
+          await request(
+            page,
+            `/api/v1/applications/${app.id}/bindings/${bound.id}/last-success`,
+          )
+        )?.status,
+    )
+    .toBe("succeeded");
+  const success = await request(
+    page,
+    `/api/v1/applications/${app.id}/bindings/${bound.id}/last-success`,
+  );
+  await page.unroute(`**/api/v1/applications/${app.id}/deployments`);
+  await dialog
+    .getByLabel("Simulation scenario")
+    .selectOption("partial_failure");
+  await dialog
+    .getByRole("button", { name: "Submit simulated deployment" })
+    .click();
+  await expect
+    .poll(async () =>
+      (
+        await request(page, `/api/v1/applications/${app.id}/deployments`)
+      ).items.some((d: { status: string }) => d.status === "failed"),
+    )
+    .toBeTruthy();
+  await dialog.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("tab", { name: "Deployments", exact: true }).click();
+  await page.getByLabel("Last-success binding").selectOption(bound.id);
+  await expect(
+    page.getByText(`Deployment: ${success.id}`, { exact: true }),
+  ).toHaveCount(2);
+  await expect(
+    page.getByText("synthetic_job: created", { exact: false }),
+  ).toBeVisible();
+  expect(
+    (await request(page, `/api/v1/applications/${app.id}/deployments`)).items,
+  ).toHaveLength(2);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/deployments-mobile.png",
+    fullPage: true,
+  });
+});

@@ -1,8 +1,9 @@
 # Development plan and agent task ledger
 
-Status: **T01–T04a complete and merged; T05 implemented, pending review/merge.**
+Status: **T01–T05 complete and merged; T06 implemented, pending review/merge.**
+T05 PR #13 merged at `8e419050c5069b97ac5b582e02378f77658f3e99` (verified 2026-09-20).
 T04a PR #10 merged at `6503ec152a7bcfbb3310e45c08f5fab78dea27d6`.
-Later tasks have not started.
+T07 and later tasks have not started.
 This plan is implementation-ready guidance,
 not a claim of implemented capabilities. Task order follows dependencies rather
 than estimated calendar dates. Do not implement the entire roadmap in one turn.
@@ -417,7 +418,7 @@ current application. Do not expand Streamlit with new feature screens.
 
 ## T05 — Generate a bundle and capture a revision
 
-**Status:** implemented on `feat/t05-fresh-generation`, pending review/merge.
+**Status:** complete and merged in PR #13 at `8e419050c5069b97ac5b582e02378f77658f3e99`.
 **Depends on:** T04a (frontend) and T04 (worker), both merged.
 
 **Delivered:** dependency-free Python batch template `python-batch:1.0.0`, canonical
@@ -437,10 +438,9 @@ workflow passed again. Ruff passed over the 58-file CI scope. Current hosted
 check evidence is in next-agent.md. Hosted [Platform CI run 34871267493](https://github.com/Niilop/data-app-control-plane/actions/runs/34871267493)
 passed at `8081f6a`; actual logs confirm all 147 offline, 17 PostgreSQL and 10
 browser tests plus generated-project/nginx/lint/type checks. The evidence-only
-follow-up changes documentation, not application code. Draft PR #13 remains
-unmerged. Existing application data was untouched.
+follow-up changes documentation, not application code. PR #13 is merged (verified 2026-09-20). Existing application data was untouched.
 
-**Next:** review T05 and CI, then merge by the user. T06 is a separate assignment.
+**Next:** T06 was separately assigned and is implemented below; leave its merge to the user.
 
 
 **Read:** [integrations](integrations.md), artifact/revision/validation contracts,
@@ -466,7 +466,27 @@ validation. API restart does not lose artifacts in the configured shared mount.
 
 ## T06 — Approve and simulate one deployment
 
-**Status:** not started. **Depends on:** T05.
+**Status:** implemented, pending review/merge. **Depends on:** T05, merged.
+
+**Delivered (2026-09-20):** migration `009_simulated_deployments`, immutable approval
+evidence, exact report/scope selection, approver and combined developer/operator
+policy, explicit audited self-approval, simulated success/partial failure, fenced
+queue completion/recovery and atomic reservations/audit. React provides approval,
+submission, history and per-binding last success. New decisions supersede older
+decisions for the same exact scope; new validation reports do not rewrite evidence.
+First success activates the application; partial failure preserves prior success.
+ADR-018 records the local trust and simulation semantics.
+
+**Verification:** 169 offline tests; 20 isolated PostgreSQL tests (no skips), with
+3 deployment cases rerun after final policy changes; generated-project locked
+offline installation and 2 tests; 39-module mypy and 66-file Ruff; frontend
+lint/format/types/build; 11 Chromium workflows and isolated production nginx smoke
+passed. See next-agent.md for final follow-ups and unrun external checks. The original
+application database and old T05 branch/stash were preserved. No provider calls,
+external permissions, Terraform, repository publication or T07 work occurred.
+
+**Next:** review T06 and its draft CI, then user merge. T07 requires a separate
+assignment and verified merged T06 prerequisites.
 
 **Read:** approval/permission/state contracts and [integration trust boundary](integrations.md).
 
