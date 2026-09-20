@@ -31,13 +31,21 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    from api.endpoints import applications, auth, environments, operations, teams
+    from api.endpoints import (
+        applications,
+        auth,
+        delivery,
+        environments,
+        operations,
+        teams,
+    )
 
     app.include_router(auth.router)
     app.include_router(applications.router)
     app.include_router(teams.router)
     app.include_router(environments.router)
     app.include_router(operations.router)
+    app.include_router(delivery.router)
 
     @app.get("/")
     def root(settings: Settings = Depends(get_settings)) -> dict[str, str]:

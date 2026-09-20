@@ -251,3 +251,31 @@ direct/team developer grant; `manage_access` for the owner or administrator;
 grant. These describe controls, not transferable authorization. Mutation services
 and sensitive worker actions continue to check current policy independently.
 There are no new user-directory or arbitrary operation-submission endpoints.
+
+## T05 implemented details
+
+All T05 rows are implemented. `GET /templates` returns the approved catalogue
+(id, content_digest, parameter_schema, active) to authenticated active users.
+Generation accepts `template_id` (default `python-batch:1.0.0`), `binding_id`,
+`expected_binding_version`, and `parameters` (only optional `package_name`, default
+`batch_app`). It requires developer and Idempotency-Key, returns 202/Location and
+`execution_mode=offline`. Same key/input replays after current role checks, even
+if binding policy has subsequently changed; new commands require fresh versions.
+
+`GET /applications/{id}/generations` is a supporting paginated read exposing
+operation ID, parameters, binding snapshot and nullable artifact digest. Operation
+history exposes `generate_bundle` and `validate_offline` with offline mode and
+sanitized status, never raw payloads. `GET /artifacts/{digest}` verifies SHA-256,
+returns attachment ZIP/JSON with no-store/nosniff, requires visible provenance,
+and returns 409 for corrupt/missing storage without leaking local paths.
+
+Revision POST accepts `generation_id`, `binding_id`, `expected_binding_version`;
+config is taken from that binding rather than accepting arbitrary overrides. It
+returns 201/Location and immutable snapshots. A different binding/config requires
+new generation. This synchronous command is not idempotency-keyed; repeated
+creation makes another immutable record. Inaccessible revisions/artifacts are 404.
+
+Validation POST accepts exactly `scope=offline` with Idempotency-Key and developer
+permission. `GET /revisions/{id}/validations` is a paginated supporting read of
+append-only results and report digests. Reports explicitly state no workspace
+validation or code execution occurred. T06 approvals/deployments remain absent.

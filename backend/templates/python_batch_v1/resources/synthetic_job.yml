@@ -1,0 +1,9 @@
+resources:
+  jobs:
+    synthetic_batch:
+      name: __SLUG__-synthetic
+      timeout_seconds: __TIMEOUT__
+      tasks:
+        - task_key: synthetic_summary
+          notebook_task:
+            notebook_path: ../notebook.py

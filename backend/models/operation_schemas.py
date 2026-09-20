@@ -35,8 +35,8 @@ class OperationResponse(Record):
     binding_id: UUID
     binding_version: int
     requested_by: int
-    kind: Literal["queue_probe"]
-    execution_mode: Literal["simulated"]
+    kind: Literal["queue_probe", "generate_bundle", "validate_offline"]
+    execution_mode: Literal["simulated", "offline"]
     status: Status
     attempt_count: int
     max_attempts: int
@@ -79,4 +79,4 @@ class AttemptResponse(Record):
 class Accepted(Input):
     operation_id: UUID
     status: Status
-    execution_mode: Literal["simulated"] = "simulated"
+    execution_mode: Literal["simulated", "offline"] = "simulated"

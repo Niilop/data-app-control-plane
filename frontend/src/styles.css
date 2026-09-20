@@ -1196,3 +1196,21 @@ summary {
     scroll-behavior: auto !important;
   }
 }
+
+/* Preparation follows the existing panels, controls and responsive record lists. */
+.preparation-content > h3 {
+  margin: 24px 0 12px;
+}
+.artifact-download,
+.attempt-list li > .artifact-download {
+  display: block;
+  margin: 12px 0;
+}
+.artifact-download small {
+  display: block;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.preparation-content .attempt-list li > div {
+  flex-wrap: wrap;
+}

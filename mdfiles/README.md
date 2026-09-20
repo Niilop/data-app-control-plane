@@ -1,14 +1,12 @@
 # Data application control plane: agent entry point
 
-Documentation baseline: 2026-09-12. Implementation status: **T01–T04 merged;
-T04a React frontend implemented, pending review/merge.** The platform includes
-owned applications, team/role administration, simulated environment bindings,
-durable operation history and recovery. React + TypeScript + Vite now replaces
-Streamlit; Docker serves the UI with nginx on localhost:8501. Existing accounts
-and database history are preserved. Local simulation must remain explicit.
-See [next-agent.md](next-agent.md) for verification and current limitations.
-The next bounded task after T04a merges is **T05: Generate a bundle and capture a
-revision**. No generation, provider deployment or organization identity exists yet.
+Documentation baseline: 2026-09-14. **T01–T04a are merged. T05 is implemented
+on a fresh branch, pending review/merge.** Preparation now includes a
+versioned synthetic Python batch template, digest-verified local downloads,
+immutable revisions, and explicitly offline static validation through the durable
+worker. React uses the existing cookie session and application permissions.
+T06 remains unstarted. No repository publication, approvals, deployment or external
+provider activation is included. See [next-agent.md](next-agent.md) for evidence.
 
 **Resume here:** [next-agent.md](next-agent.md). Verify prerequisite changes
 on updated `main` before creating or continuing any task branch; the handoff
@@ -63,11 +61,10 @@ Use this prompt (see [next-agent.md](next-agent.md) for the current, more
 specific version):
 
 > Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Inspect Git
-> status and verify T04a is merged into updated main. Create the next task branch
-> if needed and implement T05 only, using the React frontend and existing durable
-> worker contracts. Preserve accounts, data and unrelated work. Run the required
-> checks, update the handoff/contracts/map, and open a draft PR. Do not merge,
-> begin T06, publish repositories, or activate external providers.
+> status, preserve unrelated work, and verify prerequisites on updated main.
+> Review and finish the T05 draft before merging. Begin T06 only when assigned
+> after T05 is merged. Do not publish repositories or activate providers.
+
 
 
 The handoff separates implemented behavior from verification and merge status.

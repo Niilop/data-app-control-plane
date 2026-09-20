@@ -1,0 +1,7 @@
+bundle:
+  name: __SLUG__
+include:
+  - resources/*.yml
+targets:
+  __TARGET__:
+    mode: development

@@ -10,7 +10,7 @@ from models.database import User
 from models.operations import Operation, OperationAttempt, QueueProbe, WorkerHeartbeat
 from services.operation_service import audit, check_execution, release
 from services.policy_service import PolicyError
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, or_, select, true
 from sqlalchemy.orm import Session
 
 Outcome = Literal[
@@ -54,12 +54,18 @@ def worker_seen(db: Session, worker_id: str) -> None:
         heartbeat.seen_at = now(db)
 
 
-def claim(db: Session, worker_id: str, lease_seconds: int = 30) -> Claim | None:
+def claim(
+    db: Session,
+    worker_id: str,
+    lease_seconds: int = 30,
+    kinds: tuple[str, ...] | None = None,
+) -> Claim | None:
     with db.begin():
         worker_seen(db, worker_id)
         timestamp = now(db)
         operation = db.scalar(
             select(Operation)
+            .where(Operation.kind.in_(kinds) if kinds else true())
             .where(
                 or_(
                     and_(
@@ -174,19 +180,29 @@ def authorize(db: Session, item: Claim) -> None:
         actor = db.get(User, operation.requested_by)
         if actor is None:
             raise PolicyError(403, "inactive_actor", "Requester unavailable")
-        check_execution(
-            db,
-            actor,
-            operation.application_id,
-            operation.binding_id,
-            operation.binding_version,
-        )
+        if operation.kind == "queue_probe":
+            check_execution(
+                db,
+                actor,
+                operation.application_id,
+                operation.binding_id,
+                operation.binding_version,
+            )
+        else:
+            from services.delivery_service import authorize_operation
+
+            authorize_operation(db, actor, operation)
         # Policy locks can wait; recheck the lease after acquiring them.
         owned(db, item)
 
 
 def finish(
-    db: Session, item: Claim, outcome: Outcome, *, diagnostic: str | None = None
+    db: Session,
+    item: Claim,
+    outcome: Outcome,
+    *,
+    diagnostic: str | None = None,
+    delivery_result: tuple[str, int, str, str] | None = None,
 ) -> None:
     """Operation, attempt, related result, reservation and audit commit together."""
     with db.begin():
@@ -220,6 +236,19 @@ def finish(
             operation.available_at = timestamp
         else:
             status = outcome
+        if status == "succeeded" and operation.kind != "queue_probe":
+            from services.delivery_service import authorize_operation, record_result
+
+            actor = db.get(User, operation.requested_by)
+            assert actor is not None
+            try:
+                authorize_operation(db, actor, operation)
+            except PolicyError:
+                status, code = "failed", "authorization_changed"
+            else:
+                if delivery_result is None:
+                    raise ValueError("Missing delivery result")
+                record_result(db, operation, delivery_result)
         operation.status = status
         operation.diagnostic_code = code
         operation.observed_at = timestamp
@@ -233,8 +262,9 @@ def finish(
             probe = db.scalar(
                 select(QueueProbe).where(QueueProbe.operation_id == operation.id)
             )
-            assert probe is not None
-            probe.result = status
+            if operation.kind == "queue_probe":
+                assert probe is not None
+                probe.result = status
             release(db, operation)
         actor = db.get(User, operation.requested_by)
         assert actor is not None

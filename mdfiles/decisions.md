@@ -302,3 +302,30 @@ fixtures; PostgreSQL migration/concurrency tests remain separate and mandatory i
 CI. A Docker test image packages Chromium's OS libraries for hosts without them.
 This avoids requiring a host-global browser dependency installation. Browser tests
 cover UI behavior rather than reimplementing backend policy in mocks.
+
+## ADR-017 — Local preparation with immutable approved content
+
+**T05, 2026-09-14; proposed for review with the implementation.** Use a dependency-
+free Python 3.11+ batch template and bundled uv 0.12.11-compatible lock, stdlib unit
+tests, synthetic summary and a minimal Databricks bundle skeleton. Compute identity,
+CI/deployment workflow publication and workspace validation remain later gates.
+
+Canonical ZIP_STORED bytes use ordered allowlisted paths, fixed timestamps/modes,
+no directory/symlink/encrypted/compressed entries and bounded sizes/counts. The
+manifest includes template, input/config/file hashes and tool versions. No network
+or dependency resolution is needed during generation. Runtime offline validation
+compares the archive to approved rendering and parses static syntax; only the
+separate disposable generated-project checker runs template tests.
+
+Reuse the durable queue with offline handler kinds, binding reservations and
+explicit generation then revision capture. Generation inputs capture binding and
+policy versions; changes require generating again. Developer authorization applies
+at submission, handling and completion; recovery remains operator-controlled.
+Content-addressed local files publish atomically before the fenced DB transaction;
+unreferenced files after failure are harmless and may be retained. Unique digest
+insert handles concurrent completions without replacing content. No automatic GC.
+
+PostgreSQL triggers enforce immutable revision/artifact/report rows and template
+content, in addition to API/ORM safeguards. Migration 008_prepared_revisions extends
+merged 007. The abandoned branch's different 008 is not silently stamped or replaced
+on an existing database; use an isolated database or a separately reviewed conversion.

@@ -1,149 +1,126 @@
 # Agent handoff
 
-Inspect Git status, preserve unrelated changes, verify prerequisites on updated
-main, and read AGENTS.md before creating the next task branch. This handoff records
-implementation; it does not imply that its PR has merged.
+Inspect Git status, preserve unrelated work, verify prerequisites on updated main,
+and read AGENTS.md before creating or continuing a task branch. This handoff does
+not claim the current T05 draft is merged.
 
 ## Implemented state
 
-T01–T04 are merged. T04 PR #9 was confirmed merged at
-`9a36e56aac10a3b8c87cafbdc0f75f85b7752ff1`. T04a is implemented from that main and
-awaits review/merge in [PR #10](https://github.com/Niilop/data-app-control-plane/pull/10).
-T05 has not started. AI/chat/RAG/LLM/inference remain removed;
-historical tables and all migrations through `007_durable_operations` are retained.
+T01–T04a are merged. PR #10 was verified merged at
+`6503ec152a7bcfbb3310e45c08f5fab78dea27d6`. This fresh T05 implementation starts
+from that baseline. Earlier T05 branch/stash work is preserved separately.
+AI/chat/RAG/LLM/inference remain removed. Accounts, registry and migration history
+001–007 are retained.
 
-The platform provides development accounts/admin bootstrap, teams/memberships,
-owned applications, direct/team roles, versioned metadata, simulated environment
-bindings, filtered paginated reads and transactional audit. Its separate PostgreSQL
-worker uses durable operations, reservations, idempotent commands, leases/fencing,
-current authorization, heartbeats, safe bounded retry, cancellation and reconciliation.
-Only the fixed simulated queue probe runs; no arbitrary task HTTP endpoint exists.
+T05 provides the `python-batch:1.0.0` template with synthetic batch code, stdlib
+tests and its own dependency-free uv lock. Canonical stored ZIP entries have fixed
+metadata, sorted names and a manifest binding parameters/config/template digests.
+Inputs are closed; no arbitrary paths, source, secrets or external commands.
 
-T04a replaces Streamlit with React + TypeScript + Vite:
+The API submits `generate_bundle` and `validate_offline` to the existing durable
+worker with `execution_mode=offline`. Developer permission is required at request,
+execution and completion; recovery retains operator permission (retry also requires
+developer). Existing binding reservations, leases, fencing and command keys apply.
+Completion associates artifacts/reports only inside the fenced audited transaction.
+A lost worker may leave unreferenced immutable bytes; replay is safe for these local
+handlers. Probe semantics and simulated labels remain separate.
 
-- Clean light sidebar layout, accounts/profile, application list/register/detail/
-  edit, ownership and role controls, teams/memberships, environment policy/bindings,
-  audit history and operation/attempt recovery. Paginated reads, error/loading/empty
-  states, simulation labels, responsive navigation and keyboard dialog/tab controls.
-- Versioned edit controls stay disabled while fresh records are loading, and
-  lists visibly report refresh progress. Forms retain the version captured when
-  opened. Recovery keys persist per
-  operation/action/payload in workspace memory across transport retries/dialog
-  reopen. API policy/version/idempotency and worker policy remain authoritative.
-- Browser `POST/DELETE /auth/session` uses an HTTP-only, SameSite=Strict cookie
-  holding the existing expiring JWT. Login/logout and cookie-authenticated writes
-  require a custom header and trusted Origin. Existing bearer login remains.
-  No browser localStorage/sessionStorage tokens; no account/password reset.
-- `GET /api/v1/applications/{id}/capabilities` exposes four current affordances;
-  services still authorize mutations. Direct/team revocation remains immediate.
-- Node 24.21.0 / npm 11.19.0, exact direct dependencies and package-lock.json.
-  Python stays on uv. Streamlit runtime/dependencies/workspace/UI-only tests are
-  retired after equivalent browser workflows passed.
-- Docker frontend uses Node build then nginx static serving and same-origin API
-  proxy on localhost:8501. Vite development uses 127.0.0.1:5173. Frontend does not
-  receive root `.env`; Vite disables env-file discovery. `API_URL` is retired;
-  `API_PROXY_TARGET` is a Vite server-only override. Existing `.env` is untouched.
-- CI includes frontend lint/format/build/browser tests and production nginx smoke,
-  alongside Python and isolated PostgreSQL jobs. See ADR-016 for session choices.
+Local artifact writes publish atomically with fsync and SHA-256 verification;
+reads reject missing/corrupt/symlink/nonregular/oversized content and require an
+associated visible application. API and worker share `ARTIFACT_DIR`; Compose mounts
+`./data` into both. API responses contain no storage paths or queue payloads.
+
+Revision capture is an explicit synchronous command using a completed generation
+and unchanged binding version. Source/config/template/policy snapshots are immutable;
+PostgreSQL triggers protect artifacts/revisions/reports/template content against
+SQL mutation. Validation checks exact approved archive content and static Python/
+TOML syntax without executing source. Reports always say offline, never workspace.
+React's Preparation tab covers generation/download/capture/report workflows and
+shows operation IDs for lookup in the existing Operations tab.
 
 ## Verification performed
 
-On 2026-09-11/12:
+Local checks on 2026-09-14:
 
-- `uv sync --locked --all-packages --group dev` passed after lock cleanup.
-- `uv run --locked pytest -q`: **125 passed** with network blocking enabled.
-  TestClient ran outside the sandbox thread restriction. The total replaces nine
-  Streamlit-specific cases with eight cookie/capability API cases; browser coverage
-  is separate. Existing backend assertions and migration history are preserved.
-- Ruff lint/format passed across the complete README/CI scope: **48 files**.
-  `uv run --locked mypy`: **28 source files passed**.
-- `npm ci`, frontend lint/format/type checks and Vite production build passed.
-  **9 Chromium browser workflows passed** against a disposable real FastAPI/SQLite
-  API with simulated worker fixtures. Coverage includes login/register/reload/logout,
-  application edits/ownership/audit, teams, roles/revocation, environments/bindings,
-  stale versions, validation, viewer denial, pagination, connection/session failure,
-  cancel/retry/reconcile and lost-response idempotency. Desktop and 390px mobile
-  screenshots were inspected; keyboard Escape restores focus.
-- All Compose images built, quiet config validation passed, and existing local
-  backend/worker/frontend services started while preserving the database volume.
-  `/ready` via localhost:8501 returned ready. The four application services remain
-  running. A read-only check confirmed the existing active administrator and
-  migration head 007 remain present. No migration or reset was needed.
-- An isolated production nginx/browser smoke passed routing, CSP, cookie login/
-  reload, authenticated team creation, worker readiness and logout. Its fixtures
-  use a separate temporary SQLite DB, with no root `.env` or application DB volume.
-- Generated browser assets were checked against configured server secret values
-  without printing them; no configured secrets or fixture credentials were found.
-- Chromium could not run natively because WSL lacks its OS libraries; sudo requires
-  interactive authentication. No host-global packages were installed. Tests instead
-  used `tests/Dockerfile.browser`. Docker worked through regular Ubuntu via
-  `wsl.exe`; this agent session's direct Docker CLI mount still returned I/O errors.
-- Hosted [Platform CI run 34649546595](https://github.com/Niilop/data-app-control-plane/actions/runs/34649546595)
-  passed at implementation commit `7cb2c2025a178ac4ebba5973c3a5f55e98b81aaa`.
-  Actual logs confirm **125 offline tests** (12.70s), **15 PostgreSQL tests**
-  (9.78s, no skips), **9 browser workflows** (30.6s), production nginx smoke,
-  frontend checks and Python Ruff/mypy. The browser regression holds the real
-  binding-list response and checks disabled edits, visible refresh progress and
-  the updated version before saving. Handoff CI run 34649546592 also passed.
-  PostgreSQL integration tests were not rerun locally. This final follow-up changes
-  documentation only; application checks were not rerun locally for that edit.
-  Inspect current CI before merge; this PR is not claimed merged.
-
+- `uv run --locked pytest -q`: **147 passed** (22 preparation cases), with the
+  offline network guard. After ending worker read transactions before filesystem
+  work, all 22 preparation cases passed again; after preserving probe assertions, all
+  39 queue/preparation cases passed. Mypy passed for 34 modules; CI-scoped Ruff
+  lint/format passed across 58 files.
+- `uv run --locked pytest tests/integration -q`: **17 passed**, no skips, against
+  a new disposable pgvector/pg16 container on loopback port 55439. Checks include
+  legacy account/data and migration/ORM parity, SQL immutability, concurrent
+  idempotent submission, two-binding artifact completion, queue fencing/recovery.
+- Generated project: fresh temporary project/cache, locked offline uv installation
+  and stdlib tests passed (2 tests). No global package installation was needed.
+- Frontend lint, Prettier, TypeScript and Vite build passed. Docker test image
+  installed locked dependencies with npm ci. **10 Chromium workflows passed**
+  against a disposable real API and worker, including generation/download/capture/
+  offline validation. Desktop/390px screenshots were inspected. The preparation workflow passed
+  again after the spacing/control styling follow-up.
+- Production frontend image built. Isolated Compose nginx smoke passed routing,
+  CSP, cookie login/reload, authenticated write, worker readiness and logout.
+- Native Chromium initially could not launch because WSL lacks libnspr4.so.
+  After the user started Docker Desktop, container checks succeeded. The existing
+  application DB, accounts, Compose services and old T05 migration were untouched.
+- Hosted [Platform CI run 34871267493](https://github.com/Niilop/data-app-control-plane/actions/runs/34871267493) passed at implementation commit
+  `8081f6a3640e4fb81b10e00175a810ee402cdc7e`. Actual logs confirm 147 offline tests
+  (16.94s), 17 PostgreSQL tests (27.61s, no skips), 10 browser workflows (34.2s),
+  generated-project locked offline installation/tests, nginx smoke and lint/types.
+  The handoff check also passed. This evidence follow-up changes documentation
+  only; application tests were not rerun locally for it. Inspect current PR checks.
+- Draft [PR #13](https://github.com/Niilop/data-app-control-plane/pull/13) is open
+  and unmerged. Disposable test containers/network were cleaned up. No provider
+  connectivity, repository publication or deployment was performed.
 
 ## Remaining work and limitations
 
-- Review T04a and current CI before merge, particularly browser identity/session
-  changes. It is not claimed merged. T05 must wait for that merge.
-- Development logout clears the cookie but does not revoke copied JWTs before
-  expiry. TLS termination/proxy trust, organization SSO and global revocation remain
-  later work. Supported Compose development is loopback HTTP; direct HTTPS cookies
-  are Secure. Current activity/grants are still checked for every authenticated call.
-- Recovery keys survive dialog reopen and transport retry within the signed-in
-  workspace, but full reload/logout clears them. Inspect operation history before
-  repeating uncertain work after a full reload. The API is the durable boundary.
-- User ownership/membership controls still use user IDs; teams/environments have
-  paginated selectors. Application filtering applies to the displayed page only.
-- Chromium is the browser tested. Firefox/WebKit and organization deployment are
-  not verified. Browser SQLite tests do not establish PostgreSQL concurrency.
-- Devstack integration remains unverified; `~/code/devstack` was absent. Existing
-  local Compose uses the bundled pgvector/pg16 database. Preserve `.env`/volumes.
-- No template generation, artifacts, revisions, approvals, provider adapters or
-  deployments exist. Unknown probes retain reservations until a supported outcome;
-  no force-success API or exactly-once external execution claim exists.
+- Complete/review current CI and this draft; T05 is not merged. Review schema and
+  workflow permissions before user merge. No T06 implementation exists.
+- The abandoned branch reportedly migrated the local app database to
+  `008_bundle_generation`. This branch uses `008_prepared_revisions` from merged
+  007 and does not alter that database. Do not stamp over the old revision, delete
+  tables, or run this migration against it. Use a separate database from updated
+  main for T05 testing; any conversion of the old database needs an explicit,
+  data-preserving migration plan after inspecting its actual state.
+- Local storage trusts the configured root and host administrator. Unreferenced
+  files can remain after crashes; automatic garbage collection is deferred. Back
+  up the DB and shared artifact directory together; no shared/remote store exists.
+- Offline validation is static allowlist/integrity validation. It neither executes
+  tests in the general worker nor verifies Databricks schema/workspace/compute.
+  The generated project is tested separately in a disposable environment. Provider
+  identity, compute selection, workflow publication and deployments are deferred.
+- Generation/validation keys survive transport retries and dialog reopen within
+  the signed-in workspace. Reload clears browser memory; inspect existing history
+  before repeating work. Revision creation is synchronous and may create another
+  immutable record if deliberately repeated; it has no idempotency-key contract.
+- Existing development session limitations remain: logout does not revoke copied
+  JWTs. Organization SSO, global token revocation and real providers are later work.
 
 ## Next task
 
-After confirming T04a is merged on updated main, implement **T05 — Generate a
-bundle and capture a revision** on its own branch. Read the complete task and
-contracts first. Add one versioned Python batch template, deterministic safe archive
-creation, digest-checked local artifacts, generation/download React UI, immutable
-revision snapshots and offline validation through the durable worker. Generation
-requires no network; lock and test the generated project in isolation. Do not begin
-T06, publish repositories, deploy real bundles, execute adopted arbitrary repository
-code, or activate providers. Preserve current policy/audit/version/idempotency rules.
+Finish T05 review and verify its draft CI. After the user merges T05 and assigns
+new work, implement **T06 only**: exact-scope approval and one simulated deployment.
+Verify merged prerequisites on updated main, then create a new task branch.
+Do not begin T06 simply because T05 code exists on a branch.
 
 ## Files to read first
 
-- `AGENTS.md`, `mdfiles/README.md`, T05 in `mdfiles/development-plan.md`, ADR-015/016
-  in `mdfiles/decisions.md`.
-- `mdfiles/integrations.md`, artifact/revision/validation rules in
-  `mdfiles/domain-contracts.md`, T05 API rows, `mdfiles/architecture.md` and
-  `mdfiles/repository-map.md`.
-- `backend/services/operation_service.py`, `queue_service.py`, `backend/worker.py`,
-  operation/platform schemas and affected auth/policy services.
-- `frontend/src/App.tsx`, `api.ts`, `state.tsx`, `components.tsx`, and `src/pages/`.
-- `frontend/e2e/workflows.spec.ts`, `e2e/nginx-smoke.mjs`, `playwright.config.ts`,
-  `tests/browser_server.py`, Python unit/integration suites.
-- Root README, Compose/Dockerfiles, `tests/compose.browser.yaml`, Python metadata/
-  lock, frontend package metadata/lock and `.github/workflows/ci.yml`.
+- AGENTS.md; mdfiles/README.md; T05/T06 in development-plan.md; ADR-017 in decisions.md.
+- mdfiles/domain-contracts.md, api-contracts.md, integrations.md and architecture.md.
+- backend/services/delivery_service.py, template_service.py, queue_service.py,
+  operation_service.py and backend/worker.py.
+- backend/models/delivery.py, delivery_schemas.py;
+  backend/alembic/versions/008_prepared_revisions.py; backend/integrations/artifact_store.py.
+- backend/templates/python_batch_v1; scripts/check_generated_project.py;
+  frontend/src/pages/preparation.tsx and frontend/e2e/workflows.spec.ts.
+- tests/unit/test_delivery.py, tests/integration/test_delivery.py,
+  tests/integration/test_migrations.py, tests/browser_server.py and .github/workflows/ci.yml.
 
 ## Suggested agent prompt
 
 Read AGENTS.md, mdfiles/README.md and mdfiles/next-agent.md. Inspect Git status,
-preserve unrelated work, verify T04a is merged into updated main, and create the
-next task branch if needed. Implement T05 only: safe deterministic template/archive
-generation, local artifacts/digests/downloads, immutable revisions and explicitly
-offline validation, with React UI and the existing durable worker. Preserve accounts,
-data and policy/version/audit/idempotency contracts. Explain the plan, run checks,
-update handoff/contracts/map, and open a draft PR. Do not merge, start T06, publish
-repositories, activate providers or execute arbitrary adopted repository code.
+preserve unrelated work, verify the T05 draft and current CI against updated main.
+Review T05 only, including data preservation, immutable snapshots, digest checks,
+authorization, fencing and browser behavior. Do not claim it merged, begin T06,
+modify the abandoned-branch database, publish repositories or activate providers.

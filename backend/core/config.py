@@ -31,6 +31,7 @@ class Settings(BaseSettings):
             "http://localhost:3000",
         ]
     )
+    artifact_dir: str = str(_REPO_ROOT / "data" / "artifacts")
     data_dir: str = str(_REPO_ROOT / "data")
 
     model_config = SettingsConfigDict(

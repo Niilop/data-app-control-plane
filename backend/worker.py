@@ -50,10 +50,13 @@ def probe(item: Claim, cancelled: Event, lost: Event) -> Outcome:
 
 
 def run_one(
-    sessions: sessionmaker[Session], worker_id: str, lease_seconds: int = 30
+    sessions: sessionmaker[Session],
+    worker_id: str,
+    lease_seconds: int = 30,
+    kinds: tuple[str, ...] | None = None,
 ) -> bool:
     with sessions() as db:
-        item = claim(db, worker_id, lease_seconds)
+        item = claim(db, worker_id, lease_seconds, kinds)
     if item is None:
         return False
     stopped, cancelled, lost = Event(), Event(), Event()
@@ -71,6 +74,8 @@ def run_one(
     thread = Thread(target=pulse, daemon=True)
     thread.start()
     diagnostic: str | None
+    outcome: Outcome
+    delivery_result: tuple[str, int, str, str] | None = None
     try:
         with sessions() as db:
             if heartbeat(db, item, lease_seconds):
@@ -78,8 +83,23 @@ def run_one(
         with sessions() as db:
             authorize(db, item)
         # Explicit dispatch; no dynamic imports, shell commands or task endpoint.
-        if item.kind != "queue_probe":
-            outcome: Outcome = "failed"
+        if item.kind in {"generate_bundle", "validate_offline"}:
+            from services.delivery_service import execute, store
+
+            if cancelled.is_set():
+                outcome, diagnostic = "cancelled", None
+            elif item.phase == "reconcile":
+                # Only immutable local files may have been published. DB results
+                # commit with terminal state, so another attempt is safe.
+                outcome, diagnostic = "safe_to_retry", None
+            else:
+                with sessions() as db:
+                    content, media_type, verdict = execute(db, item.operation_id)
+                digest = store().put(content)
+                delivery_result = (digest, len(content), media_type, verdict)
+                outcome, diagnostic = "succeeded", None
+        elif item.kind != "queue_probe":
+            outcome = "failed"
             diagnostic = "unsupported_handler"
         else:
             outcome = probe(item, cancelled, lost)
@@ -91,14 +111,27 @@ def run_one(
         outcome = "unknown" if item.phase == "reconcile" else "failed"
         diagnostic = "authorization_changed"
     except Exception:
-        outcome, diagnostic = "unknown", "handler_error"
+        outcome, diagnostic = (
+            (
+                "transient"
+                if item.kind in {"generate_bundle", "validate_offline"}
+                else "unknown"
+            ),
+            "handler_error",
+        )
     finally:
         stopped.set()
         thread.join()
     if not lost.is_set():
         try:
             with sessions() as db:
-                finish(db, item, outcome, diagnostic=diagnostic)
+                finish(
+                    db,
+                    item,
+                    outcome,
+                    diagnostic=diagnostic,
+                    delivery_result=delivery_result,
+                )
         except LostLease:
             pass
     return True

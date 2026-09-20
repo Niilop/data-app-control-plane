@@ -37,9 +37,10 @@ def block_network(
 
 
 @pytest.fixture
-def registry(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple]:
+def registry(monkeypatch: pytest.MonkeyPatch, tmp_path) -> Iterator[tuple]:
     monkeypatch.setenv("DATABASE_URL", "postgresql://test:test@127.0.0.1:1/unused")
     monkeypatch.setenv("SECRET_KEY", "registry-unit-test-only")
+    monkeypatch.setenv("ARTIFACT_DIR", str(tmp_path / "artifacts"))
     monkeypatch.setenv("DEBUG", "false")
     monkeypatch.setenv("RUNTIME_PROFILE", "local")
     monkeypatch.setenv("DEPLOYMENT_EXECUTOR", "simulated")
@@ -81,9 +82,28 @@ def registry(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple]:
             "queue_probes",
             "operation_commands",
             "worker_heartbeats",
+            "template_versions",
+            "artifacts",
+            "generations",
+            "deployment_revisions",
+            "validation_results",
         }
     ]
     Base.metadata.create_all(engine, tables=tables)
+    from models.delivery import TemplateVersion
+    from models.delivery_schemas import TemplateParameters
+    from services.template_service import TEMPLATE_ID, template_digest
+
+    with Session(engine) as seed:
+        seed.add(
+            TemplateVersion(
+                id=TEMPLATE_ID,
+                content_digest=template_digest(),
+                parameter_schema=TemplateParameters.model_json_schema(),
+                active=True,
+            )
+        )
+        seed.commit()
     with Session(engine) as db:
         for identifier in range(1, 7):
             db.add(

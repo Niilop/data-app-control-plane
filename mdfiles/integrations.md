@@ -134,3 +134,19 @@ visibility, Actions/runners/artifact limits, Databricks compute choice and billi
 exposure, and how to stop resources. Do not publish code to obtain free usage or
 promise free Databricks/Azure service. Rate/budget limits are operational controls,
 not guaranteed hard spending caps unless verified for the actual service.
+
+## T05 concrete local template
+
+The implemented `backend/templates/python_batch_v1` template contains a minimal
+bundle/target and synthetic notebook task, Python package, stdlib tests, manifest,
+README, pyproject and uv lock. Its dependencies are empty; Python 3.11+ and uv
+0.12.11 were selected from the existing toolchain. Package names are deliberately
+restricted to `batch_...`; compute/resource/output-location inputs are deferred
+rather than accepting arbitrary strings. Config uses the existing bounded synthetic
+row count and timeout. No GitHub CI/deploy workflow, credentials, schedule or compute
+provisioning is generated in T05; those require their later integration tasks.
+
+Run `uv run --locked python scripts/check_generated_project.py` to install from the
+generated lock in a fresh offline cache and run its tests in a disposable directory.
+The worker only checks approved content and static syntax. This does not establish
+Databricks bundle schema validity or workspace/compute readiness.

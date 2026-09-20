@@ -30,6 +30,7 @@ services:
       - .env
     environment:
       - DATA_DIR=/app/data
+      - ARTIFACT_DIR=/app/data/artifacts
     # Lets DATABASE_URL in .env reach a devstack PostgreSQL published on the
     # host (e.g. postgresql://...@host.docker.internal:5432/...); unused and
     # harmless when pointing at the bundled `db` service or a remote host.
@@ -55,6 +56,9 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./backend:/app
+      - ./data:/app/data
+    environment:
+      - ARTIFACT_DIR=/app/data/artifacts
     command: python -m worker
     restart: unless-stopped
     depends_on:

@@ -30,6 +30,7 @@ import { ReferenceSelect } from "../ReferenceSelect";
 import { useData, usePage, useResource, useSession } from "../state";
 import type { Application, Capabilities, Role } from "../types";
 import { AuditList, Bindings } from "./administration";
+import { Preparation } from "./preparation";
 import { Operations } from "./operations";
 
 function MetadataFields({ application }: { application?: Application }) {
@@ -385,46 +386,52 @@ function ApplicationContent({ id }: { id: string }) {
       />
       <ErrorNotice error={permissions.error} />
       <div className="tabs" role="tablist" aria-label="Application sections">
-        {["Overview", "Environments", "Access", "Operations", "Activity"].map(
-          (name) => (
-            <button
-              key={name}
-              role="tab"
-              id={`tab-${name}`}
-              aria-controls="application-panel"
-              tabIndex={tab === name ? 0 : -1}
-              aria-selected={tab === name}
-              onClick={() => setTab(name)}
-              onKeyDown={(event) => {
-                const tabs = [
-                  "Overview",
-                  "Environments",
-                  "Access",
-                  "Operations",
-                  "Activity",
-                ];
-                const index = tabs.indexOf(name);
-                const next =
-                  event.key === "ArrowRight"
-                    ? (index + 1) % tabs.length
-                    : event.key === "ArrowLeft"
-                      ? (index + tabs.length - 1) % tabs.length
-                      : event.key === "Home"
-                        ? 0
-                        : event.key === "End"
-                          ? tabs.length - 1
-                          : -1;
-                if (next >= 0) {
-                  event.preventDefault();
-                  setTab(tabs[next]);
-                  document.getElementById(`tab-${tabs[next]}`)?.focus();
-                }
-              }}
-            >
-              {name}
-            </button>
-          ),
-        )}
+        {[
+          "Overview",
+          "Environments",
+          "Access",
+          "Preparation",
+          "Operations",
+          "Activity",
+        ].map((name) => (
+          <button
+            key={name}
+            role="tab"
+            id={`tab-${name}`}
+            aria-controls="application-panel"
+            tabIndex={tab === name ? 0 : -1}
+            aria-selected={tab === name}
+            onClick={() => setTab(name)}
+            onKeyDown={(event) => {
+              const tabs = [
+                "Overview",
+                "Environments",
+                "Access",
+                "Preparation",
+                "Operations",
+                "Activity",
+              ];
+              const index = tabs.indexOf(name);
+              const next =
+                event.key === "ArrowRight"
+                  ? (index + 1) % tabs.length
+                  : event.key === "ArrowLeft"
+                    ? (index + tabs.length - 1) % tabs.length
+                    : event.key === "Home"
+                      ? 0
+                      : event.key === "End"
+                        ? tabs.length - 1
+                        : -1;
+              if (next >= 0) {
+                event.preventDefault();
+                setTab(tabs[next]);
+                document.getElementById(`tab-${tabs[next]}`)?.focus();
+              }
+            }}
+          >
+            {name}
+          </button>
+        ))}
       </div>
       <div
         id="application-panel"
@@ -517,6 +524,12 @@ function ApplicationContent({ id }: { id: string }) {
         )}
         {tab === "Access" && (
           <Access applicationId={id} canManage={!!caps?.manage_access} />
+        )}
+        {tab === "Preparation" && (
+          <Preparation
+            applicationId={id}
+            canDevelop={!!caps?.edit_metadata && !permissions.loading}
+          />
         )}
         {tab === "Operations" && (
           <Operations applicationId={id} canOperate={!!caps?.operate} />
