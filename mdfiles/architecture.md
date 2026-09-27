@@ -196,3 +196,14 @@ reads filter the recorded history; there is no overwriteable latest-attempt poin
 A lost simulation lease is reconciled before safe retry; the generic conservative
 unknown/revoked reconciliation path keeps its reservation. This is a local workflow
 guarantee, not organization-enforced approval or exactly-once external deployment.
+
+## T07 simulated runs and recorded overview
+
+`job_run_service.py` uses the existing PostgreSQL queue and binding reservations;
+`integrations/simulated_run.py` is a pure fixed synthetic-data fixture. No generated
+source, subprocess or provider executes. The service checks current run eligibility
+and commits a separate `JobRun` result under the operation lease fence, verifying
+synthetic output before success. Cancellation/retry/reconciliation extend the existing
+operation service. The React overview reads authorized paginated DB history; timestamps
+are observation times, not a claim of live external state. See ADR-019 for the
+operator permission and historical deployment-approval boundary.

@@ -1,6 +1,6 @@
 # API contracts
 
-Status: T02–T06 registry, operations, preparation, approvals and simulated deployment endpoints are implemented; later task rows remain planned. Existing `/auth/*` remains the development login
+Status: T02–T07 registry, operations, preparation, approvals and simulated deployment endpoints are implemented; later task rows remain planned. Existing `/auth/*` remains the development login
 surface initially. Implement endpoints with their tasks; this document does not
 claim they exist. Keep services usable by API and worker without importing routers.
 
@@ -313,3 +313,37 @@ approval decision returns `approval_superseded` for an older selected approval.
 Worker rejection records a sanitized `authorization_changed` diagnostic. Submission,
 observations and recovery remain transactional and audited. All deployment records
 and accepted commands visibly identify simulated execution.
+
+## T07 concrete run API and overview
+
+- `POST /deployments/{id}/runs`: operator + Idempotency-Key; returns the standard
+  202/Location envelope. Body: `resource_key="synthetic_job"`, mandatory
+  `execution_mode="simulated"`, optional `parameters={"row_count":100}` and
+  `scenario="success"|"failure"`. Row count is a strict integer 1–10,000;
+  unknown fields, arbitrary parameters/resources, booleans, numeric strings and
+  real modes return 422 without echoing values.
+- `GET /deployments/{id}/runs`, `GET /applications/{id}/runs`, and `GET /runs/{id}`
+  expose recorded run IDs, deployment/operation/application references, requester,
+  parameters, explicit simulation/scenario, normalized status, nullable result and
+  UTC `last_observed_at`. Lists use the existing oldest-first keyset pagination.
+  `provider_run_id` is always null. No credentials, payloads or storage paths.
+- A completed result contains `execution_mode=simulated`, `lifecycle=terminated`,
+  `outcome=success|failure`, `output` (rows/total or null), and `output_verified`.
+  Success requires current authorization and verified synthetic output.
+- Inaccessible runs/deployments return 404; readable deployments without operator
+  permission return 403; failed/not-ready/stale deployments and binding conflicts
+  return 409. Worker policy rejection uses `authorization_changed`.
+- Existing cancel/retry/reconcile endpoints apply. Retry creates another run and
+  operation; reads do not trigger handler execution or provider calls.
+- Operation responses include `deploy_simulated` and `run_simulated`. This also
+  fixes the missing T06 kind in the public operation schema.
+
+React's Deployments view offers run submission to operators and paginated per-
+deployment history to readers. Overview composes existing revision/approval,
+deployment and operation reads plus the application run list. These are separately
+refreshed recorded observations, not a provider poll or a single atomic snapshot.
+Pending run command keys are scoped by deployment and input in the deployment
+screen. They survive transport retries, form close/reopen and capability/list
+refreshes even when controls remount. An acknowledged response clears that key,
+allowing another deliberate identical run. After leaving the screen or reloading,
+inspect history before repeating uncertain work.

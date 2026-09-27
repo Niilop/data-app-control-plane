@@ -311,3 +311,25 @@ workflows, production frontend build and isolated nginx smoke passed. Screenshot
 were inspected at desktop and 390px. Browser fixtures now process preparation and
 simulated deployment kinds, retaining the existing probe fixtures. See next-agent.md
 for final follow-ups, current CI status and deliberate unrun external checks.
+
+## T07 verification
+
+Local 2026-09-27: **190 offline tests passed**, including 21 run cases; **23 isolated
+PostgreSQL tests passed with no skips**. New tests cover strict bounded input,
+operator-only submission, read visibility, failed/not-ready deployments, role/policy
+changes, independent run/deployment outcomes, output verification, atomic audit
+rollback, cancellation/retry/fencing and uncertain reservation retention. PostgreSQL
+adds duplicate/conflicting submissions, role revocation during a policy-lock wait,
+head-schema parity, preserved deployment evidence through upgrade, and downgrade
+refusal with run history. All used a disposable pgvector container and per-test
+schemas, never the existing application database.
+
+CI-scoped Ruff (74 files), mypy (44 modules), generated-project offline installation
+and 2 tests passed. Locked Docker frontend lint/format/types/build and all 12 Chromium
+workflows passed, including run success/failure, lost-response replay, recorded
+application overview, mobile overflow and revoked operator controls. Production
+frontend build and isolated nginx smoke passed. After screenshot review, a CSS-only
+run-detail layout correction passed frontend checks and the focused run browser test
+again. Final desktop layout and mobile screenshots were reviewed. No host-global
+packages or runtime dependencies were added. Hosted T07 checks must be inspected
+on the actual draft; no real provider execution or old-database migration was run.

@@ -35,7 +35,13 @@ class OperationResponse(Record):
     binding_id: UUID
     binding_version: int
     requested_by: int
-    kind: Literal["queue_probe", "generate_bundle", "validate_offline"]
+    kind: Literal[
+        "queue_probe",
+        "generate_bundle",
+        "validate_offline",
+        "deploy_simulated",
+        "run_simulated",
+    ]
     execution_mode: Literal["simulated", "offline"]
     status: Status
     attempt_count: int

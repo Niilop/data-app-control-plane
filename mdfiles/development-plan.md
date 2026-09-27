@@ -1,9 +1,10 @@
 # Development plan and agent task ledger
 
-Status: **T01–T05 complete and merged; T06 implemented, pending review/merge.**
+Status: **T01–T06 complete and merged; T07 implemented, pending review/merge.**
+T06 PR #14 merged at `004b363dbeaeb34e4f8b20870fff60226ee00118` (verified 2026-09-27).
 T05 PR #13 merged at `8e419050c5069b97ac5b582e02378f77658f3e99` (verified 2026-09-20).
 T04a PR #10 merged at `6503ec152a7bcfbb3310e45c08f5fab78dea27d6`.
-T07 and later tasks have not started.
+T08–T13 have not started.
 This plan is implementation-ready guidance,
 not a claim of implemented capabilities. Task order follows dependencies rather
 than estimated calendar dates. Do not implement the entire roadmap in one turn.
@@ -466,7 +467,7 @@ validation. API restart does not lose artifacts in the configured shared mount.
 
 ## T06 — Approve and simulate one deployment
 
-**Status:** implemented, pending review/merge. **Depends on:** T05, merged.
+**Status:** complete and merged via PR #14 at `004b363`. **Depends on:** T05, merged.
 
 **Delivered (2026-09-20):** migration `009_simulated_deployments`, immutable approval
 evidence, exact report/scope selection, approver and combined developer/operator
@@ -485,8 +486,7 @@ passed. See next-agent.md for final follow-ups and unrun external checks. The or
 application database and old T05 branch/stash were preserved. No provider calls,
 external permissions, Terraform, repository publication or T07 work occurred.
 
-**Next:** review T06 and its draft CI, then user merge. T07 requires a separate
-assignment and verified merged T06 prerequisites.
+**Next:** T07 was assigned after the verified T06 merge and is implemented below.
 
 **Read:** approval/permission/state contracts and [integration trust boundary](integrations.md).
 
@@ -507,7 +507,39 @@ deployment. Every deployment/result shows `execution_mode=simulated`.
 
 ## T07 — Run a simulated job and inspect the application
 
-**Status:** not started. **Depends on:** T06.
+**Status:** implemented, pending review/merge. **Depends on:** T06, merged.
+
+**Delivered (2026-09-27):** migration `010_simulated_job_runs`, operator-only
+`synthetic_job` commands with strict bounded parameters, separate run history and
+verified simulated output. Existing durable operations, binding reservations,
+command keys, worker policy checks, fencing and audit handle submission,
+completion, cancellation, retry and reconciliation. Run results do not mutate
+deployment status. React includes run controls/history and an application overview
+of recorded revisions, approval evidence, deployments, runs and operations.
+Operation responses now also accept T06's previously omitted deployment kind.
+ADR-019 records run policy and simulation limits. No new dependencies.
+
+**Verification:** 190 offline tests passed, including 21 new run cases; 23 isolated
+PostgreSQL tests passed with no skips, including migration/ORM parity, upgrade
+preservation, concurrent keys/conflicts, stale leases and revocation while waiting
+on policy locks. Ruff passed over 74 files; mypy over 44 modules; generated-project
+locked offline install and 2 tests passed. Frontend lint/format/types/build and all
+12 Chromium workflows passed, plus production frontend build and isolated nginx
+smoke. Screenshot review prompted a small run-detail CSS fix; frontend checks and
+the focused run workflow passed again. See next-agent.md for exact evidence and
+unrun external/application-database checks.
+
+**Next:** review T07 and draft CI, then user merge. After a separate assignment,
+T11 is recommended next to complete the local access-request/archive demonstration;
+T08–T10 external integrations remain separate work.
+
+**PR review follow-up (2026-09-27):** fixed loss of pending run keys when capability
+refresh unmounted the controls. Keys now persist by deployment/input in the screen
+until an acknowledged response. The regression failed against the old code, then
+all 12 browser workflows and frontend lint/format/types/build passed with the fix.
+It checks inline retries, refresh/remount retries, one recorded run, a new deliberate
+identical run and revoked controls. Backend code and migrations were unchanged;
+their earlier checks were not rerun locally for this UI-only follow-up.
 
 **Read:** JobRun model/state and T07 API/UI contracts.
 

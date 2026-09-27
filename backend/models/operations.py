@@ -25,7 +25,7 @@ class Operation(Identity, Base):
             name="ck_operation_status",
         ),
         CheckConstraint(
-            "(kind IN ('queue_probe','deploy_simulated') AND execution_mode = 'simulated') OR (kind IN ('generate_bundle','validate_offline') AND execution_mode = 'offline')",
+            "(kind IN ('queue_probe','deploy_simulated','run_simulated') AND execution_mode = 'simulated') OR (kind IN ('generate_bundle','validate_offline') AND execution_mode = 'offline')",
             name="ck_operation_handler",
         ),
         CheckConstraint(

@@ -15,6 +15,7 @@ from core.config import get_settings
 from models import database as runtime_models
 from models import delivery as delivery_models  # noqa: F401
 from models import deployment as deployment_models  # noqa: F401
+from models import job_run as job_run_models  # noqa: F401
 from models import operations as operation_models  # noqa: F401
 from models import platform as platform_models  # noqa: F401
 

@@ -160,3 +160,13 @@ no GitHub, Databricks, Terraform, source execution or infrastructure calls. The
 approval binds offline evidence only; this cannot authorize a future real executor.
 Adding real execution requires a new scope/policy and the later integration gates.
 Local DB/host administrators remain trusted; this is not an organizational gate.
+
+## T07 implemented run simulation boundary
+
+The run adapter handles only `synthetic_job` with bounded synthetic row count and
+explicit success/failure fixtures in local simulated mode. It does not import or
+execute generated/adopted source, invoke a shell, schedule work or contact providers.
+The fixed output is checked before successful fenced completion. Records carry
+`execution_mode=simulated` and a null provider run ID. Real provider lifecycle/result
+mapping and output retrieval remain T10 work; a simulation result does not satisfy
+that gate or select a fake result for future real execution.

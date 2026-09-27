@@ -9,8 +9,8 @@ role administration, transactional audit, and a React + TypeScript interface,
 plus admin-managed simulated environments and application bindings.
 A separate durable worker runs offline bundle preparation and explicitly simulated
 deployments with exact-scope approvals, operation history and recovery controls.
-React supports generation, validation, approval, simulated deployment history and
-per-binding last success. Real GitHub/Databricks integration remains planned work.
+React supports generation, validation, approval, simulated deployment history,
+per-binding last success, simulated job runs and recorded application activity. Real GitHub/Databricks integration remains planned work.
 The old AI chat, RAG, LLM, and model-inference features have been removed.
 
 ## Local setup
@@ -240,8 +240,8 @@ and are not mounted by the platform API. The registry is under `/api/v1`; see
 ```bash
 uv run --locked pytest -q
 uv run --locked mypy
-uv run --locked ruff check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/alembic/versions/008_prepared_revisions.py backend/services/deployment_service.py backend/api/endpoints/deployments.py backend/integrations/simulated_deployment.py backend/alembic/versions/009_simulated_deployments.py backend/services/delivery_service.py backend/services/template_service.py backend/integrations/artifact_store.py backend/api/endpoints/delivery.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
-uv run --locked ruff format --check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/alembic/versions/008_prepared_revisions.py backend/services/deployment_service.py backend/api/endpoints/deployments.py backend/integrations/simulated_deployment.py backend/alembic/versions/009_simulated_deployments.py backend/services/delivery_service.py backend/services/template_service.py backend/integrations/artifact_store.py backend/api/endpoints/delivery.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
+uv run --locked ruff check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/alembic/versions/008_prepared_revisions.py backend/services/deployment_service.py backend/api/endpoints/deployments.py backend/integrations/simulated_deployment.py backend/alembic/versions/009_simulated_deployments.py backend/alembic/versions/010_simulated_job_runs.py backend/services/job_run_service.py backend/api/endpoints/job_runs.py backend/integrations/simulated_run.py backend/services/delivery_service.py backend/services/template_service.py backend/integrations/artifact_store.py backend/api/endpoints/delivery.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
+uv run --locked ruff format --check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/alembic/versions/008_prepared_revisions.py backend/services/deployment_service.py backend/api/endpoints/deployments.py backend/integrations/simulated_deployment.py backend/alembic/versions/009_simulated_deployments.py backend/alembic/versions/010_simulated_job_runs.py backend/services/job_run_service.py backend/api/endpoints/job_runs.py backend/integrations/simulated_run.py backend/services/delivery_service.py backend/services/template_service.py backend/integrations/artifact_store.py backend/api/endpoints/delivery.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
 ```
 
 Unit tests (`tests/unit`, the default `testpaths`) block network calls. Startup and
@@ -386,3 +386,29 @@ Every result remains labelled simulated. No provider resources are created and n
 data job runs. Command keys survive transport retries within the signed-in browser
 workspace; after reload inspect history before deliberately repeating work. Approval
 decisions are synchronous and not command-keyed; inspect history after response loss.
+
+
+### Run a simulated job (T07)
+
+On an isolated database on the merged migration chain, apply migration
+`010_simulated_job_runs`. Preserve any older database using the abandoned
+`008_bundle_generation` history; it needs separately reviewed conversion work.
+
+An application operator can open **Deployments**, select **Run simulated job**
+under a successful deployment, and queue `synthetic_job` with 1–10,000 synthetic
+rows and an explicitly simulated success/failure scenario. No developer role is
+needed for a run. Current roles, active application, unchanged binding/template
+and ready deployed job are checked before execution and successful completion.
+
+Refresh **Job run history** or **Overview** for recorded status, synthetic output
+and observation time. Deployment success is independent of job success. **Operations**
+provides attempts, cancellation, retry and reconciliation. Retry creates a new run;
+unknown outcomes retain the binding reservation. Each binding permits one unresolved
+operation, including runs. These results demonstrate simulation only, with no real
+provider run ID, source execution, compute, scheduler or external data access.
+
+A transport retry with the same inputs reuses its pending command key, including
+after closing the form and refreshing capabilities or deployment history. An
+acknowledged response clears the key so a new deliberate run gets a new key.
+After leaving the deployment screen or reloading, inspect run history before
+resubmitting an uncertain request.

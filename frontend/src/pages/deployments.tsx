@@ -12,6 +12,7 @@ import {
 } from "../components";
 import { useData, useResource } from "../state";
 import type { Binding } from "../types";
+import { RunControls, RunHistory } from "./job-runs";
 
 type Approval = {
   id: string;
@@ -260,8 +261,16 @@ function LastSuccess({ path }: { path: string }) {
     </>
   );
 }
-export function Deployments({ applicationId }: { applicationId: string }) {
+export function Deployments({
+  applicationId,
+  canOperate,
+}: {
+  applicationId: string;
+  canOperate: boolean;
+}) {
   const [binding, setBinding] = useState("");
+  // Capability/list refreshes can unmount controls; pending keys outlive them.
+  const [runKeys] = useState(() => new Map<string, string>());
   const path = `/api/v1/applications/${applicationId}`;
   return (
     <section className="panel">
@@ -304,6 +313,13 @@ export function Deployments({ applicationId }: { applicationId: string }) {
               {items.map((row) => (
                 <li key={row.id}>
                   <DeploymentDetails row={row} />
+                  {canOperate && row.status === "succeeded" && (
+                    <RunControls deploymentId={row.id} commandKeys={runKeys} />
+                  )}
+                  <details>
+                    <summary>Job run history</summary>
+                    <RunHistory path={`/api/v1/deployments/${row.id}/runs`} />
+                  </details>
                 </li>
               ))}
             </ul>

@@ -1,6 +1,6 @@
 # Repository map
 
-Updated for T06 on 2026-09-20. Paths below are current unless labelled proposed. Recheck
+Updated for T07 on 2026-09-27. Paths below are current unless labelled proposed. Recheck
 affected files before editing; avoid a full repository crawl for each task.
 
 ## Current implementation
@@ -152,3 +152,16 @@ main resolves the earlier local-only instruction and ignore-file uncertainty.
 | `backend/services/queue_service.py`, `operation_service.py`, `backend/worker.py` | Deployment dispatch, leases/fencing, audit, cancellation and recovery |
 | `frontend/src/pages/deployments.tsx`, `preparation.tsx` | Exact-scope approval, simulated submission, history and last-success UI |
 | `tests/unit/test_deployments.py`, `tests/integration/test_deployments.py` | Scope/role/policy changes, atomicity, partial failure, concurrent commands and fencing |
+
+### T07 simulated jobs and application overview
+
+| Path | Responsibility |
+|---|---|
+| `backend/models/job_run.py`, `job_run_schemas.py` | Separate simulated run state, strict inputs and safe result views |
+| `backend/alembic/versions/010_simulated_job_runs.py` | Add run history and queue kind; refuse downgrade with run history |
+| `backend/services/job_run_service.py`, `backend/api/endpoints/job_runs.py` | Current operator/target checks, keyed submission, output verification and authorized run reads |
+| `backend/integrations/simulated_run.py` | Fixed synthetic success/failure fixture with no external effects |
+| `backend/services/queue_service.py`, `operation_service.py`, `backend/worker.py` | Run claim/authorization/completion, cancellation and recovery under existing fences |
+| `frontend/src/pages/job-runs.tsx`, `application-dashboard.tsx` | Run form/history and recorded application overview |
+| `tests/unit/test_job_runs.py`, `tests/integration/test_job_runs.py` | Inputs, permissions, rollback, output, recovery, concurrent commands, policy-lock races and migration preservation |
+| `frontend/e2e/workflows.spec.ts` | Full simulated run success/failure, lost-response replay, overview and revoked controls |

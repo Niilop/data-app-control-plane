@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from core.config import get_settings
 from core.database import SessionLocal
+from models.job_run_schemas import RunInput, RunResult
 from models.operation_schemas import ProbeInput
 from services.environment_service import require_local_simulation
 from services.policy_service import PolicyError
@@ -77,6 +78,7 @@ def run_one(
     outcome: Outcome
     delivery_result: tuple[str, int, str, str] | None = None
     deployment_resources: list[dict] | None = None
+    run_result: RunResult | None = None
     try:
         with sessions() as db:
             if heartbeat(db, item, lease_seconds):
@@ -117,6 +119,24 @@ def run_one(
                 diagnostic = (
                     "simulated_partial_failure" if outcome == "failed" else None
                 )
+        elif item.kind == "run_simulated":
+            from integrations.simulated_run import execute as simulate_run
+
+            if cancelled.is_set():
+                outcome, diagnostic = "cancelled", None
+            elif item.phase == "reconcile":
+                outcome, diagnostic = "safe_to_retry", None
+            else:
+                run_data = RunInput.model_validate(
+                    {
+                        k: v
+                        for k, v in item.payload.items()
+                        if k not in {"schema_version", "deployment_id"}
+                    }
+                )
+                run_result = simulate_run(run_data)
+                outcome = "succeeded" if run_result.outcome == "success" else "failed"
+                diagnostic = "simulated_run_failure" if outcome == "failed" else None
         elif item.kind != "queue_probe":
             outcome = "failed"
             diagnostic = "unsupported_handler"
@@ -151,6 +171,7 @@ def run_one(
                     diagnostic=diagnostic,
                     delivery_result=delivery_result,
                     deployment_resources=deployment_resources,
+                    run_result=run_result,
                 )
         except LostLease:
             pass

@@ -360,3 +360,30 @@ failure retains observations and does not alter previous success. Simulation and
 offline validation are never evidence of external provisioning or data-job success.
 No dependencies, provider credentials, real adapter, T07 run model or Terraform
 are introduced. Enterprise trust enforcement remains ADR-007's later review gate.
+
+## ADR-019 — Operator runs from successful simulated deployments
+
+**T07, 2026-09-27; proposed for review with the implementation.** Extend migration
+009 with separate `job_runs` and the closed `run_simulated` operation kind. Keep
+migration history and deployment results unchanged. Runs use the existing durable
+worker, command keys, reservation, audit, leases and fencing; no dependencies or
+alternate dispatch mechanism are introduced.
+
+An operator can run the ready synthetic job of a successful simulated deployment.
+Check current actor/application/binding/template eligibility at submission, worker
+execution and completion, including after policy-lock waits. Deployment approval
+remains historical evidence; a run does not redeploy code and does not require a
+developer role, renewed approval or continued roles of the former approver/deployer.
+Changing the binding/policy requires a new prepared and successful deployment.
+
+The only parameter is strict row count 1–10,000, default 100; this is a bounded run
+input, separate from the captured deployment configuration. Success/failure fixtures
+exist only in mandatory simulated mode. A fixed function returns a synthetic summary,
+which completion checks against row count/arithmetic total. It never executes source
+or creates a provider run ID. Real run/output verification remains T10.
+
+Serialize runs with all other unresolved work on their binding initially. Retry
+creates new linked records; lost leases reconcile before safe repeat. Unknown or
+revoked reconciliation retains reservations. Runs never mutate deployment success.
+React shows separate results and recorded observation times using authorized DB reads;
+no global dashboard endpoint or live provider polling is needed.
