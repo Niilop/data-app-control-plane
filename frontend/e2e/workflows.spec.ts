@@ -748,3 +748,194 @@ test("approve exact scope, simulate deployment and retain last success after par
     fullPage: true,
   });
 });
+
+test("simulated job success, failure, lost response and recorded dashboard", async ({
+  page,
+}) => {
+  await login(page);
+  const seed = await existing(page);
+  const app = await request(page, "/api/v1/applications", "POST", {
+    slug: "job-run-browser",
+    name: "Job run browser",
+    description: "Run simulation checks",
+    owning_team_id: seed.owning_team_id,
+    owner_user_id: 1,
+    data_owner_user_id: 1,
+    repository_url: "https://github.com/example/job-run-browser",
+    bundle_root: ".",
+  });
+  for (const role of ["operator", "approver"]) {
+    await request(page, `/api/v1/applications/${app.id}/roles`, "POST", {
+      user_id: 1,
+      role,
+    });
+  }
+  const env = await request(page, "/api/v1/environments", "POST", {
+    name: "Job run browser",
+    workspace_ref: "simulated://job-run-browser",
+    allowed_executor: "simulated",
+    allowed_bundle_targets: ["sandbox"],
+    allow_self_approval: true,
+  });
+  const binding = await request(
+    page,
+    `/api/v1/applications/${app.id}/bindings`,
+    "POST",
+    { environment_id: env.id, bundle_target: "sandbox" },
+  );
+  async function command(path: string, data: object) {
+    const response = await page.request.post(path, {
+      headers: { ...headers, "Idempotency-Key": crypto.randomUUID() },
+      data,
+    });
+    expect(response.status(), await response.text()).toBe(202);
+    const operation = await response.json();
+    await expect
+      .poll(
+        async () =>
+          (await request(page, `/api/v1/operations/${operation.operation_id}`))
+            .status,
+      )
+      .toBe("succeeded");
+  }
+  await command(`/api/v1/applications/${app.id}/generations`, {
+    binding_id: binding.id,
+    expected_binding_version: 1,
+  });
+  const generation = (
+    await request(page, `/api/v1/applications/${app.id}/generations`)
+  ).items[0];
+  const revision = await request(
+    page,
+    `/api/v1/applications/${app.id}/revisions`,
+    "POST",
+    {
+      generation_id: generation.id,
+      binding_id: binding.id,
+      expected_binding_version: 1,
+    },
+  );
+  await command(`/api/v1/revisions/${revision.id}/validations`, {
+    scope: "offline",
+  });
+  const report = (
+    await request(page, `/api/v1/revisions/${revision.id}/validations`)
+  ).items[0];
+  const scope = await request(
+    page,
+    `/api/v1/revisions/${revision.id}/approval-scope?validation_id=${report.id}`,
+  );
+  const approval = await request(
+    page,
+    `/api/v1/revisions/${revision.id}/approvals`,
+    "POST",
+    {
+      validation_id: report.id,
+      scope_digest: scope.scope_digest,
+      decision: "approved",
+      reason: "Local run test",
+      acknowledge_local_self_approval: true,
+    },
+  );
+  await command(`/api/v1/applications/${app.id}/deployments`, {
+    revision_id: revision.id,
+    approval_id: approval.id,
+    binding_id: binding.id,
+    execution_mode: "simulated",
+  });
+  const deployment = (
+    await request(page, `/api/v1/applications/${app.id}/deployments`)
+  ).items[0];
+  await page.goto(`/applications/${app.id}`);
+  await page.getByRole("tab", { name: "Deployments", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Run simulated job", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Synthetic row count").fill("7");
+  const keys: string[] = [];
+  await page.route(
+    `**/api/v1/deployments/${deployment.id}/runs`,
+    async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      keys.push(route.request().headers()["idempotency-key"]);
+      const response = await route.fetch();
+      if (keys.length === 1) await route.abort("failed");
+      else await route.fulfill({ response });
+    },
+  );
+  await dialog.getByRole("button", { name: "Queue simulated run" }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "Unable to reach the API",
+  );
+  await dialog.getByRole("button", { name: "Queue simulated run" }).click();
+  await expect(dialog).not.toBeVisible();
+  expect(keys).toHaveLength(2);
+  expect(keys[0]).toBe(keys[1]);
+  await page.unroute(`**/api/v1/deployments/${deployment.id}/runs`);
+  const runsPath = `/api/v1/deployments/${deployment.id}/runs`;
+  await expect
+    .poll(async () => (await request(page, runsPath)).items[0]?.status)
+    .toBe("succeeded");
+  expect((await request(page, runsPath)).items).toHaveLength(1);
+  await page
+    .getByRole("button", { name: "Run simulated job", exact: true })
+    .click();
+  await dialog.getByLabel("Run simulation scenario").selectOption("failure");
+  await dialog.getByRole("button", { name: "Queue simulated run" }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect
+    .poll(async () => (await request(page, runsPath)).items[1]?.status)
+    .toBe("failed");
+  expect(
+    (await request(page, `/api/v1/deployments/${deployment.id}`)).status,
+  ).toBe("succeeded");
+  await page.getByRole("tab", { name: "Overview", exact: true }).click();
+  await expect(
+    page.getByText("Simulated output: 7 rows, total 21.", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("The simulated job failed. Deployment status is unchanged."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Operation history", exact: true }),
+  ).toBeVisible();
+  await page.getByText("Approval history for this revision").click();
+  await expect(
+    page.getByText(`Scope SHA-256: ${scope.scope_digest}`),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "test-results/runs-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/runs-mobile.png",
+    fullPage: true,
+  });
+  const roles = (await request(page, `/api/v1/applications/${app.id}/roles`))
+    .items;
+  const operator = roles.find(
+    (r: { user_id: number; role: string }) =>
+      r.user_id === 1 && r.role === "operator",
+  );
+  await request(
+    page,
+    `/api/v1/applications/${app.id}/roles/${operator.id}`,
+    "DELETE",
+  );
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await page.getByRole("tab", { name: "Deployments", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Run simulated job", exact: true }),
+  ).toHaveCount(0);
+  await page.getByText("Job run history", { exact: true }).click();
+  await expect(
+    page.getByText("Simulated output: 7 rows, total 21.", { exact: false }),
+  ).toBeVisible();
+});

@@ -1220,3 +1220,7 @@ summary {
   overflow-wrap: anywhere;
   font-size: 0.8rem;
 }
+
+.attempt-list li > .run-details {
+  display: block;
+}

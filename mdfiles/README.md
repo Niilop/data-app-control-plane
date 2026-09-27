@@ -1,11 +1,11 @@
 # Data application control plane: agent entry point
 
-Documentation baseline: 2026-09-20. **T01–T05 are merged. T06 is implemented,
-pending review/merge.** T05 PR #13 merged at
-`8e419050c5069b97ac5b582e02378f77658f3e99`. React now covers exact-scope approval,
-explicitly simulated deployment, history and last success through the durable worker.
-No provider activation or external deployment is included. T07 remains unstarted.
-See [next-agent.md](next-agent.md) for evidence and database isolation requirements.
+Documentation baseline: 2026-09-27. **T01–T06 are merged. T07 is implemented,
+pending review/merge.** T06 PR #14 merged at
+`004b363dbeaeb34e4f8b20870fff60226ee00118`. React covers preparation, exact-scope
+approval, simulated deployment and job runs, with recorded application activity.
+No provider activation or external execution is included. See
+[next-agent.md](next-agent.md) for checks and database isolation requirements.
 
 **Resume here:** [next-agent.md](next-agent.md). Verify prerequisite changes
 on updated `main` before creating or continuing any task branch; the handoff
@@ -61,11 +61,9 @@ specific version):
 
 > Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Inspect Git
 > status, preserve unrelated work, and verify prerequisites on updated main.
-> Review the T06 draft and its checks. Leave merging to the user. T07 is a
-> separate assignment after T06 merges. Preserve the old T05 database, branch
-> and stash; do not publish repositories or activate providers.
-
-
+> Review T07 and its checks; leave merging to the user. After merge and assignment,
+> T11 completes the remaining local access-request/archive flow. Preserve the old
+> T05 database, branch and stash; do not activate providers.
 
 The handoff separates implemented behavior from verification and merge status.
 Infrastructure activation and later task completion are not implied by this plan.

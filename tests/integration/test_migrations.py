@@ -51,8 +51,9 @@ EXPECTED_HEAD_TABLES = {
     "validation_results",
     "approvals",
     "deployments",
+    "job_runs",
 }
-HEAD_REVISION = "009_simulated_deployments"
+HEAD_REVISION = "010_simulated_job_runs"
 
 
 def _scoped_database_url(schema: str) -> str:
@@ -223,6 +224,7 @@ def test_upgrade_from_old_head_preserves_user_and_safe_flags(
             "validation_results",
             "approvals",
             "deployments",
+            "job_runs",
         }
         with engine.connect() as connection:
             context = MigrationContext.configure(

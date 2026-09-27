@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ApplicationDashboard } from "./application-dashboard";
 import { Link, useNavigate, useParams } from "react-router";
 import {
   ArrowLeft,
@@ -444,6 +445,7 @@ function ApplicationContent({ id }: { id: string }) {
       >
         {tab === "Overview" && (
           <div className="detail-grid">
+            <ApplicationDashboard applicationId={id} />
             <section className="panel">
               <div className="section-heading">
                 <h2>Repository</h2>
@@ -536,7 +538,16 @@ function ApplicationContent({ id }: { id: string }) {
             canDeploy={!!caps?.deploy && !permissions.loading}
           />
         )}
-        {tab === "Deployments" && <Deployments applicationId={id} />}
+        {tab === "Deployments" && (
+          <Deployments
+            applicationId={id}
+            canOperate={
+              !!caps?.operate &&
+              !permissions.loading &&
+              app.lifecycle !== "archived"
+            }
+          />
+        )}
         {tab === "Operations" && (
           <Operations applicationId={id} canOperate={!!caps?.operate} />
         )}

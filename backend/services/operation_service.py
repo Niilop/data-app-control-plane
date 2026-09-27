@@ -267,6 +267,10 @@ def command(
                         from services.deployment_service import observe
 
                         observe(db, operation, "cancelled")
+                    if operation.kind == "run_simulated":
+                        from services.job_run_service import observe as observe_run
+
+                        observe_run(db, operation, "cancelled")
                     release(db, operation)
         elif action == "retry":
             if operation.status not in {"failed", "cancelled"}:
@@ -293,6 +297,14 @@ def command(
                     input_for(operation),
                     request_id,
                     operation.id,
+                )
+            elif operation.kind == "run_simulated":
+                from services.job_run_service import enqueue as enqueue_run
+                from services.job_run_service import input_for as run_input
+
+                deployment_id, data = run_input(operation)
+                result = enqueue_run(
+                    db, actor, deployment_id, data, request_id, operation.id
                 )
             else:
                 from services.delivery_service import retry_operation

@@ -1,6 +1,6 @@
 # Domain and workflow contracts
 
-Status: T02–T06 registry, queue, preparation, approval and simulated deployment entities are implemented; later task entities remain proposed. Introduce entities in their owning task,
+Status: T02–T07 registry, queue, preparation, approval and simulated deployment entities are implemented; later task entities remain proposed. Introduce entities in their owning task,
 not all at once. New entities use UUIDs, timezone-aware UTC timestamps, explicit
 foreign keys, and database constraints for uniqueness. Historical AI tables remain migration-only metadata after T01a; no runtime AI
 features are retained. Existing user IDs may remain
@@ -264,4 +264,37 @@ needs-attention/reservation behavior. No operator override can force success.
 Last success is queried independently per binding from successful deployment history,
 ordered by observation time and ID. Later failures never erase it. First success
 activates a registered application with an atomic version increment; deployment
-success does not claim that a data job ran. T07 run records remain absent.
+success does not claim that a data job ran. T07 adds separate run records as described below.
+
+## T07 implemented simulated job runs
+
+`JobRun` is separate from deployment and operation state. It references one
+successful simulated deployment, its application, requester and unique operation.
+Only the ready `synthetic_job` resource in the approved template is runnable.
+The command accepts strict integer `parameters.row_count` in 1–10,000 (default 100)
+and explicitly simulated `success`/`failure` fixtures. These are run inputs rather
+than edits to the immutable deployment configuration. Provider run ID stays null;
+no fabricated provider ID or local path appears in results.
+
+An active operator is sufficient; developer, owner or admin status alone is not.
+The API, worker authorization and successful completion check the current operator,
+active application, unchanged complete revision/binding policy, approved template,
+successful deployment and ready job. Eligibility is refreshed after blocking policy
+locks. Approval evidence remains the historical evidence of the successful deployment;
+running an already deployed job is not a new deployment approval or self-approval.
+It does not require the original deployer or approver to retain their roles.
+
+Submission commits run, operation, binding reservation, command key and audit together.
+Runs share the existing conservative one-unresolved-operation-per-binding rule with
+preparation/deployment work. Matching keys replay the original operation after current
+operator checks; changed inputs conflict. Run records and results commit with the
+operation/attempt/audit lease fence. A fixed simulator computes a synthetic summary;
+completion verifies its row count and arithmetic total before recording success.
+Results retain simulated lifecycle/outcome and output verification, never claiming
+actual Databricks execution. Job failure cannot change deployment history/last success.
+
+Queued cancellation updates the run and releases its reservation. Manual retry
+creates a linked operation and a new run after current checks. Lease loss first
+marks unknown and reconciles; safe replay is possible because the handler has no
+external effects. Revoked authorization during reconciliation conservatively retains
+unknown state and reservation. Operator reconciliation cannot force a result.

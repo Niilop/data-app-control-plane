@@ -7,6 +7,7 @@ from typing import Literal
 from uuid import UUID, uuid4
 
 from models.database import User
+from models.job_run_schemas import RunResult
 from models.operations import Operation, OperationAttempt, QueueProbe, WorkerHeartbeat
 from services.operation_service import audit, check_execution, release
 from services.policy_service import PolicyError
@@ -108,6 +109,10 @@ def claim(
             from services.deployment_service import observe
 
             observe(db, operation, operation.status)
+        if operation.kind == "run_simulated":
+            from services.job_run_service import observe as observe_run
+
+            observe_run(db, operation, operation.status)
         operation.worker_id = worker_id
         operation.heartbeat_at = now(db)
         operation.lease_expires_at = operation.heartbeat_at + timedelta(
@@ -198,6 +203,18 @@ def authorize(db: Session, item: Claim) -> None:
             )
 
             authorize_deployment(db, actor, operation)
+        elif operation.kind == "run_simulated":
+            from services.job_run_service import authorize_operation as authorize_run
+
+            authorize_run(db, actor, operation)
+            audit(
+                db,
+                actor,
+                operation,
+                operation.request_id,
+                "run.authorized",
+                {"worker_id": item.worker_id, "fencing_token": item.token},
+            )
         else:
             from services.delivery_service import authorize_operation
 
@@ -227,6 +244,7 @@ def finish(
     diagnostic: str | None = None,
     delivery_result: tuple[str, int, str, str] | None = None,
     deployment_resources: list[dict] | None = None,
+    run_result: "RunResult | None" = None,
 ) -> None:
     """Operation, attempt, related result, reservation and audit commit together."""
     with db.begin():
@@ -277,6 +295,24 @@ def finish(
                     if deployment_resources is None:
                         raise ValueError("Missing simulated deployment observations")
             observe(db, operation, status, deployment_resources)
+        if operation.kind == "run_simulated":
+            from services.job_run_service import authorize_operation as authorize_run
+            from services.job_run_service import observe as observe_run
+            from services.job_run_service import verify_result
+
+            actor = db.get(User, operation.requested_by)
+            assert actor is not None
+            if status == "succeeded":
+                try:
+                    authorize_run(db, actor, operation)
+                except PolicyError:
+                    status, code = "failed", "authorization_changed"
+                    run_result = None
+                else:
+                    if run_result is None or not verify_result(operation, run_result):
+                        status, code = "failed", "invalid_run_output"
+                        run_result = None
+            observe_run(db, operation, status, run_result)
         if status == "succeeded" and operation.kind in {
             "generate_bundle",
             "validate_offline",
