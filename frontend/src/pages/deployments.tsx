@@ -269,6 +269,8 @@ export function Deployments({
   canOperate: boolean;
 }) {
   const [binding, setBinding] = useState("");
+  // Capability/list refreshes can unmount controls; pending keys outlive them.
+  const [runKeys] = useState(() => new Map<string, string>());
   const path = `/api/v1/applications/${applicationId}`;
   return (
     <section className="panel">
@@ -312,7 +314,7 @@ export function Deployments({
                 <li key={row.id}>
                   <DeploymentDetails row={row} />
                   {canOperate && row.status === "succeeded" && (
-                    <RunControls deploymentId={row.id} />
+                    <RunControls deploymentId={row.id} commandKeys={runKeys} />
                   )}
                   <details>
                     <summary>Job run history</summary>

@@ -533,6 +533,14 @@ unrun external/application-database checks.
 T11 is recommended next to complete the local access-request/archive demonstration;
 T08–T10 external integrations remain separate work.
 
+**PR review follow-up (2026-09-27):** fixed loss of pending run keys when capability
+refresh unmounted the controls. Keys now persist by deployment/input in the screen
+until an acknowledged response. The regression failed against the old code, then
+all 12 browser workflows and frontend lint/format/types/build passed with the fix.
+It checks inline retries, refresh/remount retries, one recorded run, a new deliberate
+identical run and revoked controls. Backend code and migrations were unchanged;
+their earlier checks were not rerun locally for this UI-only follow-up.
+
 **Read:** JobRun model/state and T07 API/UI contracts.
 
 **Implement:** allowlisted job run operation, simulated run adapter behavior,

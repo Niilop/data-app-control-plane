@@ -79,11 +79,15 @@ export function RunHistory({ path }: { path: string }) {
   );
 }
 
-export function RunControls({ deploymentId }: { deploymentId: string }) {
+export function RunControls({
+  deploymentId,
+  commandKeys,
+}: {
+  deploymentId: string;
+  commandKeys: Map<string, string>;
+}) {
   const [open, setOpen] = useState(false);
-  // A new deliberate run gets a new intent; transport retries retain its key.
-  const [intent, setIntent] = useState(() => crypto.randomUUID());
-  const { commandKey, notify, refresh } = useData();
+  const { notify, refresh } = useData();
   return (
     <>
       <button className="button secondary" onClick={() => setOpen(true)}>
@@ -106,14 +110,18 @@ export function RunControls({ deploymentId }: { deploymentId: string }) {
                 parameters: { row_count: number(data, "row_count") },
                 scenario: text(data, "scenario"),
               };
+              const scope = `${path}:${JSON.stringify(body)}`;
+              const key = commandKeys.get(scope) ?? crypto.randomUUID();
+              commandKeys.set(scope, key);
               const result = await api<{ operation_id: string }>(path, {
                 method: "POST",
                 body,
-                key: commandKey(`${path}:${intent}:${JSON.stringify(body)}`),
+                key,
               });
+              // Only an acknowledged response starts a new deliberate run intent.
+              if (commandKeys.get(scope) === key) commandKeys.delete(scope);
               notify(`Simulated run queued. Operation: ${result.operation_id}`);
               setOpen(false);
-              setIntent(crypto.randomUUID());
               refresh();
             }}
           >

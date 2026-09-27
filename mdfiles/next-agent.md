@@ -37,6 +37,11 @@ reads use authorized DB state with existing pagination, not provider polling.
 OperationResponse now includes the T06 deployment kind as well as the new run kind,
 fixing deployment operation/history serialization. No dependencies or lock changes.
 
+PR review found that refreshing capabilities unmounted run controls and discarded
+an uncertain submission's retry intent. Pending keys now live in the deployment
+screen, scoped by deployment and input, and survive capability/list refreshes and
+control remounts. Only an acknowledged run response clears its pending key.
+
 ## Verification performed
 
 Local checks on 2026-09-27:
@@ -68,6 +73,14 @@ Local checks on 2026-09-27:
 - No real-provider work, application-database migration, or abandoned-database
   conversion was run. Hosted T07 CI is not claimed passed here; inspect the draft's
   actual checks before merging.
+- Review follow-up: the new browser regression failed against the pre-fix image
+  because refresh produced a second retry key. With pending keys hoisted into the
+  deployment screen, frontend lint/format/types/build and all **12 Chromium
+  workflows passed again** (26.5s). The regression holds the capability response
+  to prove controls unmount, then verifies one key/one run across inline retry and
+  refresh, a fresh key for a deliberate identical run, and revoked controls.
+  The final key-cleanup guard passed frontend checks and the focused workflow again.
+  Backend/PostgreSQL checks above were not rerun locally for this UI-only fix.
 
 ## Remaining work and limitations
 
@@ -84,9 +97,10 @@ Local checks on 2026-09-27:
 - Overview lists are separately refreshed paginated histories, not a single atomic
   snapshot or live provider dashboard. Approval history is evidence, not a claim
   that every old decision remains currently executable.
-- Run keys survive transport retries and dialog close/reopen on the same mounted
-  deployment screen. Leaving that screen/reloading starts new form state; inspect
-  history before repeating uncertain work. A successful submit starts a new intent
+- Run keys survive transport retries, dialog close/reopen and capability/list
+  refreshes on the same mounted deployment screen. Leaving that screen/reloading
+  starts new form state; inspect history before repeating uncertain work.
+  A successful submit starts a new intent
   so another deliberate identical run is possible.
 - Existing limitations remain: local DB/host administrators are trusted; logout
   does not revoke copied JWTs; artifacts require backups alongside the DB;

@@ -342,6 +342,8 @@ React's Deployments view offers run submission to operators and paginated per-
 deployment history to readers. Overview composes existing revision/approval,
 deployment and operation reads plus the application run list. These are separately
 refreshed recorded observations, not a provider poll or a single atomic snapshot.
-Run command keys survive transport retries and form close/reopen while the deployment
-screen stays mounted; after leaving that screen or reloading, inspect history first.
-Successful submission starts a new intent so another deliberate identical run is allowed.
+Pending run command keys are scoped by deployment and input in the deployment
+screen. They survive transport retries, form close/reopen and capability/list
+refreshes even when controls remount. An acknowledged response clears that key,
+allowing another deliberate identical run. After leaving the screen or reloading,
+inspect history before repeating uncertain work.

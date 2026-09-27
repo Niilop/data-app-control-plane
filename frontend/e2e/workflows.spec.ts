@@ -860,7 +860,7 @@ test("simulated job success, failure, lost response and recorded dashboard", asy
       if (route.request().method() !== "POST") return route.continue();
       keys.push(route.request().headers()["idempotency-key"]);
       const response = await route.fetch();
-      if (keys.length === 1) await route.abort("failed");
+      if (keys.length <= 2) await route.abort("failed");
       else await route.fulfill({ response });
     },
   );
@@ -869,15 +869,60 @@ test("simulated job success, failure, lost response and recorded dashboard", asy
     "Unable to reach the API",
   );
   await dialog.getByRole("button", { name: "Queue simulated run" }).click();
-  await expect(dialog).not.toBeVisible();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "Unable to reach the API",
+  );
   expect(keys).toHaveLength(2);
   expect(keys[0]).toBe(keys[1]);
-  await page.unroute(`**/api/v1/deployments/${deployment.id}/runs`);
   const runsPath = `/api/v1/deployments/${deployment.id}/runs`;
   await expect
     .poll(async () => (await request(page, runsPath)).items[0]?.status)
     .toBe("succeeded");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  // Hold the capability refresh so the controls definitely unmount before retry.
+  let releaseCapabilities!: () => void;
+  const capabilitiesHeld = new Promise<void>((resolve) => {
+    releaseCapabilities = resolve;
+  });
+  const capabilitiesPath = `**/api/v1/applications/${app.id}/capabilities`;
+  await page.route(capabilitiesPath, async (route) => {
+    const response = await route.fetch();
+    await capabilitiesHeld;
+    await route.fulfill({ response });
+  });
+  const capabilitiesReloaded = page.waitForResponse((response) =>
+    response.url().endsWith(`/applications/${app.id}/capabilities`),
+  );
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Run simulated job", exact: true }),
+  ).toHaveCount(0);
+  releaseCapabilities();
+  await capabilitiesReloaded;
+  await page.unroute(capabilitiesPath);
+  await page
+    .getByRole("button", { name: "Run simulated job", exact: true })
+    .click();
+  await dialog.getByLabel("Synthetic row count").fill("7");
+  await dialog.getByRole("button", { name: "Queue simulated run" }).click();
+  await expect(dialog).not.toBeVisible();
+  expect(keys).toHaveLength(3);
+  expect(new Set(keys).size).toBe(1);
   expect((await request(page, runsPath)).items).toHaveLength(1);
+  // An acknowledged command permits another deliberate run with identical input.
+  await page
+    .getByRole("button", { name: "Run simulated job", exact: true })
+    .click();
+  await dialog.getByLabel("Synthetic row count").fill("7");
+  await dialog.getByRole("button", { name: "Queue simulated run" }).click();
+  await expect(dialog).not.toBeVisible();
+  expect(keys).toHaveLength(4);
+  expect(keys[3]).not.toBe(keys[0]);
+  await page.unroute(`**/api/v1/deployments/${deployment.id}/runs`);
+  await expect
+    .poll(async () => (await request(page, runsPath)).items[1]?.status)
+    .toBe("succeeded");
+  expect((await request(page, runsPath)).items).toHaveLength(2);
   await page
     .getByRole("button", { name: "Run simulated job", exact: true })
     .click();
@@ -885,7 +930,7 @@ test("simulated job success, failure, lost response and recorded dashboard", asy
   await dialog.getByRole("button", { name: "Queue simulated run" }).click();
   await expect(dialog).not.toBeVisible();
   await expect
-    .poll(async () => (await request(page, runsPath)).items[1]?.status)
+    .poll(async () => (await request(page, runsPath)).items[2]?.status)
     .toBe("failed");
   expect(
     (await request(page, `/api/v1/deployments/${deployment.id}`)).status,
@@ -893,7 +938,7 @@ test("simulated job success, failure, lost response and recorded dashboard", asy
   await page.getByRole("tab", { name: "Overview", exact: true }).click();
   await expect(
     page.getByText("Simulated output: 7 rows, total 21.", { exact: false }),
-  ).toBeVisible();
+  ).toHaveCount(2);
   await expect(
     page.getByText("The simulated job failed. Deployment status is unchanged."),
   ).toBeVisible();
@@ -936,6 +981,8 @@ test("simulated job success, failure, lost response and recorded dashboard", asy
   ).toHaveCount(0);
   await page.getByText("Job run history", { exact: true }).click();
   await expect(
-    page.getByText("Simulated output: 7 rows, total 21.", { exact: false }),
+    page
+      .getByText("Simulated output: 7 rows, total 21.", { exact: false })
+      .first(),
   ).toBeVisible();
 });

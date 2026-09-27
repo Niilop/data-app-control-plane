@@ -407,6 +407,8 @@ unknown outcomes retain the binding reservation. Each binding permits one unreso
 operation, including runs. These results demonstrate simulation only, with no real
 provider run ID, source execution, compute, scheduler or external data access.
 
-A transport retry in the same run form reuses its command key; after success a
-new deliberate run gets a new key. After leaving the deployment screen or reloading,
-inspect run history before resubmitting an uncertain request.
+A transport retry with the same inputs reuses its pending command key, including
+after closing the form and refreshing capabilities or deployment history. An
+acknowledged response clears the key so a new deliberate run gets a new key.
+After leaving the deployment screen or reloading, inspect run history before
+resubmitting an uncertain request.
