@@ -7,9 +7,10 @@ scope, architecture, contracts, and bounded agent tasks.
 The platform provides development login, an owned application registry, team and
 role administration, transactional audit, and a React + TypeScript interface,
 plus admin-managed simulated environments and application bindings.
-A separate durable worker runs explicit simulated probes with operation history
-and recovery controls. Bundle generation, GitHub integration and Databricks
-deployment remain planned work.
+A separate durable worker runs offline bundle preparation and explicitly simulated
+deployments with exact-scope approvals, operation history and recovery controls.
+React supports generation, validation, approval, simulated deployment history and
+per-binding last success. Real GitHub/Databricks integration remains planned work.
 The old AI chat, RAG, LLM, and model-inference features have been removed.
 
 ## Local setup
@@ -239,8 +240,8 @@ and are not mounted by the platform API. The registry is under `/api/v1`; see
 ```bash
 uv run --locked pytest -q
 uv run --locked mypy
-uv run --locked ruff check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/alembic/versions/008_prepared_revisions.py backend/services/delivery_service.py backend/services/template_service.py backend/integrations/artifact_store.py backend/api/endpoints/delivery.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
-uv run --locked ruff format --check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/alembic/versions/008_prepared_revisions.py backend/services/delivery_service.py backend/services/template_service.py backend/integrations/artifact_store.py backend/api/endpoints/delivery.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
+uv run --locked ruff check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/alembic/versions/008_prepared_revisions.py backend/services/deployment_service.py backend/api/endpoints/deployments.py backend/integrations/simulated_deployment.py backend/alembic/versions/009_simulated_deployments.py backend/services/delivery_service.py backend/services/template_service.py backend/integrations/artifact_store.py backend/api/endpoints/delivery.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
+uv run --locked ruff format --check backend/core/config.py backend/core/database.py backend/main.py backend/models backend/api/dependencies.py backend/api/browser_session.py backend/api/platform_errors.py backend/api/endpoints/auth.py backend/api/endpoints/applications.py backend/api/endpoints/teams.py backend/services/auth_service.py backend/services/application_service.py backend/services/policy_service.py backend/services/audit_service.py backend/services/pagination.py backend/bootstrap.py backend/seed_sandbox.py backend/services/operation_service.py backend/services/queue_service.py backend/api/endpoints/operations.py backend/worker.py backend/queue_probe.py backend/alembic/versions/007_durable_operations.py backend/alembic/versions/008_prepared_revisions.py backend/services/deployment_service.py backend/api/endpoints/deployments.py backend/integrations/simulated_deployment.py backend/alembic/versions/009_simulated_deployments.py backend/services/delivery_service.py backend/services/template_service.py backend/integrations/artifact_store.py backend/api/endpoints/delivery.py backend/services/environment_service.py backend/api/endpoints/environments.py backend/alembic/env.py backend/alembic/legacy_models.py backend/alembic/versions/005_owned_applications.py backend/alembic/versions/006_environment_bindings.py tests/browser_server.py tests/conftest.py tests/unit tests/integration
 ```
 
 Unit tests (`tests/unit`, the default `testpaths`) block network calls. Startup and
@@ -338,7 +339,8 @@ not a generated application, deployment, or proof of external connectivity.
 
 From an isolated database at the merged 007 baseline, run the usual explicit
 `uv run --locked alembic upgrade head` from `backend/`. This adds
-`008_prepared_revisions`; it does not alter earlier migrations or account data.
+`008_prepared_revisions` and `009_simulated_deployments`; neither alters earlier
+migrations or account data.
 A database from the abandoned T05 branch at `008_bundle_generation` is a different
 history: do not stamp it or run these migrations against it. Preserve it and use a
 separate database, or prepare a reviewed data-preserving conversion first.
@@ -359,3 +361,28 @@ Check the bundled project's own lock/tests separately:
 ```bash
 uv run --locked python scripts/check_generated_project.py
 ```
+
+### Approve and simulate deployment (T06)
+
+Use a separate database with the merged migration chain through
+`009_simulated_deployments`. Do not run startup migrations against the abandoned
+`008_bundle_generation` database. Keep `DEPLOYMENT_EXECUTOR=simulated` explicit.
+
+In **Preparation → View revision**, validate offline, then review the complete
+approval scope beside a passed report. An assigned approver records a reason and
+decision. Local self-approval requires an administrator-enabled environment policy
+**before preparation** and the explicit acknowledgement checkbox. Changing policy
+later invalidates the captured revision; generate/capture/validate again.
+
+A user holding both developer and operator can submit a **simulated deployment**
+from an approved decision. Choose simulated success or simulated partial failure.
+The server/worker recheck all roles, actors, policy versions and approval evidence;
+a newer decision for the same exact scope supersedes an older decision. Refresh
+**Deployments** for history and select a binding for last success. Partial failure
+preserves simulated resource observations and any previous successful deployment.
+**Operations** provides status, attempts, cancellation and permitted recovery.
+
+Every result remains labelled simulated. No provider resources are created and no
+data job runs. Command keys survive transport retries within the signed-in browser
+workspace; after reload inspect history before deliberately repeating work. Approval
+decisions are synchronous and not command-keyed; inspect history after response loss.

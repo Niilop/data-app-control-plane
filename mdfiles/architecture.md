@@ -177,3 +177,22 @@ store before completion. Crashes may leave unreferenced bytes but cannot expose 
 uncommitted generation through the API. Safe local reconciliation schedules retry;
 unknown simulated probe semantics remain unchanged. No subprocess or network calls
 occur in either preparation handler. API and worker mount the same ARTIFACT_DIR.
+
+## T06 simulated approval and execution
+
+`deployment_service.py` owns exact approval decisions, current-policy checks and
+submission; it reuses preparation enqueue and the existing command/reservation
+records. `integrations/simulated_deployment.py` is a closed, pure local executor.
+It returns deterministic simulated observations without database, filesystem,
+subprocess or network effects. The worker dispatches it explicitly and commits
+observations with deployment/operation/attempt/audit under the current lease fence.
+No FastAPI BackgroundTasks, broker, second worker or provider adapter was introduced.
+
+Approval supersession and deployment commands serialize with environment policy
+changes. Successful completion rechecks scope and roles, then atomically records
+success and activates the application if registered. Partial failure and failed
+completion authorization retain observations without claiming success. Last-success
+reads filter the recorded history; there is no overwriteable latest-attempt pointer.
+A lost simulation lease is reconciled before safe retry; the generic conservative
+unknown/revoked reconciliation path keeps its reservation. This is a local workflow
+guarantee, not organization-enforced approval or exactly-once external deployment.

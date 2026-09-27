@@ -1,6 +1,6 @@
 # API contracts
 
-Status: T02/T03 registry and T04 operation endpoints are implemented; later task rows remain planned. Existing `/auth/*` remains the development login
+Status: T02–T06 registry, operations, preparation, approvals and simulated deployment endpoints are implemented; later task rows remain planned. Existing `/auth/*` remains the development login
 surface initially. Implement endpoints with their tasks; this document does not
 claim they exist. Keep services usable by API and worker without importing routers.
 
@@ -176,7 +176,7 @@ Authorization: Bearer <development session>
 Idempotency-Key: <client-generated UUID>
 Content-Type: application/json
 
-{"revision_id":"<revision UUID>","binding_id":"<binding UUID>"}
+{"revision_id":"<revision UUID>","binding_id":"<binding UUID>","approval_id":"<approval UUID>","execution_mode":"simulated"}
 ```
 
 Server resolves the immutable source, approval, target, and executor. Clients
@@ -278,4 +278,38 @@ creation makes another immutable record. Inaccessible revisions/artifacts are 40
 Validation POST accepts exactly `scope=offline` with Idempotency-Key and developer
 permission. `GET /revisions/{id}/validations` is a paginated supporting read of
 append-only results and report digests. Reports explicitly state no workspace
-validation or code execution occurred. T06 approvals/deployments remain absent.
+validation or code execution occurred. T06 consumes an explicit passed report as described below.
+
+## T06 concrete approval/deployment API
+
+- `GET /revisions/{id}/approval-scope?validation_id=<uuid>` returns `scope_digest`
+  and the complete canonical evidence object. Application readers may inspect it.
+- `POST /revisions/{id}/approvals` accepts `validation_id`, exact `scope_digest`,
+  `decision=approved|rejected`, bounded `reason`, and
+  `acknowledge_local_self_approval` (default false). Returns 201 and immutable
+  decision/evidence. Approver required. This synchronous decision has no command-key
+  contract; after a lost response inspect history before recording another decision.
+- `GET /revisions/{id}/approvals` returns paginated visible decisions. A later
+  decision supersedes older decisions only for the same scope digest.
+- `POST /applications/{id}/deployments` requires Idempotency-Key and both developer
+  and operator. Body: `revision_id`, `binding_id`, `approval_id`,
+  `execution_mode=simulated`, optional `scenario=success|partial_failure` (success
+  by default). No real mode, external parameters, secrets or arbitrary payloads.
+  Returns the existing 202 operation envelope and Location. Matching replay returns
+  the original operation, even terminal; a different payload with that key is 409.
+- `GET /applications/{id}/deployments` and `GET /deployments/{id}` return recorded
+  status, revision/binding/approval/operation IDs, requester, simulated mode/executor,
+  scenario, resource observations and `last_observed_at`. Source/target details are
+  available through the referenced immutable revision/approval, not live providers.
+- `GET /applications/{id}/bindings/{binding_id}/last-success` returns the last
+  successful deployment for that binding, or null. Application visibility is required.
+- Existing operation cancel/retry/reconcile endpoints apply; retry creates a new
+  deployment/operation after all current approval and permission checks.
+- Capabilities adds `approve` and `deploy`; UI affordances never bypass service policy.
+
+Scope/report/binding changes return 409; absent action roles or disallowed
+self-approval return 403; inaccessible records return 404. A newer exact-scope
+approval decision returns `approval_superseded` for an older selected approval.
+Worker rejection records a sanitized `authorization_changed` diagnostic. Submission,
+observations and recovery remain transactional and audited. All deployment records
+and accepted commands visibly identify simulated execution.

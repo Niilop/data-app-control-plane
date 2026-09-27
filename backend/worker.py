@@ -76,6 +76,7 @@ def run_one(
     diagnostic: str | None
     outcome: Outcome
     delivery_result: tuple[str, int, str, str] | None = None
+    deployment_resources: list[dict] | None = None
     try:
         with sessions() as db:
             if heartbeat(db, item, lease_seconds):
@@ -98,6 +99,24 @@ def run_one(
                 digest = store().put(content)
                 delivery_result = (digest, len(content), media_type, verdict)
                 outcome, diagnostic = "succeeded", None
+        elif item.kind == "deploy_simulated":
+            from integrations.simulated_deployment import execute as simulate
+            from models.deployment_schemas import DeploymentInput
+
+            if cancelled.is_set():
+                outcome, diagnostic = "cancelled", None
+            elif item.phase == "reconcile":
+                # Simulation has no effects outside the fenced DB transaction.
+                outcome, diagnostic = "safe_to_retry", None
+            else:
+                data = DeploymentInput.model_validate(
+                    {k: v for k, v in item.payload.items() if k != "schema_version"}
+                )
+                verdict, deployment_resources = simulate(item.operation_id, data)
+                outcome = "succeeded" if verdict == "succeeded" else "failed"
+                diagnostic = (
+                    "simulated_partial_failure" if outcome == "failed" else None
+                )
         elif item.kind != "queue_probe":
             outcome = "failed"
             diagnostic = "unsupported_handler"
@@ -131,6 +150,7 @@ def run_one(
                     outcome,
                     diagnostic=diagnostic,
                     delivery_result=delivery_result,
+                    deployment_resources=deployment_resources,
                 )
         except LostLease:
             pass

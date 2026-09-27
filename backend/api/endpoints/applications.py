@@ -76,6 +76,8 @@ def capabilities(application_id: UUID, db: DB, actor: Actor) -> dict[str, bool]:
         or application.owner_user_id == actor.id,
         "manage_bindings": actor.is_platform_admin,
         "operate": "operator" in roles,
+        "approve": "approver" in roles,
+        "deploy": {"developer", "operator"}.issubset(roles),
     }
 
 

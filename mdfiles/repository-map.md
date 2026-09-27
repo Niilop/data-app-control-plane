@@ -1,13 +1,13 @@
 # Repository map
 
-Updated for T05 on 2026-09-14. Paths below are current unless labelled proposed. Recheck
+Updated for T06 on 2026-09-20. Paths below are current unless labelled proposed. Recheck
 affected files before editing; avoid a full repository crawl for each task.
 
 ## Current implementation
 
 | Path | Responsibility / relevant limitation |
 |---|---|
-| `backend/main.py` | FastAPI assembly; auth/system and T02/T03 registry and T04 operation and T05 preparation routes, request IDs and safe error handlers; no AI routes |
+| `backend/main.py` | FastAPI assembly; auth/system and T02/T03 registry and T04 operation and T05 preparation/T06 simulated deployment routes, request IDs and safe error handlers; no AI routes |
 | `backend/core/config.py` | Cached settings; explicit simulated executor, local-only profile gate, DB/auth settings, sanitized validation errors and SQL debug off |
 | `backend/core/database.py` | Synchronous engine/session and typed DeclarativeBase; settings constructed on import |
 | `backend/core/logging.py` | Basic Python logging, no structured audit/correlation |
@@ -82,7 +82,7 @@ Keep the existing import layout initially; a package-wide rename is outside T01.
 | Path | Planned content |
 |---|---|
 | `backend/api/endpoints/revisions.py`, `access.py` | Workflow endpoints |
-| `backend/services/deployment_service.py`, `access_service.py` | Workflow logic |
+| `backend/services/access_service.py` | Future access-request workflow logic |
 | `backend/workers/` | Split handlers here when future tasks need them |
 | `backend/integrations/` | Only implemented simulation, artifact, GitHub, Databricks adapters |
 | `templates/python-batch/` | Versioned generated-project assets and tests |
@@ -139,3 +139,16 @@ main resolves the earlier local-only instruction and ignore-file uncertainty.
 | `frontend/src/pages/preparation.tsx` | Generation, capture, downloads and offline report UI |
 | `scripts/check_generated_project.py` | Disposable offline lock installation and generated stdlib tests |
 | `tests/unit/test_delivery.py`, `tests/integration/test_delivery.py` | Integrity, policy, failure, fencing, concurrent publication and immutable SQL |
+
+### T06 approval and simulated deployment
+
+| Path | Responsibility |
+|---|---|
+| `backend/models/deployment.py`, `deployment_schemas.py` | Immutable approval evidence and closed simulated deployment records/inputs |
+| `backend/alembic/versions/009_simulated_deployments.py` | Add approval/deployment tables and approval immutability; preserve 001–008 |
+| `backend/services/deployment_service.py` | Scope hash, approval/supersession, self-approval, current policy, transactional submission and observations |
+| `backend/api/endpoints/deployments.py` | Scope/approval/deployment endpoints, visibility and per-binding last success |
+| `backend/integrations/simulated_deployment.py` | Pure explicit success/partial-failure simulation, no external effects |
+| `backend/services/queue_service.py`, `operation_service.py`, `backend/worker.py` | Deployment dispatch, leases/fencing, audit, cancellation and recovery |
+| `frontend/src/pages/deployments.tsx`, `preparation.tsx` | Exact-scope approval, simulated submission, history and last-success UI |
+| `tests/unit/test_deployments.py`, `tests/integration/test_deployments.py` | Scope/role/policy changes, atomicity, partial failure, concurrent commands and fencing |

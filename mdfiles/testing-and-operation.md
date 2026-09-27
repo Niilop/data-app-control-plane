@@ -294,3 +294,20 @@ Chromium workflows and isolated production nginx smoke passed. Mypy passed for
 See next-agent.md for final changes, current checks and limitations. Existing live
 application DB migration/startup were deliberately not performed: the abandoned
 T05 branch used a different migration history.
+
+## T06 verification
+
+Local 2026-09-20: 169 offline tests passed (22 deployment cases); 20 isolated
+PostgreSQL tests passed with no skips; 3 deployment PostgreSQL cases passed again
+after the final approval decision rule. These cover exact scope/report matching,
+permission and policy changes, revocation during a policy-lock wait, self-approval,
+idempotency, atomic audit rollback, reservation conflicts, stale leases, recovery
+and partial failure preserving success. PostgreSQL uses a disposable container and
+per-test schemas; the abandoned 008_bundle_generation application DB is untouched.
+
+Mypy passed 39 modules; CI-scoped Ruff passed 66 files. Generated-project offline
+installation and 2 tests passed. Locked frontend lint/format/types/build, 11 Chromium
+workflows, production frontend build and isolated nginx smoke passed. Screenshots
+were inspected at desktop and 390px. Browser fixtures now process preparation and
+simulated deployment kinds, retaining the existing probe fixtures. See next-agent.md
+for final follow-ups, current CI status and deliberate unrun external checks.

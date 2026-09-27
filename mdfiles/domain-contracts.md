@@ -1,6 +1,6 @@
 # Domain and workflow contracts
 
-Status: T02/T03 registry entities and permissions implemented; later task entities remain proposed. Introduce entities in their owning task,
+Status: T02–T06 registry, queue, preparation, approval and simulated deployment entities are implemented; later task entities remain proposed. Introduce entities in their owning task,
 not all at once. New entities use UUIDs, timezone-aware UTC timestamps, explicit
 foreign keys, and database constraints for uniqueness. Historical AI tables remain migration-only metadata after T01a; no runtime AI
 features are retained. Existing user IDs may remain
@@ -226,3 +226,42 @@ reports. Validation reports are append-only and bind an exact revision with
 `scope=offline`, validator `static-v1`, passed/failed result, report digest and time.
 A successfully completed validation operation may produce a failed check report;
 operation success is completion of the check, not workspace or deployment success.
+
+## T06 implemented approval and simulated deployment
+
+`Approval` is append-only in the ORM and PostgreSQL. Its canonical SHA-256 scope
+contains the application/revision IDs, generated source kind, artifact digest,
+template ID/content digest, configuration/digest, complete binding/environment
+snapshot (including target, workspace, versions and self-approval policy), simulated
+mode/executor, policy version `local-simulation-v1`, and the exact passed offline
+report ID/digest/validator/result. Failed or unrelated reports cannot be approved.
+A newer decision for the **same scope digest** supersedes earlier decisions for
+execution. A new validation report is a different scope and does not silently
+rewrite an approval. Rejection cannot itself authorize a deployment.
+
+Approval requires an active approver role; admin/owner alone is insufficient.
+An approver matching the revision requester or deployment submitter is permitted
+only by an explicitly enabled local environment policy and an acknowledged approval.
+The policy and acknowledgement are stored, and the approval/submission audit records
+self-approval context. Independence is checked again for retries by another actor.
+
+Submission requires both developer and operator, explicit `execution_mode=simulated`,
+revision/binding/approval IDs and an idempotency key. The worker rechecks active
+requester and approver, current roles, application lifecycle, complete binding policy,
+active template and exact latest approval before execution and before successful
+completion. Eligibility is refreshed after waiting on the environment lock.
+
+Deployment records are distinct from operations. One operation owns one deployment;
+manual retry creates both anew and links `retry_of`. Queued cancellation updates the
+deployment atomically. Claim/reconciliation maps to deploying/unknown; terminal
+state, resource observations, reservation release and audit share the lease fence.
+The closed `success`/`partial_failure` scenarios are explicitly simulation-only.
+Partial failure records a simulated created resource, never a real external ID.
+Reconciliation can safely repeat this handler because it has no external effects;
+revoked authorization during reconciliation retains the existing conservative
+needs-attention/reservation behavior. No operator override can force success.
+
+Last success is queried independently per binding from successful deployment history,
+ordered by observation time and ID. Later failures never erase it. First success
+activates a registered application with an atomic version increment; deployment
+success does not claim that a data job ran. T07 run records remain absent.

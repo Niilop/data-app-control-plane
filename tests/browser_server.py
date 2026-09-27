@@ -74,6 +74,8 @@ def run() -> None:
                 "generations",
                 "deployment_revisions",
                 "validation_results",
+                "approvals",
+                "deployments",
             }
         ]
         Base.metadata.create_all(engine, tables=tables)
@@ -213,7 +215,7 @@ def run() -> None:
                 run_one(
                     sessionmaker(engine),
                     "browser-preparation",
-                    kinds=("generate_bundle", "validate_offline"),
+                    kinds=("generate_bundle", "validate_offline", "deploy_simulated"),
                 )
 
         thread = Thread(target=prepare_work, daemon=True)
