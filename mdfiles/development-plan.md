@@ -631,8 +631,8 @@ while the real execution gate remains pending; state both explicitly.
 
 ## T11 — Platform access requests, revocation, and archive
 
-**Status:** implemented in draft PR #16; audit-privacy review finding fixed,
-pending updated CI/review and user merge. Initial implementation CI passed.
+**Status:** implemented in draft PR #16; audit-privacy review finding fixed and
+verified by hosted CI. Pending review and user merge.
 **Depends on:** T07, merged. Implemented on 2026-10-17; precedes T08.
 
 **Delivered:** migration `011_platform_access` adds own-access request history,
@@ -655,28 +655,17 @@ transfer and archived history. Added a PostgreSQL JSON-filter/pagination test.
 
 **Review-fix verification:** 217 offline tests passed, changed-file Ruff lint/format
 and mypy (48 modules) passed. Six access integration cases skipped locally because
-TEST_DATABASE_URL is unset; PostgreSQL execution awaits hosted CI. Frontend,
+TEST_DATABASE_URL is unset; hosted CI below ran all PostgreSQL tests. Frontend,
 generated-project and container checks were not rerun locally for this backend fix.
 
-**Initial verification:** 213 offline tests (23 new access/archive cases), CI-scoped Ruff
-over 81 files, mypy over 48 modules, generated project offline installation/2 tests,
-frontend lint/format/types/build and all 13 Chromium workflows passed locally.
-All 28 PostgreSQL tests were skipped locally because TEST_DATABASE_URL is unset;
-Docker/production nginx checks were unavailable. See next-agent.md for exact
-evidence and hosted CI status. Offline tests cover request privacy, decisions,
-rollback, all effective grant revocation, queued worker denial, archive conflicts
-and history/artifact preservation. PostgreSQL tests cover competing requests and
-decisions, both archive/submission orderings, changed ownership during a lock wait,
-upgrade preservation and downgrade refusal. Browser coverage follows an outsider
-request through approval, retained team access, final revocation and archive.
-
-Hosted [Platform CI run 39032600688](https://github.com/Niilop/data-app-control-plane/actions/runs/39032600688)
-passed at implementation commit `10ed3c2`: actual logs report **213 offline tests,
-28 PostgreSQL tests with no skips, 13 Chromium workflows**, locked browser and
-production frontend builds, and production nginx routing/CSP/session/write/readiness/
-logout smoke all passed. Handoff checks passed. This run predates the audit-privacy
-fix; inspect [PR #16 checks](https://github.com/Niilop/data-app-control-plane/pull/16/checks)
-for verification of the latest head.
+Hosted [Platform CI run 39034899377](https://github.com/Niilop/data-app-control-plane/actions/runs/39034899377)
+passed at fix commit `82dfc9c`: **217 offline tests, 29 PostgreSQL tests with no
+skips, 13 Chromium workflows**, CI-scoped Ruff (81 files), mypy (48 modules),
+generated-project locked offline installation/tests, frontend checks/builds and
+production nginx smoke all passed. PostgreSQL includes the new audit JSON-filter/
+pagination regression plus existing grant races, archive/submission ordering,
+ownership changes and migration/history preservation. Handoff checks passed.
+The follow-up verification update changes documentation only.
 
 **Next:** review T11 and its real CI results; user merge only. After merge and a
 separate assignment, T08 is the next bounded implementation task. External

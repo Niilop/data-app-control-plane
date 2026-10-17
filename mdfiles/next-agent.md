@@ -58,56 +58,37 @@ Audit-privacy review-fix checks on 2026-10-17:
   `uv run --locked mypy`: **48 modules passed**.
 - `uv run --locked pytest tests/integration/test_access.py -q`: **6 skipped**
   because TEST_DATABASE_URL is unset, including the new PostgreSQL JSON-filter/
-  pagination case. This is collection evidence only; inspect
-  [PR #16 checks](https://github.com/Niilop/data-app-control-plane/pull/16/checks)
-  for hosted results on the fix. No developer database was touched.
+  pagination case. This is collection evidence only; hosted execution passed below.
+  No developer database was touched.
 - Frontend, generated-project and container checks were not rerun locally for
-  this backend-only fix. Initial T11 evidence below predates the fix.
-
-Initial T11 local checks on 2026-10-17:
-
-- `uv run --locked pytest -q`: **213 passed**, including **23 access/archive cases**.
-  Covers privacy/pagination, strict inputs, approval/self-escalation/replay,
-  withdrawal/rejection, inactive subjects, transactional failure, retained team
-  grants, complete revocation with worker denial, archive conflicts and preservation
-  of recorded delivery/run results and downloadable artifacts.
-- CI-scoped `ruff check` and `ruff format --check`: **81 files passed**.
-  `uv run --locked mypy`: **48 modules passed**.
-- `uv run --locked python scripts/check_generated_project.py`: locked offline
-  installation and **2 generated stdlib tests passed**.
-- `uv run --locked pytest tests/integration -q`: **28 skipped** because
-  TEST_DATABASE_URL is unset. This is collection/skip evidence only. The five new
-  PostgreSQL tests cover concurrent duplicate requests/decisions, both orderings
-  of archive versus submission, changed ownership during a lock wait, migration
-  preservation, pending uniqueness and refusal to downgrade with request history.
-- Frontend lint, Prettier, TypeScript and production build passed using existing
-  local Node 24.21.0/npm dependencies. All **13 Chromium workflows passed** (46.3s),
-  including request/decision, retained team access, final revocation, stale and
-  unresolved archive rejection, preserved audit and mobile overflow checks.
-  Desktop retained-access and mobile archived-history screenshots were inspected.
+  this backend-only fix; hosted CI reran those gates. Initial T11 local frontend
+  checks and all 13 Chromium workflows passed, with desktop/mobile screenshots
+  inspected before the review fix.
 - Python commands required execution outside the sandbox for uv cache locks.
   Tests used disposable SQLite data; no developer database was migrated. No global
   installation, real-provider work or infrastructure activation occurred.
 - Docker's WSL launcher reports unavailable integration and ~/code/devstack is
   absent. Local PostgreSQL, container builds and production nginx smoke were not
   run in this session; hosted evidence below covers those isolated CI gates.
+- The local handoff checker and `git diff --check` passed.
 
-Hosted verification at implementation commit `10ed3c29894d0885dcaf79b941e6619ecace330f`:
-[Platform CI run 39032600688](https://github.com/Niilop/data-app-control-plane/actions/runs/39032600688)
-passed all three jobs. Actual logs show **213 offline tests passed** (34.88s),
-**28 PostgreSQL tests passed, no skips** (15.29s), and **13 Chromium workflows
-passed** (51.8s). Ruff, mypy and the generated-project check passed. Locked browser
-and production frontend images built; isolated production nginx smoke passed
-routing, CSP, cookie login/reload, authenticated write, readiness and logout.
-The handoff workflow and local handoff checker passed. This hosted run predates
-the audit-privacy fix; it is not verification of the latest application code.
+Hosted verification at fix commit `82dfc9c8d71125308490b0180cc7152a1f6c7324`:
+[Platform CI run 39034899377](https://github.com/Niilop/data-app-control-plane/actions/runs/39034899377)
+passed all three jobs. Actual logs show **217 offline tests passed** (25.89s),
+**29 PostgreSQL tests passed, no skips** (16.57s), and **13 Chromium workflows
+passed** (44.6s). The new PostgreSQL audit-filter/pagination regression ran.
+Ruff lint/format (81 files), mypy (48 modules) and generated-project locked offline
+installation/tests passed. Frontend lint/format/types/build passed; locked browser
+and production frontend images built. Production nginx smoke passed routing, CSP,
+cookie login/reload, authenticated write, readiness and logout. The handoff workflow
+passed. The subsequent evidence update changes documentation only; application
+code is unchanged from this verified commit.
 
 ## Remaining work and limitations
 
-- Review T11, ADR-020, the audit-privacy fix and the latest draft checks. Initial
-  hosted PostgreSQL tests passed; the new filter test requires updated hosted
-  evidence. No developer database was migrated. Only the user merges. Execution remains
-  explicitly local simulation.
+- Review T11, ADR-020, the audit-privacy fix and the latest draft checks. Hosted
+  PostgreSQL tests include the new filter regression and passed. No developer
+  database was migrated. Only the user merges. Execution remains local simulation.
 - The abandoned T05 database reportedly uses `008_bundle_generation`, while main
   uses `008_prepared_revisions`. Do not stamp/reset/automatically migrate it.
   Preserve its data, abandoned branch and stash; conversion needs separate,
