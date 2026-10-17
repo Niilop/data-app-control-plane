@@ -418,3 +418,36 @@ checks acquire environment locks before the application lock, then recheck curre
 actor/lifecycle/roles. Archive only reads operation/reservation state, avoiding the
 opposite lock order. This serializes new work with archive without changing the
 existing durable queue, reservation or lease/fencing contracts.
+
+## ADR-021 — Pinned source capture and read-only GitHub CI observations
+
+**T08, 2026-10-17; proposed with implementation.** Add explicitly enabled GitHub
+reads while retaining simulated deployment. Use exact administrator-allowed repository
+names and a worker-only optional read token. Reuse operation reservations, policy
+locks, idempotency, attempts and leases; no additional queue/runtime dependencies.
+
+Persist repository ID and resolved commit before archive download under a current
+lease fence. Automatic and manual retries preserve that pin; only a new capture
+follows a moving reference. Snapshot template/binding/repository/root, recheck current
+developer policy before provider work and completion, and publish capture/artifact/
+verification time with operation/audit atomically. Read-only recovery is safely
+repeatable without ambiguous external side effects. Source pins, completed source
+and CI history have database immutability guards; downgrade refuses history loss.
+
+Adopt only bounded compatible v1 Python batch bundles. Inspect ZIP entries and
+Python/TOML/manifest structure in memory; never run repository code or hooks in the
+worker. Adopted bytes may differ from generated ones; exact artifact digest and
+capture reference distinguish provenance. YAML/workspace semantic validation remains
+a separate gate. Immutable generated templates and migration history are preserved.
+
+CI refresh reads exact-commit workflow runs with bounded pagination, sanitized
+diagnostics and durable backoff. Observations append rather than overwrite, including
+run attempts and observation times. They are informational and do not grant approval.
+Zero-run refresh is a successful observation command with an audited count, not CI
+success. Page reads use DB state only; no source/CI webhooks or dispatch in this task.
+
+Provide a separately reviewed CI overlay with a locked tool environment and pinned
+actions. The immutable v1 template has package=false and a legacy import layout;
+document the one-time import-format change and build a temporary package copy. Do
+not silently rewrite existing repositories or template digests. Real application
+CI and provider activation require separate authorization; T09 remains separate.

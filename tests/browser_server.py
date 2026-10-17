@@ -77,6 +77,8 @@ def run() -> None:
                 "approvals",
                 "deployments",
                 "job_runs",
+                "source_captures",
+                "ci_runs",
                 "access_requests",
             }
         ]
@@ -208,7 +210,65 @@ def run() -> None:
                     assert run_one(sessionmaker(engine), str(uuid4()))
                     if scenario == "unknown":
                         assert run_one(sessionmaker(engine), str(uuid4()))
+        # Scripted read-only provider for the dedicated browser adoption fixture.
+        # Production configuration never selects this adapter.
+        import io
+        import zipfile
         from threading import Event, Thread
+
+        from integrations.github import GitHubError
+        from models.source import SourceCapture
+        from services import source_service
+        from services.template_service import render, unpack
+        from sqlalchemy import select
+
+        class BrowserGitHub:
+            def __init__(self, repository: str, token: str | None = None) -> None:
+                assert repository == "example/github-browser"
+
+            def resolve(self, ref: str) -> tuple[int, str]:
+                if ref == "missing":
+                    raise GitHubError("github_not_found")
+                return 42, "a" * 40
+
+            def verify_repository(self, repository_id: int) -> None:
+                assert repository_id == 42
+
+            def archive(self, commit: str) -> bytes:
+                with Session(engine) as db:
+                    source = db.scalar(
+                        select(SourceCapture).where(SourceCapture.commit_sha == commit)
+                    )
+                    assert source is not None
+                    captured = source.binding_snapshot
+                content = render(
+                    "github-browser",
+                    captured["bundle_target"],
+                    captured["config"],
+                    TemplateParameters(),
+                )
+                buffer = io.BytesIO()
+                with zipfile.ZipFile(buffer, "w") as archive:
+                    for name, data in unpack(content).items():
+                        archive.writestr("github-root/" + name, data)
+                return buffer.getvalue()
+
+            def runs(self, repository_id: int, commit: str) -> list[dict]:
+                return [
+                    {
+                        "run_id": 12,
+                        "run_attempt": 2,
+                        "workflow_id": 4,
+                        "status": "completed",
+                        "conclusion": "failure",
+                        "event": "push",
+                        "url": "https://github.com/example/github-browser/actions/runs/12/attempts/2",
+                    }
+                ]
+
+        source_service.GitHub = BrowserGitHub
+        get_settings().github_reads_enabled = True
+        get_settings().github_allowed_repositories = ["example/github-browser"]
 
         stopped = Event()
 
@@ -222,6 +282,8 @@ def run() -> None:
                         "validate_offline",
                         "deploy_simulated",
                         "run_simulated",
+                        "capture_github",
+                        "refresh_github_ci",
                     ),
                 )
 

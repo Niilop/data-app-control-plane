@@ -139,7 +139,11 @@ function OperationDetail({
           <div className="operation-status">
             <Status value={operation.status} />
             <Badge tone="blue">{label(operation.execution_mode)}</Badge>
-            <Badge tone="blue">Local work</Badge>
+            <Badge tone="blue">
+              {operation.execution_mode === "github_read"
+                ? "External read"
+                : "Local work"}
+            </Badge>
             <button className="text-button" onClick={refresh}>
               Refresh operation
             </button>

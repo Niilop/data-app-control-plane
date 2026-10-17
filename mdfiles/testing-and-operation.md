@@ -349,3 +349,26 @@ retained team access after direct revocation, loss of access after the final gra
 continued own-outcome reads, unresolved/stale archive rejection and archived mobile
 history. Browser data is disposable and no developer account or database is used.
 Current measured check results and unavailable gates are in next-agent.md.
+
+## T08 source/CI verification
+
+Run `uv run --locked pytest tests/unit/test_github_source.py -q` for mocked GitHub
+auth/not-found/rate-limit responses, pagination/identity, moving refs, malformed
+archives, current policy, cancellation, source revision validation and private reads.
+All network is blocked in offline tests. `tests/integration/test_github_source.py`
+needs the existing isolated PostgreSQL+pgvector harness; it verifies commit-pin and
+completion fencing, restart/retry, SQL immutability and refusal to erase source history.
+Historical migration and generated revision tests remain required.
+
+`uv run --locked python scripts/check_ci_onboarding.py` exercises only the approved
+template in a disposable directory: documented import-format migration, separately
+locked CI tools, lint/type/static/unit checks and wheel build. It downloads locked
+tools if needed; it never executes adopted user source locally. The existing
+`scripts/check_generated_project.py` still proves the unchanged template installs
+and tests offline. Playwright uses a test-only scripted provider with real API/worker
+and disposable SQLite; production has no fake-provider selection setting.
+
+Before any authorized provider activation, review the CI overlay and explicit
+repository/token configuration in integrations.md. The real application CI gate is
+separate from local mocks and hosted platform CI. Never migrate/stamp the abandoned
+T05 database; use an isolated database on the current migration chain.

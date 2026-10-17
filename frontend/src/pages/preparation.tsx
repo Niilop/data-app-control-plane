@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ApprovalControls, RevisionApprovals } from "./deployments";
+import { Sources } from "./sources";
 import { api } from "../api";
 import {
   ActionForm,
@@ -175,6 +176,7 @@ export function Preparation({
             </ul>
           )}
         </Paged>
+        <Sources applicationId={applicationId} canDevelop={canDevelop} />
         <h3>Immutable revisions</h3>
         <Paged<Revision>
           path={`${path}/revisions`}

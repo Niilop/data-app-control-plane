@@ -5,7 +5,7 @@ from typing import Literal
 from uuid import UUID
 
 from models.platform_schemas import Input, Record
-from pydantic import Field
+from pydantic import Field, model_validator
 
 
 class TemplateParameters(Input):
@@ -22,9 +22,16 @@ class GenerationInput(Input):
 
 
 class RevisionInput(Input):
-    generation_id: UUID
+    generation_id: UUID | None = None
+    source_capture_id: UUID | None = None
     binding_id: UUID
     expected_binding_version: int = Field(ge=1, strict=True)
+
+    @model_validator(mode="after")
+    def one_source(self) -> "RevisionInput":
+        if (self.generation_id is None) == (self.source_capture_id is None):
+            raise ValueError("Reference one completed generation or source capture")
+        return self
 
 
 class ValidationInput(Input):
@@ -49,8 +56,9 @@ class GenerationResponse(Record):
 
 class RevisionResponse(Record):
     application_id: UUID
-    generation_id: UUID
-    source_kind: Literal["generated"]
+    generation_id: UUID | None
+    source_capture_id: UUID | None
+    source_kind: Literal["generated", "github"]
     artifact_digest: str
     template_id: str
     template_digest: str

@@ -1,7 +1,56 @@
 # GitHub Actions and Databricks integration
 
-Status: planned. Verify API/tool versions and provider capabilities during each
-integration task; pin the versions tested. Sources below were consulted 2026-09-11.
+Status: T08 read-only GitHub capture/CI is implemented for review. Dispatch and
+Databricks remain planned. Verify API/tool versions during each integration task;
+T08 REST sources below were checked 2026-10-17; older sources date to 2026-09-11.
+
+## T08 read-only boundary
+
+API and worker require `GITHUB_READS_ENABLED=true` and a comma-separated or JSON
+`GITHUB_ALLOWED_REPOSITORIES` list of exact `owner/repository` names (case-insensitive).
+Defaults deny all reads. Restart processes after configuration changes. The optional
+`GITHUB_READ_TOKEN` is resolved only from the worker process environment. Give it
+Contents:read and Actions:read for explicitly authorized repositories. Public reads
+can be unauthenticated. Do not add it to shared API configuration, payloads or bundles.
+This feature does not change `RUNTIME_PROFILE=local` / `DEPLOYMENT_EXECUTOR=simulated`.
+
+REST version `2026-03-10` is pinned. The adapter resolves a commit, persists its SHA
+and numeric repository ID, checks repository identity again, downloads only that
+SHA, and stores the inspected bundle root as a canonical ZIP. It reads only fixed
+`api.github.com` and `codeload.github.com` origins; API redirects are rejected except
+the expected zipball redirect to the same repository/SHA. Authorization is never
+forwarded to the archive host; signed locations are never stored/logged. Each read
+has a 10-second socket timeout, 30-second read deadline and 2 MB response limit.
+Archives permit at most 500 entries / 2 MB declared expanded data, no traversal,
+symlinks, encryption or duplicate paths; the selected canonical bundle has at most
+50 files / 2 MB including ZIP metadata. `.git`, `.env`, `.aws`, `.ssh` bundle paths
+are rejected. These are small-template limits, not general monorepo support.
+
+CI reads use `head_sha`, fixed constructed pagination URLs and up to 10 pages/1000
+runs. Mismatched commit/repository, duplicate attempts, changing totals or incomplete
+pagination fail without publishing partial observations. Rate limits persist a
+retry delay (at least 60 seconds, honoring provider headers up to one day) instead
+of sleeping with database locks. Longer requested waits stop with a diagnostic.
+Only three automatic execution attempts are allowed by the existing queue; manual
+retry remains authorized and preserves any resolved commit. Read-only crash recovery
+can safely retry; it never dispatches workflows or returns simulated provider results.
+
+The separate CI overlay uses pinned checkout/setup-uv commits already used by this
+repository, uv 0.12.11/Python 3.11, and its own checked-in tool lock. It is downloaded
+and manually reviewed/applied at repository root, with the configured bundle path.
+The v1 template remains byte-for-byte unchanged: onboarding documents its one-line
+import-format migration, and CI builds a temporary package copy using pinned
+setuptools. It runs locked installs, Ruff, mypy, unittest, structural checks and a
+wheel build. It neither dispatches deployment nor receives workspace credentials.
+PR checks may target a synthetic merge SHA; capture that exact SHA, or observe the
+merged main push run. A genuine application CI demonstration remains unrun pending
+separate authorization; the platform's own hosted CI does not satisfy that gate.
+
+Primary references: [REST versions](https://docs.github.com/en/rest/about-the-rest-api/api-versions),
+[commit resolution](https://docs.github.com/en/rest/commits/commits#get-a-commit),
+[ZIP archive redirect](https://docs.github.com/en/rest/repos/contents#download-a-repository-archive-zip),
+[workflow run filters](https://docs.github.com/en/rest/actions/workflow-runs#list-workflow-runs-for-a-repository),
+[rate-limit handling](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api).
 
 ## Generated application contract
 

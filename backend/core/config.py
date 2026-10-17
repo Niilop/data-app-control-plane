@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     runtime_profile: Literal["local", "sandbox", "organization"] = "local"
     # No implicit simulation: existing local .env files must opt in explicitly.
     deployment_executor: Literal["simulated", "github_actions"]
+    # Read-only source/CI integration is separate from deployment execution.
+    github_reads_enabled: bool = False
+    github_allowed_repositories: Annotated[list[str], NoDecode] = Field(
+        default_factory=list
+    )
 
     # Required for development authentication and persistence, including local mode.
     database_url: str = Field(min_length=1)
@@ -41,7 +46,7 @@ class Settings(BaseSettings):
         hide_input_in_errors=True,
     )
 
-    @field_validator("cors_origins", mode="before")
+    @field_validator("cors_origins", "github_allowed_repositories", mode="before")
     @classmethod
     def parse_cors_origins(cls, value: object) -> object:
         """Accept JSON arrays or comma-separated environment values."""

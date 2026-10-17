@@ -215,6 +215,10 @@ def authorize(db: Session, item: Claim) -> None:
                 "run.authorized",
                 {"worker_id": item.worker_id, "fencing_token": item.token},
             )
+        elif operation.kind in {"capture_github", "refresh_github_ci"}:
+            from services.source_service import authorize_operation as authorize_source
+
+            authorize_source(db, actor, operation)
         else:
             from services.delivery_service import authorize_operation
 
@@ -245,6 +249,8 @@ def finish(
     delivery_result: tuple[str, int, str, str] | None = None,
     deployment_resources: list[dict] | None = None,
     run_result: "RunResult | None" = None,
+    source_result: dict | None = None,
+    retry_after: int = 0,
 ) -> None:
     """Operation, attempt, related result, reservation and audit commit together."""
     with db.begin():
@@ -269,9 +275,11 @@ def finish(
                 status = "retry_wait"
                 delay = min(60, 2**operation.attempt_count)
                 operation.available_at = timestamp + timedelta(
-                    seconds=delay * random.uniform(0.8, 1.2)
+                    seconds=max(
+                        delay * random.uniform(0.8, 1.2), min(retry_after, 86400)
+                    )
                 )
-                code = "safe_retry_scheduled"
+                code = diagnostic or "safe_retry_scheduled"
         elif outcome == "unknown":
             status = "needs_attention" if item.phase == "reconcile" else "reconciling"
             code = "outcome_unknown"
@@ -329,6 +337,26 @@ def finish(
                 if delivery_result is None:
                     raise ValueError("Missing delivery result")
                 record_result(db, operation, delivery_result)
+        if status == "succeeded" and operation.kind in {
+            "capture_github",
+            "refresh_github_ci",
+        }:
+            from services.source_service import authorize_operation as authorize_source
+            from services.source_service import record_result as record_source
+
+            actor = db.get(User, operation.requested_by)
+            assert actor is not None
+            if operation.cancel_requested:
+                status, code = "cancelled", None
+            else:
+                try:
+                    authorize_source(db, actor, operation)
+                except PolicyError:
+                    status, code = "failed", "authorization_changed"
+                else:
+                    if source_result is None:
+                        raise ValueError("Missing source result")
+                    record_source(db, operation, source_result)
         operation.status = status
         operation.diagnostic_code = code
         operation.observed_at = timestamp

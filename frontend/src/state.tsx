@@ -66,6 +66,7 @@ const Refresh = createContext<{
   refresh: () => void;
   notify: (message: string) => void;
   commandKey: (scope: string) => string;
+  completeCommand: (scope: string) => void;
 }>({
   version: 0,
   refresh: () => {},
@@ -73,6 +74,7 @@ const Refresh = createContext<{
   commandKey: () => {
     throw new Error("Missing workspace context");
   },
+  completeCommand: () => {},
 });
 export function DataProvider({ children }: { children: ReactNode }) {
   const [version, setVersion] = useState(0);
@@ -86,7 +88,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(() => setVersion((value) => value + 1), []);
   return (
     <Refresh.Provider
-      value={{ version, refresh, notify: setNotice, commandKey }}
+      value={{
+        version,
+        refresh,
+        notify: setNotice,
+        commandKey,
+        completeCommand: (scope) => {
+          commandKeys.current.delete(scope);
+        },
+      }}
     >
       {notice && (
         <div className="toast" role="status">

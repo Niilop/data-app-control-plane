@@ -119,6 +119,8 @@ def enqueue(
         kind=kind,
         execution_mode="simulated"
         if kind in {"deploy_simulated", "run_simulated"}
+        else "github_read"
+        if kind in {"capture_github", "refresh_github_ci"}
         else "offline",
         requested_by=actor.id,
         request_id=request_id,
@@ -196,14 +198,22 @@ def create_revision(
         binding = check_preparation(
             db, actor, application_id, data.binding_id, data.expected_binding_version
         )
-        generation = db.get(Generation, data.generation_id)
+        from models.source import SourceCapture
+
+        generation = (
+            db.get(Generation, data.generation_id)
+            if data.generation_id
+            else db.get(SourceCapture, data.source_capture_id)
+        )
         if (
             generation is None
             or generation.application_id != application_id
             or generation.artifact_digest is None
         ):
             raise PolicyError(
-                422, "invalid_generation", "Completed generation required"
+                422,
+                "invalid_generation",
+                "Completed generation or source capture required",
             )
         captured = snapshot(db, binding)
         if generation.binding_snapshot != captured:
@@ -213,6 +223,18 @@ def create_revision(
                 "Generate again for the current binding configuration",
             )
         approved = template(db)
+        if isinstance(generation, SourceCapture):
+            app = get_application(db, actor, application_id)
+            if (
+                generation.repository_url != app.repository_url
+                or generation.bundle_root != app.bundle_root
+                or generation.template_digest != approved.content_digest
+            ):
+                raise PolicyError(
+                    409,
+                    "stale_source",
+                    "Capture the current repository configuration again",
+                )
         try:
             store().read(generation.artifact_digest)
         except ArtifactError:
@@ -222,7 +244,9 @@ def create_revision(
         revision = DeploymentRevision(
             id=uuid4(),
             application_id=application_id,
-            generation_id=generation.id,
+            generation_id=data.generation_id,
+            source_capture_id=data.source_capture_id,
+            source_kind="generated" if data.generation_id else "github",
             artifact_digest=generation.artifact_digest,
             template_id=approved.id,
             template_digest=approved.content_digest,
@@ -339,10 +363,10 @@ def execute(db: Session, operation_id: UUID) -> tuple[bytes, str, str]:
         )
     revision = db.get(DeploymentRevision, UUID(payload["revision_id"]))
     assert revision is not None
-    generation = db.get(Generation, revision.generation_id)
-    assert generation is not None
-    original = db.get(Operation, generation.operation_id)
-    assert original is not None
+    generation = (
+        db.get(Generation, revision.generation_id) if revision.generation_id else None
+    )
+    original = db.get(Operation, generation.operation_id) if generation else None
     # These fully loaded immutable inputs remain readable after ending the read
     # transaction; filesystem/static work holds no DB transaction or locks.
     db.expunge_all()
@@ -351,21 +375,27 @@ def execute(db: Session, operation_id: UUID) -> tuple[bytes, str, str]:
     try:
         data = store().read(revision.artifact_digest)
         files = unpack(data)
-        expected = render(
-            original.payload["slug"],
-            revision.binding_snapshot["bundle_target"],
-            revision.config_snapshot,
-            TemplateParameters.model_validate(generation.parameters),
-        )
-        if data != expected:
-            raise ValueError("Unapproved content")
+        if generation is not None and original is not None:
+            expected = render(
+                original.payload["slug"],
+                revision.binding_snapshot["bundle_target"],
+                revision.config_snapshot,
+                TemplateParameters.model_validate(generation.parameters),
+            )
+            if data != expected:
+                raise ValueError("Unapproved content")
+        else:
+            from integrations.source_archive import inspect_bundle
+
+            inspect_bundle(files, revision.binding_snapshot)
+            code = "captured_content_and_static_syntax"
         for path, content in files.items():
             if path.endswith(".py"):
                 ast.parse(content)
             elif path.endswith(".toml") or path == "uv.lock":
                 tomllib.loads(content.decode())
         json.loads(files["manifest.json"])
-    except (ArtifactError, ValueError, SyntaxError):
+    except (ArtifactError, ValueError, SyntaxError, KeyError, TypeError):
         result, code = "failed", "artifact_or_static_check_failed"
     report = canonical(
         {
@@ -388,19 +418,7 @@ def record_result(
     db: Session, operation: Operation, result: tuple[str, int, str, str]
 ) -> None:
     digest, size, media_type, verdict = result
-    # Unique digest publication must survive simultaneous completions across bindings.
-    from sqlalchemy.dialects.postgresql import insert as pg_insert
-    from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-
-    insert = pg_insert if db.get_bind().dialect.name == "postgresql" else sqlite_insert
-    db.execute(
-        insert(Artifact)
-        .values(digest=digest, size=size, media_type=media_type)
-        .on_conflict_do_nothing(index_elements=["digest"])
-    )
-    artifact = db.get(Artifact, digest)
-    if artifact is None or artifact.size != size or artifact.media_type != media_type:
-        raise ValueError("Artifact metadata mismatch")
+    record_artifact(db, digest, size, media_type)
     if operation.kind == "generate_bundle":
         generation = db.scalar(
             select(Generation).where(Generation.operation_id == operation.id)
@@ -419,8 +437,34 @@ def record_result(
         )
 
 
+def record_artifact(db: Session, digest: str, size: int, media_type: str) -> None:
+    # Unique digest publication must survive simultaneous completions across bindings.
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+    from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+    insert = pg_insert if db.get_bind().dialect.name == "postgresql" else sqlite_insert
+    db.execute(
+        insert(Artifact)
+        .values(digest=digest, size=size, media_type=media_type)
+        .on_conflict_do_nothing(index_elements=["digest"])
+    )
+    artifact = db.get(Artifact, digest)
+    if artifact is None or artifact.size != size or artifact.media_type != media_type:
+        raise ValueError("Artifact metadata mismatch")
+
+
 def download(db: Session, actor: User, digest: str) -> tuple[bytes, str]:
+    from models.source import SourceCapture
+
     applications = visible_applications(actor).with_only_columns(Application.id)
+    captured = db.scalar(
+        select(SourceCapture.id)
+        .where(
+            SourceCapture.artifact_digest == digest,
+            SourceCapture.application_id.in_(applications),
+        )
+        .limit(1)
+    )
     generation = db.scalar(
         select(Generation.id)
         .where(
@@ -438,7 +482,7 @@ def download(db: Session, actor: User, digest: str) -> tuple[bytes, str]:
         )
         .limit(1)
     )
-    artifact = db.get(Artifact, digest) if generation or report else None
+    artifact = db.get(Artifact, digest) if generation or report or captured else None
     if artifact is None:
         raise PolicyError(404, "not_found", "Artifact not found")
     try:

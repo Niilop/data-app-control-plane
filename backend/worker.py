@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from core.config import get_settings
 from core.database import SessionLocal
+from integrations.github import GitHubError
 from models.job_run_schemas import RunInput, RunResult
 from models.operation_schemas import ProbeInput
 from services.environment_service import require_local_simulation
@@ -79,6 +80,8 @@ def run_one(
     delivery_result: tuple[str, int, str, str] | None = None
     deployment_resources: list[dict] | None = None
     run_result: RunResult | None = None
+    source_result: dict | None = None
+    retry_after = 0
     try:
         with sessions() as db:
             if heartbeat(db, item, lease_seconds):
@@ -101,6 +104,17 @@ def run_one(
                 digest = store().put(content)
                 delivery_result = (digest, len(content), media_type, verdict)
                 outcome, diagnostic = "succeeded", None
+        elif item.kind in {"capture_github", "refresh_github_ci"}:
+            from services.source_service import execute as execute_source
+
+            if cancelled.is_set():
+                outcome, diagnostic = "cancelled", None
+            elif item.phase == "reconcile":
+                outcome, diagnostic = "safe_to_retry", None
+            else:
+                source_result = execute_source(sessions, item)
+                outcome = "cancelled" if source_result.get("cancelled") else "succeeded"
+                diagnostic = None
         elif item.kind == "deploy_simulated":
             from integrations.simulated_deployment import execute as simulate
             from models.deployment_schemas import DeploymentInput
@@ -145,15 +159,29 @@ def run_one(
             diagnostic = "probe_rejected" if outcome == "failed" else None
     except LostLease:
         return True
+    except GitHubError as error:
+        outcome = "transient" if error.transient else "failed"
+        diagnostic, retry_after = error.code, error.retry_after
     except PolicyError:
         # An uncertain prior attempt is not made safe by revoking its requester.
-        outcome = "unknown" if item.phase == "reconcile" else "failed"
+        outcome = (
+            "unknown"
+            if item.phase == "reconcile"
+            and item.kind not in {"capture_github", "refresh_github_ci"}
+            else "failed"
+        )
         diagnostic = "authorization_changed"
     except Exception:
         outcome, diagnostic = (
             (
                 "transient"
-                if item.kind in {"generate_bundle", "validate_offline"}
+                if item.kind
+                in {
+                    "generate_bundle",
+                    "validate_offline",
+                    "capture_github",
+                    "refresh_github_ci",
+                }
                 else "unknown"
             ),
             "handler_error",
@@ -172,6 +200,8 @@ def run_one(
                     delivery_result=delivery_result,
                     deployment_resources=deployment_resources,
                     run_result=run_result,
+                    source_result=source_result,
+                    retry_after=retry_after,
                 )
         except LostLease:
             pass
@@ -180,7 +210,7 @@ def run_one(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run the simulated durable operation worker"
+        description="Run the durable preparation, GitHub read and simulated execution worker"
     )
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
@@ -190,7 +220,7 @@ def main() -> None:
     signal.signal(signal.SIGINT, lambda *_: stopped.set())
     worker_id = str(uuid4())
     logging.basicConfig(level=logging.INFO)
-    logger.info("Simulated worker started: %s", worker_id)
+    logger.info("Durable worker started: %s", worker_id)
     while not stopped.is_set():
         try:
             worked = run_one(SessionLocal, worker_id)

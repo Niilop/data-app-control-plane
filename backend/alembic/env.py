@@ -19,6 +19,7 @@ from models import deployment as deployment_models  # noqa: F401
 from models import job_run as job_run_models  # noqa: F401
 from models import operations as operation_models  # noqa: F401
 from models import platform as platform_models  # noqa: F401
+from models import source as source_models  # noqa: F401
 
 # Retain historical AI table metadata without importing it into the application.
 # This also avoids a name collision with the installed Alembic package. Alembic

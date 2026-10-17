@@ -41,8 +41,10 @@ class OperationResponse(Record):
         "validate_offline",
         "deploy_simulated",
         "run_simulated",
+        "capture_github",
+        "refresh_github_ci",
     ]
-    execution_mode: Literal["simulated", "offline"]
+    execution_mode: Literal["simulated", "offline", "github_read"]
     status: Status
     attempt_count: int
     max_attempts: int
@@ -85,4 +87,4 @@ class AttemptResponse(Record):
 class Accepted(Input):
     operation_id: UUID
     status: Status
-    execution_mode: Literal["simulated", "offline"] = "simulated"
+    execution_mode: Literal["simulated", "offline", "github_read"] = "simulated"

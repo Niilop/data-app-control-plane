@@ -40,6 +40,7 @@ def create_app() -> FastAPI:
         environments,
         job_runs,
         operations,
+        sources,
         teams,
     )
 
@@ -51,6 +52,7 @@ def create_app() -> FastAPI:
     app.include_router(delivery.router)
     app.include_router(deployments.router)
     app.include_router(job_runs.router)
+    app.include_router(sources.router)
     app.include_router(access.router)
 
     @app.get("/")

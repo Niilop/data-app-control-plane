@@ -1,6 +1,6 @@
 # API contracts
 
-Status: T02–T07 registry, operations, preparation, approvals and simulated deployment endpoints are implemented; later task rows remain planned. Existing `/auth/*` remains the development login
+Status: T02–T08 and T11 endpoints are implemented (T08 pending review); other task rows remain planned. Existing `/auth/*` remains the development login
 surface initially. Implement endpoints with their tasks; this document does not
 claim they exist. Keep services usable by API and worker without importing routers.
 
@@ -58,7 +58,11 @@ All paths below are under `/api/v1`. Permissions are defined in
 | T07 | `POST /deployments/{id}/runs` | `202`; allowlisted job key + bounded typed parameters |
 | T07 | `GET /deployments/{id}/runs`, `GET /runs/{id}` | Genuine or explicitly simulated result and observation time |
 | T08 | `POST /applications/{id}/source-captures` | `202`; resolve repository ref to immutable commit/artifact |
+| T08 | `GET /applications/{id}/source-captures` | Paginated source snapshots and their operation IDs |
+| T08 | `POST /source-captures/{id}/ci-refresh` | `202`; queue exact-commit CI observation; empty body |
 | T08 | `GET /applications/{id}/ci-runs` | Paginated observed checks associated with exact source commit |
+| T08 | `GET /applications/{id}/source-policy` | This repository's enabled flag and `github_read` mode; no allowlist/token |
+| T08 | `GET /applications/{id}/ci-onboarding` | Authorized reviewed ZIP download; no repository writes |
 | T11 | `POST /applications/{id}/access-requests`, `GET /applications/{id}/access-requests` | Request own access; owner/admin sees all, requester sees own |
 | T11 | `POST /access-requests/{id}/decision` | Owner/admin approve/reject; cannot self-escalate through requester role |
 | T11 | `POST /applications/{id}/archive` | Version check, no unresolved operations; retain history/data |
@@ -66,6 +70,37 @@ All paths below are under `/api/v1`. Permissions are defined in
 T08 extends revision input to reference a completed source capture. Repository ref
 resolution is asynchronous; clients cannot assert an arbitrary commit was verified.
 GitHub status refresh is worker-driven, not fan-out during page requests.
+
+## T08 implemented details
+
+Source capture takes `binding_id`, `expected_binding_version`, `ref`, and optional
+`template_id` (only `python-batch:1.0.0`). References use bounded ASCII branch/tag/SHA
+syntax without traversal; repository URL and bundle root come from authorized app
+metadata. Developer role, current binding and configured repository enablement are
+required. Commands require `Idempotency-Key`; operations use `execution_mode=github_read`.
+Disabled/unallowlisted sources return sanitized `409 github_reads_disabled`.
+
+Source reads expose requested reference, immutable repository ID/commit once pinned,
+binding/template snapshot, artifact digest and capture time when completed, plus
+operation ID for status/diagnostics. Pending/failed captures may have a pinned SHA
+but no artifact. `/artifacts/{digest}` checks application visibility for captures too.
+Revision input must contain exactly one of `generation_id` or `source_capture_id`;
+source capture must be complete and match the current repository/root/binding/template.
+Revision responses distinguish `source_kind=generated|github` and preserve both IDs
+as nullable fields. Historical generated revision behavior is unchanged.
+
+CI refresh accepts `{}` for a completed capture. It rechecks current developer
+access and source/binding policy and queues all provider work. Observations contain
+capture/operation IDs, exact `commit_sha`, GitHub run ID, attempt, workflow ID,
+status/conclusion/event, constructed GitHub run URL and UTC observation time.
+Repeated refreshes append observations, including changed state on the same run.
+Successful zero-run refreshes are evidenced by the operation and `ci.observed` audit
+with `run_count=0`; no synthetic successful CI row is created. Counts are informational,
+not approval gates. A failed refresh retains earlier observations.
+
+GET routes require application visibility and never contact GitHub. List routes use
+the existing actor/application-scoped pagination. No API contains credentials,
+signed archive URLs, raw provider error text or local artifact paths.
 
 ## T02 implemented details
 
