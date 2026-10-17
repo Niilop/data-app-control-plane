@@ -91,6 +91,8 @@ def registry(monkeypatch: pytest.MonkeyPatch, tmp_path) -> Iterator[tuple]:
             "deployments",
             "job_runs",
             "access_requests",
+            "source_captures",
+            "ci_runs",
         }
     ]
     Base.metadata.create_all(engine, tables=tables)

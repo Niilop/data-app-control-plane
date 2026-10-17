@@ -1,6 +1,6 @@
 # Repository map
 
-Updated for T11 on 2026-10-17. Paths below are current unless labelled proposed. Recheck
+Updated for T08 on 2026-10-17. Paths below are current unless labelled proposed. Recheck
 affected files before editing; avoid a full repository crawl for each task.
 
 ## Current implementation
@@ -64,6 +64,19 @@ affected files before editing; avoid a full repository crawl for each task.
 | `tests/integration/test_environment_bindings.py` | Upgrade preservation, unique/FK checks, rollback and concurrent environment/binding writes on PostgreSQL |
 
 ## Reuse and migration strategy
+
+T08 source/CI implementation:
+
+| Path | Responsibility |
+|---|---|
+| `backend/models/source.py`, `source_schemas.py` | Immutable source pins/completion and append-only CI observations |
+| `backend/alembic/versions/012_github_source.py` | Source/CI tables, revision source XOR, read-only operation kinds, immutability and downgrade guards |
+| `backend/services/source_service.py`, `backend/api/endpoints/sources.py` | Authorized async capture/CI commands, fenced pin/result transactions, DB-only reads |
+| `backend/integrations/github.py`, `source_archive.py` | Bounded fixed-origin REST, exact-commit pagination, static safe archive inspection |
+| `backend/services/ci_onboarding.py`, `backend/templates/github_ci_v1/` | Separate reviewed workflow/tool-lock/instructions overlay; never changes v1 bundle template |
+| `frontend/src/pages/sources.tsx` | Adoption, disabled/status/diagnostic states, captured revisions and CI observation history |
+| `tests/unit/test_github_source.py`, `tests/integration/test_github_source.py` | Mock provider failures, source policy, retry/pinning, PostgreSQL fencing and immutable history |
+| `scripts/check_ci_onboarding.py` | Local exercise of reviewed CI overlay on approved generated source only |
 
 Reuse FastAPI, Pydantic, synchronous SQLAlchemy, Alembic, PostgreSQL and uv.
 React + TypeScript + Vite replaces Streamlit in T04a after browser parity passed

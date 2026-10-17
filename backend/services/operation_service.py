@@ -312,6 +312,10 @@ def command(
                 result = enqueue_run(
                     db, actor, deployment_id, data, request_id, operation.id
                 )
+            elif operation.kind in {"capture_github", "refresh_github_ci"}:
+                from services.source_service import retry_operation as retry_source
+
+                result = retry_source(db, actor, operation, request_id)
             else:
                 from services.delivery_service import retry_operation
 

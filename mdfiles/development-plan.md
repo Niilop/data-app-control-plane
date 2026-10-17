@@ -1,12 +1,12 @@
 # Development plan and agent task ledger
 
-Status: **T01–T07 complete and merged; T11 implemented with passing CI, pending
-review/merge in draft PR #16.** T07 PR #15 merged on 2026-09-27, verified on
-updated main `55105b7` on 2026-10-17.
+Status: **T01–T07 and T11 complete and merged; T08 implemented for review,
+with hosted verification and a genuine application CI demonstration pending.**
+T11 PR #16 merged at `3671334aee3ff964d7f233313c63314db7c3b747` on 2026-10-17.
 T06 PR #14 merged at `004b363dbeaeb34e4f8b20870fff60226ee00118` (verified 2026-09-27).
 T05 PR #13 merged at `8e419050c5069b97ac5b582e02378f77658f3e99` (verified 2026-09-20).
 T04a PR #10 merged at `6503ec152a7bcfbb3310e45c08f5fab78dea27d6`.
-T08–T10 and T12–T13 have not started.
+T09–T10 and T12–T13 have not started.
 This plan is implementation-ready guidance,
 not a claim of implemented capabilities. Task order follows dependencies rather
 than estimated calendar dates. Do not implement the entire roadmap in one turn.
@@ -560,7 +560,36 @@ credentials or local storage paths.
 
 ## T08 — Adopt an existing GitHub repository and run CI
 
-**Status:** not started. **Depends on:** T07.
+**Status:** implemented for review on 2026-10-17; hosted verification pending.
+Real application-repository CI gate remains pending separate authorization.
+**Depends on:** T07; T11 also merged before this work.
+
+**Delivered:** migration `012_github_source`, immutable source captures, append-only
+CI observations, GitHub read adapter and durable `capture_github` / `refresh_github_ci`
+handlers. Worker pins repository ID and commit under a lease fence before archive
+download; automatic/manual retry preserves that commit. Current developer access,
+repository/root, template and binding policy are checked at acceptance, execution,
+pinning and completion. Explicit repository allowlist/enable flag defaults off;
+worker-only token is absent from payloads/responses. Fixed origins, safe redirect,
+bounded ZIP inspection, pagination and durable rate-limit delays avoid source execution.
+Source revisions reuse offline validation and simulated approval/deployment workflows.
+
+React shows disabled access, capture status/diagnostics, commit, verified time,
+revision capture and recorded CI results. CI onboarding is a separate reviewed ZIP:
+pinned workflow actions, locked tools, lint/types/unit/static checks and wheel build.
+Immutable v1 templates remain unchanged. Onboarding documents a one-time reviewed
+import-format fix and builds package=false v1 source in a temporary copy.
+No repository write/creation, workflow dispatch or real deployment is implemented.
+
+**Local verification:** full offline suite 261 passed, including 44 GitHub tests.
+All 14 Chromium workflows passed, plus a focused adoption rerun after UI polish.
+Mypy passed 55 modules; generated CI overlay passed locked install, Ruff, mypy,
+two unit tests and wheel build. PostgreSQL source/migration selection collected
+with 8 skips because TEST_DATABASE_URL is unset. Current final evidence is recorded
+in next-agent.md; hosted PostgreSQL/containers are not yet claimed.
+
+**Next:** finish checks and review T08. Leave merge to the user. A real application
+CI demo needs its own authorization; T09 dispatch/reconciliation remains separate.
 
 **Read:** source-capture/CI sections in [integrations](integrations.md), T08 API rows.
 
@@ -631,8 +660,8 @@ while the real execution gate remains pending; state both explicitly.
 
 ## T11 — Platform access requests, revocation, and archive
 
-**Status:** implemented in draft PR #16; audit-privacy review finding fixed and
-verified by hosted CI. Pending review and user merge.
+**Status:** merged in PR #16 at `3671334`; audit-privacy review finding fixed and
+verified by hosted CI before merge.
 **Depends on:** T07, merged. Implemented on 2026-10-17; precedes T08.
 
 **Delivered:** migration `011_platform_access` adds own-access request history,
@@ -667,8 +696,7 @@ pagination regression plus existing grant races, archive/submission ordering,
 ownership changes and migration/history preservation. Handoff checks passed.
 The follow-up verification update changes documentation only.
 
-**Next:** review T11 and its real CI results; user merge only. After merge and a
-separate assignment, T08 is the next bounded implementation task. External
+**Next:** T08 is now assigned and implemented separately for review. External
 activation and the old abandoned database remain outside this change.
 
 **Read:** persona/permission distinctions, AccessRequest and archive contracts,

@@ -32,6 +32,115 @@ async function existing(page: Page) {
   );
 }
 
+test("GitHub adoption, failed diagnostics, immutable revision and exact-commit CI", async ({
+  page,
+}) => {
+  await login(page);
+  const prior = await existing(page);
+  await page.goto(`/applications/${prior.id}`);
+  await page.getByRole("tab", { name: "Preparation", exact: true }).click();
+  await expect(
+    page.getByText("GitHub reads are disabled for this repository.", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  const download = page.waitForEvent("download");
+  await page
+    .getByRole("link", {
+      name: "Download CI workflow and onboarding instructions",
+    })
+    .click();
+  expect((await download).suggestedFilename()).toBe("ci-onboarding.zip");
+  const app = await request(page, "/api/v1/applications", "POST", {
+    slug: "github-browser",
+    name: "GitHub browser",
+    repository_url: "https://github.com/example/github-browser",
+    owning_team_id: prior.owning_team_id,
+    owner_user_id: 1,
+    data_owner_user_id: 2,
+  });
+  const environment = await request(page, "/api/v1/environments", "POST", {
+    name: "Adoption browser",
+    workspace_ref: "simulated://adoption",
+    allowed_executor: "simulated",
+    allowed_bundle_targets: ["dev"],
+  });
+  await request(page, `/api/v1/applications/${app.id}/bindings`, "POST", {
+    environment_id: environment.id,
+    bundle_target: "dev",
+  });
+  const open = async () => {
+    await page.goto(`/applications/${app.id}`);
+    await page.getByRole("tab", { name: "Preparation", exact: true }).click();
+  };
+  await open();
+  for (const ref of ["missing", "main"]) {
+    await page.getByRole("button", { name: "Adopt GitHub source" }).click();
+    await page.getByLabel("Branch, tag or commit").fill(ref);
+    await page.getByRole("button", { name: "Queue source capture" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect
+      .poll(async () => {
+        const sources = await request(
+          page,
+          `/api/v1/applications/${app.id}/source-captures`,
+        );
+        const source = sources.items.find(
+          (s: { requested_ref: string }) => s.requested_ref === ref,
+        );
+        if (!source) return "pending";
+        return (
+          await request(page, `/api/v1/operations/${source.operation_id}`)
+        ).status;
+      })
+      .toBe(ref === "missing" ? "failed" : "succeeded");
+    await open();
+  }
+  await expect(
+    page.getByText("Capture failed · github not found"),
+  ).toBeVisible();
+  await expect(
+    page.getByText(`Commit: ${"a".repeat(40)}`).first(),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Capture adopted revision" }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Immutable revision captured" }),
+  ).toBeVisible();
+  const keys: string[] = [];
+  page.on("request", (r) => {
+    if (r.url().endsWith("/ci-refresh"))
+      keys.push(r.headers()["idempotency-key"]);
+  });
+  for (const count of [1, 2]) {
+    await page.getByRole("button", { name: "Refresh CI", exact: true }).click();
+    await expect
+      .poll(
+        async () =>
+          (await request(page, `/api/v1/applications/${app.id}/ci-runs`)).items
+            .length,
+      )
+      .toBe(count);
+    await open();
+  }
+  expect(new Set(keys).size).toBe(2);
+  await expect(
+    page.getByRole("link", { name: "CI failure · attempt 2" }),
+  ).toHaveCount(2);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    page.getByRole("heading", { name: "GitHub source and CI" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.screenshot({
+    path: "test-results/github-adoption-mobile.png",
+    fullPage: true,
+  });
+});
+
 test("existing login, HTTP-only session, reload, profile and logout", async ({
   page,
   context,

@@ -458,7 +458,7 @@ function ApplicationContent({ id }: { id: string }) {
             <section className="panel">
               <div className="section-heading">
                 <h2>Repository</h2>
-                <Badge tone="amber">
+                <Badge tone={app.repository_verified_at ? "green" : "amber"}>
                   {app.repository_verified_at ? "Verified" : "Unverified"}
                 </Badge>
               </div>
@@ -483,6 +483,12 @@ function ApplicationContent({ id }: { id: string }) {
                   </dd>
                   <dt>Registered</dt>
                   <dd>{date(app.created_at)}</dd>
+                  {app.repository_verified_at && (
+                    <>
+                      <dt>Last verified source capture</dt>
+                      <dd>{date(app.repository_verified_at)}</dd>
+                    </>
+                  )}
                   <dt>Version</dt>
                   <dd>{app.version}</dd>
                 </dl>

@@ -49,10 +49,20 @@ class Generation(Identity, Base):
 
 class DeploymentRevision(Identity, Base):
     __tablename__ = "deployment_revisions"
+    __table_args__ = (
+        CheckConstraint(
+            "(source_kind = 'generated' AND generation_id IS NOT NULL AND source_capture_id IS NULL) OR "
+            "(source_kind = 'github' AND generation_id IS NULL AND source_capture_id IS NOT NULL)",
+            name="ck_revision_source",
+        ),
+    )
     application_id: Mapped[UUID] = mapped_column(
         ForeignKey("applications.id"), index=True
     )
-    generation_id: Mapped[UUID] = mapped_column(ForeignKey("generations.id"))
+    generation_id: Mapped[UUID | None] = mapped_column(ForeignKey("generations.id"))
+    source_capture_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("source_captures.id")
+    )
     source_kind: Mapped[str] = mapped_column(String(30), default="generated")
     artifact_digest: Mapped[str] = mapped_column(ForeignKey("artifacts.digest"))
     template_id: Mapped[str] = mapped_column(ForeignKey("template_versions.id"))
