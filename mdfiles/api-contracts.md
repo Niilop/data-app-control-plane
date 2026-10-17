@@ -366,6 +366,13 @@ owner/admin; other callers get 404. Request responses contain IDs, requested rol
 reason, status, timestamps and decision attribution/reason, never private app
 metadata. Requesters retain these outcome reads after role revocation.
 
+Application audit history applies the same requester/current-owner/admin boundary
+to access-request events before pagination. Ordinary application members and data
+owners cannot see another user's request or decision through `/audit-events`.
+The caller still needs application read access to use application audit history;
+own-outcome endpoints remain available independently. Other audit events retain
+normal application visibility, and the admin audit route retains complete history.
+
 `POST /access-requests/{id}/decision` accepts `decision=approved|rejected` and a
 nonblank `reason` (at most 2,000 characters). Only the current owner/admin may
 decide, including their own request when independently authorized. Data owners

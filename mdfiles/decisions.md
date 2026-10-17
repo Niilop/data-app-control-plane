@@ -397,6 +397,11 @@ Owner/admin decisions and direct grant creation commit with audit. Self-approval
 requires independent current owner/admin authority. Terminal decision replay never
 recreates a revoked role. The global request inbox is own-only; application managers
 use the per-application inbox. Request responses contain no private app metadata.
+Access-request audit events use the same requester/current-owner/admin visibility
+boundary, filtered in SQL before pagination. Full audit records are preserved;
+ordinary application read access does not expose other users' request outcomes.
+Application audit reads still require application visibility; admin audit remains
+complete, and an outsider's own outcomes stay on the dedicated request endpoints.
 
 Explain effective access by enumerating direct/team grants and owner/data-owner/
 admin relationships. A role deletion remains the existing 204 command; a fresh

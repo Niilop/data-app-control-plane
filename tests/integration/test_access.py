@@ -17,6 +17,56 @@ from test_operations import prepare, submit
 pytestmark = pytest.mark.integration
 
 
+def test_access_audit_filter_and_pagination_on_postgres(registry_engine) -> None:
+    from models.access_schemas import AccessDecision, AccessRequestInput
+    from models.database import User
+    from models.platform import AuditEvent
+    from models.platform_schemas import RoleCreate
+    from services.access_service import decide, request_access
+    from services.application_service import assign_role
+    from services.audit_service import visible_application_audit
+    from services.pagination import paginate
+
+    app_id, _, _ = setup_binding(registry_engine, bind=False)
+    with Session(registry_engine) as db:
+        owner, viewer = db.get(User, 2), db.get(User, 3)
+        assign_role(db, owner, app_id, RoleCreate(user_id=3, role="viewer"), "grant")
+        for user_id in (1, 3):
+            row = request_access(
+                db,
+                db.get(User, user_id),
+                app_id,
+                AccessRequestInput(requested_role="operator", reason="Review"),
+                "request",
+            )
+            decide(
+                db,
+                owner,
+                row.id,
+                AccessDecision(decision="rejected", reason=f"Decision for {user_id}"),
+                "decision",
+            )
+        query = visible_application_audit(db, viewer, app_id)
+        first = paginate(db, query, AuditEvent, 3, None, "review-audit")
+        assert [event.action for event in first["items"]] == [
+            "application.registered",
+            "application.role_assigned",
+            "access.requested",
+        ]
+        assert first["items"][-1].details["requested_by"] == viewer.id
+        assert first["next_cursor"] is not None
+        last = paginate(db, query, AuditEvent, 3, first["next_cursor"], "review-audit")
+        assert last["next_cursor"] is None
+        assert len(last["items"]) == 1
+        assert last["items"][0].details["reason"] == "Decision for 3"
+        for actor in (db.get(User, 1), owner):
+            events = list(db.scalars(visible_application_audit(db, actor, app_id)))
+            assert len(events) == 6
+            assert any(
+                event.details.get("reason") == "Decision for 1" for event in events
+            )
+
+
 def test_concurrent_requests_and_decisions_create_one_grant(registry_engine) -> None:
     from models.access import AccessRequest
     from models.access_schemas import AccessDecision, AccessRequestInput

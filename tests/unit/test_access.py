@@ -71,6 +71,122 @@ def test_outsider_request_privacy_pagination_and_own_outcomes(registry: tuple) -
     assert client.get(path + "/access-requests", headers=headers[6]).status_code == 403
 
 
+@pytest.mark.parametrize("outcome", ["approved", "rejected", "cancelled"])
+def test_access_audit_privacy_before_pagination(registry: tuple, outcome: str) -> None:
+    client, headers, _, _ = registry
+    app = create(registry)
+    path = f"/api/v1/applications/{app['id']}"
+    other = request(registry, app["id"])
+    request_path = f"/api/v1/access-requests/{other['id']}"
+    if outcome == "cancelled":
+        result = client.post(request_path + "/cancel", headers=headers[5])
+    else:
+        result = client.post(
+            request_path + "/decision",
+            headers=headers[3],
+            json={"decision": outcome, "reason": "Private decision explanation"},
+        )
+    assert result.status_code == 200
+    own = request(registry, app["id"], user=2, role="operator")
+    assert (
+        client.post(
+            f"/api/v1/access-requests/{own['id']}/decision",
+            headers=headers[3],
+            json={"decision": "rejected", "reason": "Own decision explanation"},
+        ).status_code
+        == 200
+    )
+
+    # Hidden request/decision events precede this member's own visible events.
+    # Filter in SQL so neither page contents nor cursors leak the hidden rows.
+    page = client.get(path + "/audit-events?limit=2", headers=headers[2]).json()
+    assert [event["action"] for event in page["items"]] == [
+        "application.registered",
+        "access.requested",
+    ]
+    assert page["items"][1]["target_id"] == own["id"]
+    assert page["next_cursor"] is not None
+    last = client.get(
+        path + "/audit-events",
+        headers=headers[2],
+        params={"limit": 2, "cursor": page["next_cursor"]},
+    ).json()
+    assert last["next_cursor"] is None
+    assert len(last["items"]) == 1
+    assert last["items"][0]["target_id"] == own["id"]
+    assert last["items"][0]["details"]["reason"] == "Own decision explanation"
+    assert client.get(request_path, headers=headers[2]).status_code == 404
+
+    # Data ownership allows ordinary history, not other people's access outcomes.
+    data_owner = client.get(path + "/audit-events?limit=1", headers=headers[4]).json()
+    assert [event["action"] for event in data_owner["items"]] == [
+        "application.registered"
+    ]
+    assert data_owner["next_cursor"] is None
+    assert client.get(request_path, headers=headers[4]).status_code == 404
+
+    for user in (1, 3):
+        events = client.get(path + "/audit-events", headers=headers[user]).json()[
+            "items"
+        ]
+        assert len(events) == 5
+        assert events[2]["target_id"] == other["id"]
+        assert events[2]["action"] == f"access.{outcome}"
+        assert events[2]["details"]["reason"] == result.json()["decision_reason"]
+    admin_events = client.get("/api/v1/audit-events", headers=headers[1]).json()[
+        "items"
+    ]
+    assert any(event["id"] == events[2]["id"] for event in admin_events)
+    if outcome == "approved":
+        # A newly admitted requester can read their own full history, not peers'.
+        events = client.get(path + "/audit-events", headers=headers[5]).json()["items"]
+        assert [event["action"] for event in events] == [
+            "application.registered",
+            "access.requested",
+            "access.approved",
+        ]
+
+
+def test_access_audit_uses_current_owner_and_preserves_archived_history(
+    registry: tuple,
+) -> None:
+    client, headers, _, _ = registry
+    app = create(registry)
+    path = f"/api/v1/applications/{app['id']}"
+    row = request(registry, app["id"])
+    # Keep the old owner as data owner so losing management is distinct from
+    # losing all application visibility.
+    changed = client.patch(
+        path,
+        headers=headers[3],
+        json={"expected_version": 1, "owner_user_id": 2, "data_owner_user_id": 3},
+    )
+    assert changed.status_code == 200
+    assert (
+        client.post(
+            path + "/archive", headers=headers[2], json={"expected_version": 2}
+        ).status_code
+        == 200
+    )
+    for user in (1, 2, 3):
+        events = client.get(path + "/audit-events", headers=headers[user]).json()[
+            "items"
+        ]
+        access_events = [event for event in events if event["target_id"] == row["id"]]
+        assert [event["action"] for event in access_events] == (
+            [] if user == 3 else ["access.requested", "access.cancelled"]
+        )
+        assert events[-1]["action"] == "application.archived"
+    # An outsider's own outcome does not grant access to application history.
+    assert client.get(path + "/audit-events", headers=headers[5]).status_code == 404
+    assert (
+        client.get(f"/api/v1/access-requests/{row['id']}", headers=headers[5]).json()[
+            "decision_reason"
+        ]
+        == "Application archived"
+    )
+
+
 @pytest.mark.parametrize(
     "changes",
     [

@@ -631,7 +631,8 @@ while the real execution gate remains pending; state both explicitly.
 
 ## T11 — Platform access requests, revocation, and archive
 
-**Status:** implemented with passing CI, pending review/merge in draft PR #16.
+**Status:** implemented in draft PR #16; audit-privacy review finding fixed,
+pending updated CI/review and user merge. Initial implementation CI passed.
 **Depends on:** T07, merged. Implemented on 2026-10-17; precedes T08.
 
 **Delivered:** migration `011_platform_access` adds own-access request history,
@@ -646,7 +647,18 @@ Application locks after environment policy locks serialize lifecycle changes wit
 new work and recheck current authorization after waits. Revocation stays available
 on archived applications. ADR-020 documents these choices; no new dependencies.
 
-**Verification:** 213 offline tests (23 new access/archive cases), CI-scoped Ruff
+**Review fix:** application audit reads now restrict access-request events to the
+requester/current owner/admin before pagination. Full audit records and ordinary
+application history are retained. Four new offline cases reproduce the leak before
+the fix and pass afterward, covering decisions/withdrawal, pagination, ownership
+transfer and archived history. Added a PostgreSQL JSON-filter/pagination test.
+
+**Review-fix verification:** 217 offline tests passed, changed-file Ruff lint/format
+and mypy (48 modules) passed. Six access integration cases skipped locally because
+TEST_DATABASE_URL is unset; PostgreSQL execution awaits hosted CI. Frontend,
+generated-project and container checks were not rerun locally for this backend fix.
+
+**Initial verification:** 213 offline tests (23 new access/archive cases), CI-scoped Ruff
 over 81 files, mypy over 48 modules, generated project offline installation/2 tests,
 frontend lint/format/types/build and all 13 Chromium workflows passed locally.
 All 28 PostgreSQL tests were skipped locally because TEST_DATABASE_URL is unset;
@@ -662,8 +674,9 @@ Hosted [Platform CI run 39032600688](https://github.com/Niilop/data-app-control-
 passed at implementation commit `10ed3c2`: actual logs report **213 offline tests,
 28 PostgreSQL tests with no skips, 13 Chromium workflows**, locked browser and
 production frontend builds, and production nginx routing/CSP/session/write/readiness/
-logout smoke all passed. Handoff checks passed. The subsequent evidence update is
-documentation-only; no application code changed after this verified commit.
+logout smoke all passed. Handoff checks passed. This run predates the audit-privacy
+fix; inspect [PR #16 checks](https://github.com/Niilop/data-app-control-plane/pull/16/checks)
+for verification of the latest head.
 
 **Next:** review T11 and its real CI results; user merge only. After merge and a
 separate assignment, T08 is the next bounded implementation task. External

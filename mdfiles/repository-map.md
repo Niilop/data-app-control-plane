@@ -45,7 +45,7 @@ affected files before editing; avoid a full repository crawl for each task.
 | `backend/api/dependencies.py`, `platform_errors.py` | Database-current actor/admin dependencies; request UUIDs and sanitized envelopes |
 | `backend/api/endpoints/applications.py`, `teams.py` | T02 registry, ownership/roles, team/membership and application/admin audit routes |
 | `backend/services/application_service.py` | Command transaction ownership, atomic audit, version-predicate metadata updates |
-| `backend/services/policy_service.py`, `audit_service.py`, `pagination.py` | Central role/visibility policy, flush-only audit helper, scoped keyset navigation |
+| `backend/services/policy_service.py`, `audit_service.py`, `pagination.py` | Central role/visibility policy, permission-filtered audit reads and flush-only writes, scoped keyset navigation |
 | `backend/bootstrap.py` | Explicit prompted local account/admin creation; refuses overwrite; audited |
 | `frontend/src/pages/applications.tsx` | Application list/register/detail/edit, snapshot versions, ownership and direct/team role controls |
 | `tests/unit/test_registry.py`, `frontend/e2e/workflows.spec.ts` | Offline registry policy/transactions and real-browser API workflows |
@@ -172,6 +172,7 @@ main resolves the earlier local-only instruction and ignore-file uncertainty.
 | `backend/models/access.py`, `access_schemas.py` | Own-access history, closed commands, safe outcome and effective-access views |
 | `backend/alembic/versions/011_platform_access.py` | Add requests, partial pending uniqueness and decision checks; refuse downgrade with history |
 | `backend/services/access_service.py`, `backend/api/endpoints/access.py` | Request/decision/withdrawal, filtered inboxes, effective grants and transactional archive |
+| `backend/services/audit_service.py`, `backend/api/endpoints/applications.py` | Filter access-request audit events to requester/current owner/admin before pagination; preserve other application history |
 | `backend/services/policy_service.py` | Application lifecycle locks, refreshed current actor and archive guards shared by commands/workers |
 | `backend/services/application_service.py` | Role and metadata writes serialize with archive/decisions; role revocation remains possible after archive |
 | `frontend/src/pages/access.tsx`, `applications.tsx`, `App.tsx` | Own inbox, manager decisions, retained-access explanation and archive confirmation/read-only affordances |

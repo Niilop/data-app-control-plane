@@ -20,6 +20,11 @@ role insertion and audit share a transaction; identical decision replay never
 recreates a revoked role. A partial unique index prevents duplicate pending
 app/user/role requests. Requesters can withdraw pending requests and read their
 own outcomes after revocation without gaining private application metadata.
+The audit-privacy review fix also filters access-request audit events to the
+requester/current owner/admin before pagination. Ordinary members/data owners
+cannot recover other users' outcomes through application history. Full audit
+records, ordinary application events and complete admin audit remain preserved;
+application audit reads still require application visibility.
 
 React adds an own-request inbox, per-application owner/admin decisions, request
 withdrawal and effective-access inspection. The latter explains direct/team roles,
@@ -43,7 +48,23 @@ are unchanged. No dependencies or lockfile changes.
 
 ## Verification performed
 
-Local checks on 2026-10-17:
+Audit-privacy review-fix checks on 2026-10-17:
+
+- All four new offline regression cases failed against the original implementation
+  and pass with the audit filter. They cover approval/rejection/withdrawal,
+  pagination, requester/owner/admin access, ownership transfer and archived history.
+- `uv run --locked pytest -q`: **217 passed** (27 access/archive cases).
+- Ruff lint and format checks passed for all four changed Python files;
+  `uv run --locked mypy`: **48 modules passed**.
+- `uv run --locked pytest tests/integration/test_access.py -q`: **6 skipped**
+  because TEST_DATABASE_URL is unset, including the new PostgreSQL JSON-filter/
+  pagination case. This is collection evidence only; inspect
+  [PR #16 checks](https://github.com/Niilop/data-app-control-plane/pull/16/checks)
+  for hosted results on the fix. No developer database was touched.
+- Frontend, generated-project and container checks were not rerun locally for
+  this backend-only fix. Initial T11 evidence below predates the fix.
+
+Initial T11 local checks on 2026-10-17:
 
 - `uv run --locked pytest -q`: **213 passed**, including **23 access/archive cases**.
   Covers privacy/pagination, strict inputs, approval/self-escalation/replay,
@@ -78,13 +99,14 @@ passed all three jobs. Actual logs show **213 offline tests passed** (34.88s),
 passed** (51.8s). Ruff, mypy and the generated-project check passed. Locked browser
 and production frontend images built; isolated production nginx smoke passed
 routing, CSP, cookie login/reload, authenticated write, readiness and logout.
-The handoff workflow and local handoff checker passed. This evidence update is
-documentation-only; application code is unchanged from that verified commit.
+The handoff workflow and local handoff checker passed. This hosted run predates
+the audit-privacy fix; it is not verification of the latest application code.
 
 ## Remaining work and limitations
 
-- Review T11, ADR-020 and the actual draft checks. Hosted PostgreSQL tests passed;
-  no developer database was migrated. Only the user merges. Execution remains
+- Review T11, ADR-020, the audit-privacy fix and the latest draft checks. Initial
+  hosted PostgreSQL tests passed; the new filter test requires updated hosted
+  evidence. No developer database was migrated. Only the user merges. Execution remains
   explicitly local simulation.
 - The abandoned T05 database reportedly uses `008_bundle_generation`, while main
   uses `008_prepared_revisions`. Do not stamp/reset/automatically migrate it.
@@ -117,7 +139,7 @@ requires separate authorization. T09/T10 and Terraform remain separate work.
 - AGENTS.md; mdfiles/README.md; T11/T08 in development-plan.md; next-agent.md.
 - mdfiles/domain-contracts.md, api-contracts.md, architecture.md; ADR-020 in decisions.md.
 - backend/models/access.py, access_schemas.py; migration 011_platform_access.py.
-- backend/services/access_service.py, policy_service.py, application_service.py;
+- backend/services/access_service.py, audit_service.py, policy_service.py, application_service.py;
   environment/delivery/deployment/job_run/operation service command guards.
 - backend/api/endpoints/access.py, applications.py; frontend/src/pages/access.tsx,
   applications.tsx and App.tsx.

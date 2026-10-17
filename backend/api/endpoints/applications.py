@@ -19,6 +19,7 @@ from models.platform_schemas import (
     RoleResponse,
 )
 from services import application_service as service
+from services.audit_service import visible_application_audit
 from services.pagination import paginate
 from services.policy_service import get_application, role_filter, visible_applications
 from sqlalchemy import select
@@ -140,10 +141,9 @@ def remove_role(
 def audit(
     application_id: UUID, db: DB, actor: Actor, limit: Limit = 20, cursor: Cursor = None
 ) -> dict:
-    get_application(db, actor, application_id)
     return paginate(
         db,
-        select(AuditEvent).where(AuditEvent.application_id == application_id),
+        visible_application_audit(db, actor, application_id),
         AuditEvent,
         limit,
         cursor,

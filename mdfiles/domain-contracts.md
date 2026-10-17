@@ -308,6 +308,9 @@ policy. A terminal approval is historical evidence, not proof of a currently
 held role; replay cannot recreate a revoked assignment. Requesters can withdraw
 pending requests and always read their own outcome without seeing private app
 metadata. Current owners/admins see and decide application requests.
+Access-request audit events follow that same visibility boundary, including
+decisions and withdrawals; ordinary application-history access does not reveal
+other users' outcomes. Audit records remain intact and are filtered before paging.
 
 Effective-access reads enumerate direct/team assignments and ownership/admin
 relationships. All grants of a role must be removed to remove that role; read
