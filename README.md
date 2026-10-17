@@ -10,7 +10,10 @@ plus admin-managed simulated environments and application bindings.
 A separate durable worker runs offline bundle preparation and explicitly simulated
 deployments with exact-scope approvals, operation history and recovery controls.
 React supports generation, validation, approval, simulated deployment history,
-per-binding last success, simulated job runs and recorded application activity. Real GitHub/Databricks integration remains planned work.
+per-binding last success, simulated job runs and recorded application activity.
+Platform access requests, owner/admin decisions, effective-access inspection and
+archiving preserve history while enforcing current roles. Real GitHub/Databricks
+integration remains planned work.
 The old AI chat, RAG, LLM, and model-inference features have been removed.
 
 ## Local setup

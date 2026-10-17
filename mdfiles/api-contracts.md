@@ -98,7 +98,7 @@ Ownership fields are `owning_team_id`, `owner_user_id`, `data_owner_user_id`.
 Other fields are `name`, `description`, `repository_url`, `bundle_root`. A mixed
 patch requires both management and developer permissions. The database update
 compares and increments version atomically; stale writes return `stale_version`
-409. Source changes clear verification. No archive endpoint is added before T11.
+409. Source changes clear verification. T11 adds the separate archive action below.
 
 Repositories accept only `https://github.com/<owner>/<repository>` (optional
 `.git` is normalized away), without credentials, port, query, fragment or trailing
@@ -347,3 +347,59 @@ screen. They survive transport retries, form close/reopen and capability/list
 refreshes even when controls remount. An acknowledged response clears that key,
 allowing another deliberate identical run. After leaving the screen or reloading,
 inspect history before repeating uncertain work.
+
+## T11 implemented details
+
+`POST /applications/{id}/access-requests` accepts only `requested_role` (viewer,
+developer, approver or operator) and a nonblank `reason` of at most 2,000 characters.
+The active caller is always the subject; no user/team/admin override is accepted.
+The application ID must be known to the caller; no public application directory
+is added. A matching pending request returns the same record with 201; changing
+its reason while pending returns `request_pending` 409. One pending request per
+application/requester/role is also enforced by a partial unique index.
+
+`GET /access-requests` is a paginated own inbox even for administrators.
+`GET /applications/{id}/access-requests` shows all requests to the current
+owner/admin, otherwise only the caller's requests. An empty own list reveals no
+application metadata. `GET /access-requests/{id}` permits the requester or current
+owner/admin; other callers get 404. Request responses contain IDs, requested role,
+reason, status, timestamps and decision attribution/reason, never private app
+metadata. Requesters retain these outcome reads after role revocation.
+
+`POST /access-requests/{id}/decision` accepts `decision=approved|rejected` and a
+nonblank `reason` (at most 2,000 characters). Only the current owner/admin may
+decide, including their own request when independently authorized. Data owners
+and ordinary roles cannot approve. Approval inserts the existing direct role if
+missing, with the request transition and audit in one transaction. A repeated
+identical decision returns its historical outcome; it never re-grants access after
+revocation. A conflicting decision/reason returns `request_resolved` 409.
+Approval requires an active subject. `POST /access-requests/{id}/cancel` is a
+requester-only pending withdrawal, idempotent once cancelled; resolved decisions
+cannot be withdrawn. Decision reasons are explicitly visible to the requester.
+
+`GET /applications/{id}/effective-access/{user_id}` is available for a visible
+application to that user, or to its owner/admin for another user. It returns
+current effective roles, source assignment IDs/direct or team grants, active/read
+flags and owner/data-owner/global-admin relationships. Inactive subjects have no
+effective roles or read access even if assignments remain. Existing role DELETE
+stays 204; the UI refreshes this explanation afterward. Removing a team role affects
+all its members; removing membership is still the separate admin-only T02 action.
+No implicit owner/admin execution privileges or external permission changes arise.
+
+`POST /applications/{id}/archive` takes a strict positive `expected_version` and
+requires current owner/admin authority. It returns the incremented application
+record, or `stale_version` 409. Any nonterminal operation or retained reservation
+returns `unresolved_work` 409, including `needs_attention`. Archive cancels pending
+access requests with attributable audit, marks lifecycle archived and preserves
+roles, revisions, approvals, artifacts, deployments, runs and all history. New
+requests, grants, metadata/ownership/binding changes, preparation, approval,
+deployment/run and operation commands are rejected. Role removal remains possible
+so archived history can still be secured. Global team/environment administration
+remains independent. There is no restore or resource-deletion endpoint.
+
+Application commands acquire the lifecycle row lock after any environment policy
+lock, then refresh identity/visibility and check roles/lifecycle before accepting
+new work. Archive holds that same row lock while checking unresolved work, so a
+waiting submit either commits first and blocks archive, or observes archived state
+and cannot create an operation. Command-key replays also recheck current access and
+lifecycle, while retaining existing binding-version replay semantics for live apps.

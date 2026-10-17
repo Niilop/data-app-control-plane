@@ -66,6 +66,33 @@ def get_application(db: Session, actor: User, application_id: UUID) -> Applicati
     return application
 
 
+def lock_application(db: Session, application_id: UUID) -> Application:
+    """Serialize lifecycle/role writes. Acquire after environment locks, if any."""
+    application = db.scalar(
+        select(Application)
+        .where(Application.id == application_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if application is None:
+        raise PolicyError(404, "not_found", "Application not found")
+    return application
+
+
+def require_unarchived(application: Application) -> None:
+    if application.lifecycle == "archived":
+        raise PolicyError(409, "application_archived", "Application is archived")
+
+
+def mutable_application(db: Session, actor: User, application_id: UUID) -> Application:
+    """Recheck current identity/visibility after a possible lifecycle-lock wait."""
+    lock_application(db, application_id)
+    db.refresh(actor)
+    application = get_application(db, actor, application_id)
+    require_unarchived(application)
+    return application
+
+
 def require_manager(actor: User, application: Application) -> None:
     require_active(actor)
     if not actor.is_platform_admin and application.owner_user_id != actor.id:

@@ -14,7 +14,7 @@ from services.delivery_service import enqueue as enqueue_operation
 from services.deployment_service import current_revision
 from services.environment_service import lock_environment
 from services.operation_service import audit, remember, replay, require_operator
-from services.policy_service import PolicyError, get_application
+from services.policy_service import PolicyError, get_application, mutable_application
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -121,9 +121,8 @@ def submit(
         binding = db.get(EnvironmentBinding, deployment.binding_id)
         assert binding is not None
         lock_environment(db, binding.environment_id)
-        db.refresh(actor)
         require_operator(
-            db, actor, get_application(db, actor, deployment.application_id)
+            db, actor, mutable_application(db, actor, deployment.application_id)
         )
         payload = data.model_dump(mode="json")
         previous = replay(db, actor, "run_simulated", deployment_id, key, payload)

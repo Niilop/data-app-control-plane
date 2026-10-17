@@ -70,14 +70,15 @@ def capabilities(application_id: UUID, db: DB, actor: Actor) -> dict[str, bool]:
             )
         )
     )
+    writable = application.lifecycle != "archived"
     return {
-        "edit_metadata": "developer" in roles,
+        "edit_metadata": writable and "developer" in roles,
         "manage_access": actor.is_platform_admin
         or application.owner_user_id == actor.id,
-        "manage_bindings": actor.is_platform_admin,
-        "operate": "operator" in roles,
-        "approve": "approver" in roles,
-        "deploy": {"developer", "operator"}.issubset(roles),
+        "manage_bindings": writable and actor.is_platform_admin,
+        "operate": writable and "operator" in roles,
+        "approve": writable and "approver" in roles,
+        "deploy": writable and {"developer", "operator"}.issubset(roles),
     }
 
 

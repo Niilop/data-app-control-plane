@@ -986,3 +986,183 @@ test("simulated job success, failure, lost response and recorded dashboard", asy
       .first(),
   ).toBeVisible();
 });
+
+test("access requests, retained team access, full revocation and archive", async ({
+  page,
+  browser,
+}) => {
+  await login(page);
+  const base = await existing(page);
+  await page.goto(`/applications/${base.id}`);
+  await page
+    .getByRole("button", { name: "Archive application", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("button", { name: "Archive application", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Resolve all application operations",
+  );
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  const team = await request(page, "/api/v1/teams", "POST", {
+    name: "Access workflow team",
+  });
+  for (const user_id of [1, 4])
+    await request(page, `/api/v1/teams/${team.id}/members`, "POST", {
+      user_id,
+    });
+  const app = await request(page, "/api/v1/applications", "POST", {
+    slug: "access-workflow",
+    name: "Private access workflow",
+    description: "Private metadata",
+    owning_team_id: team.id,
+    owner_user_id: 1,
+    data_owner_user_id: 1,
+    repository_url: "https://github.com/example/private-access",
+  });
+  const other = await browser.newContext();
+  const requester = await other.newPage();
+  await login(requester, "outsider");
+  await requester
+    .getByRole("link", { name: "Access requests", exact: true })
+    .click();
+  await requester
+    .getByRole("button", { name: "Request access", exact: true })
+    .click();
+  const requestDialog = requester.getByRole("dialog");
+  await requestDialog.getByLabel("Application ID").fill(app.id);
+  await requestDialog.getByLabel("Requested role").selectOption("viewer");
+  await requestDialog.getByLabel("Reason").fill("Review application results");
+  await requestDialog.getByRole("button", { name: "Send request" }).click();
+  await expect(requestDialog).not.toBeVisible();
+  await expect(requester.getByText("pending", { exact: true })).toBeVisible();
+  await expect(
+    requester.getByText("Private access workflow", { exact: true }),
+  ).not.toBeVisible();
+  expect(
+    (await requester.request.get(`/api/v1/applications/${app.id}`)).status(),
+  ).toBe(404);
+  await page.goto(`/applications/${app.id}`);
+  await page.getByRole("tab", { name: "Access", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Approve request", exact: true })
+    .click();
+  await dialog.getByLabel("Decision reason").fill("Read-only review approved");
+  await dialog
+    .getByRole("button", { name: "Approve access", exact: true })
+    .click();
+  await expect(dialog).not.toBeVisible();
+  await requester.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(requester.getByText("approved", { exact: true })).toBeVisible();
+  await requester
+    .getByRole("link", { name: "Open application", exact: true })
+    .click();
+  await expect(
+    requester.getByRole("heading", { name: app.name, exact: true }),
+  ).toBeVisible();
+  await request(page, `/api/v1/applications/${app.id}/roles`, "POST", {
+    team_id: team.id,
+    role: "viewer",
+  });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Remove viewer for 4", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Remove assignment", exact: true })
+    .click();
+  await expect(dialog).not.toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Effective access for user #4" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Access retained: this user can read the application."),
+  ).toBeVisible();
+  await expect(page.getByText(`Through team ${team.id}`)).toBeVisible();
+  await page.screenshot({
+    path: "test-results/access-retained-desktop.png",
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: `Remove viewer for ${team.id}`, exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Remove assignment", exact: true })
+    .click();
+  await expect(dialog).not.toBeVisible();
+  await expect(
+    page.getByText(
+      "No effective access: this user cannot read the application.",
+    ),
+  ).toBeVisible();
+  await requester.reload();
+  await expect(requester.getByRole("alert")).toContainText(
+    "Application not found",
+  );
+  await requester
+    .getByRole("link", { name: "Access requests", exact: true })
+    .click();
+  await expect(requester.getByText("approved", { exact: true })).toBeVisible();
+  await expect(
+    requester.getByText("Private metadata", { exact: true }),
+  ).not.toBeVisible();
+  await page.getByRole("tab", { name: "Overview", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Archive application", exact: true })
+    .click();
+  await request(page, `/api/v1/applications/${app.id}`, "PATCH", {
+    expected_version: app.version,
+    name: "Renamed private workflow",
+  });
+  await dialog
+    .getByRole("button", { name: "Archive application", exact: true })
+    .click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "This record changed since you opened it",
+  );
+  expect(
+    (await request(page, `/api/v1/applications/${app.id}`)).lifecycle,
+  ).toBe("registered");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Renamed private workflow",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Archive application", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Archive application", exact: true })
+    .click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page.getByText("archived", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Edit application", exact: true }),
+  ).not.toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Manage ownership", exact: true }),
+  ).not.toBeVisible();
+  await page.getByRole("tab", { name: "Activity", exact: true }).click();
+  await expect(
+    page.getByText("application · archived", { exact: true }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("tab", { name: "Access", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Assign role", exact: true }),
+  ).not.toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/access-archived-mobile.png",
+    fullPage: true,
+  });
+  await other.close();
+});

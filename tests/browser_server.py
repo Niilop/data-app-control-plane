@@ -77,6 +77,7 @@ def run() -> None:
                 "approvals",
                 "deployments",
                 "job_runs",
+                "access_requests",
             }
         ]
         Base.metadata.create_all(engine, tables=tables)

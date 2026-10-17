@@ -18,6 +18,7 @@ from services.application_service import transaction
 from services.policy_service import (
     PolicyError,
     get_application,
+    mutable_application,
     require_active,
     require_admin,
     visible_applications,
@@ -215,6 +216,8 @@ def create_binding(
                 409, "application_archived", "Archived applications cannot be bound"
             )
         environment = lock_environment(db, data.environment_id)
+        mutable_application(db, actor, application_id)
+        require_admin(actor)
         require_target(environment, data.bundle_target)
         binding = EnvironmentBinding(application_id=application_id, **data.model_dump())
         db.add(binding)
@@ -258,6 +261,8 @@ def update_binding(
         if binding is None:
             raise PolicyError(404, "not_found", "Binding not found")
         environment = lock_environment(db, binding.environment_id)
+        mutable_application(db, actor, application_id)
+        require_admin(actor)
         # Reload after acquiring the environment lock to observe any competing update.
         binding = db.scalar(query.execution_options(populate_existing=True))
         assert binding is not None

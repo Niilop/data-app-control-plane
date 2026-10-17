@@ -34,6 +34,7 @@ import { AuditList, Bindings } from "./administration";
 import { Deployments } from "./deployments";
 import { Preparation } from "./preparation";
 import { Operations } from "./operations";
+import { AccessInspector, AccessRequests, RequestAccess } from "./access";
 
 function MetadataFields({ application }: { application?: Application }) {
   return (
@@ -337,6 +338,7 @@ function ApplicationContent({ id }: { id: string }) {
   const resource = useResource<Application>(path);
   const permissions = useResource<Capabilities>(`${path}/capabilities`);
   const [tab, setTab] = useState("Overview");
+  const [archive, setArchive] = useState<Application | null>(null);
   const [edit, setEdit] = useState<{
     kind: "metadata" | "ownership";
     snapshot: Application;
@@ -353,6 +355,7 @@ function ApplicationContent({ id }: { id: string }) {
         </Link>
         <ErrorNotice error={resource.error} />
         <RefreshButton />
+        <RequestAccess applicationId={id} />
       </>
     );
   if (!app) return <Loading />;
@@ -387,6 +390,12 @@ function ApplicationContent({ id }: { id: string }) {
         }
       />
       <ErrorNotice error={permissions.error} />
+      {app.lifecycle === "archived" && (
+        <div className="alert" role="status">
+          This application is archived. History and data are preserved. New work
+          is disabled.
+        </div>
+      )}
       <div className="tabs" role="tablist" aria-label="Application sections">
         {[
           "Overview",
@@ -482,7 +491,7 @@ function ApplicationContent({ id }: { id: string }) {
             <section className="panel">
               <div className="section-heading">
                 <h2>Ownership</h2>
-                {caps?.manage_access && (
+                {caps?.manage_access && app.lifecycle !== "archived" && (
                   <button
                     className="text-button"
                     disabled={resource.loading || permissions.loading}
@@ -520,6 +529,15 @@ function ApplicationContent({ id }: { id: string }) {
                     <Badge tone="blue">Simulated</Badge>
                   </dd>
                 </dl>
+                {caps?.manage_access && app.lifecycle !== "archived" && (
+                  <button
+                    className="button secondary"
+                    disabled={resource.loading || permissions.loading}
+                    onClick={() => setArchive(app)}
+                  >
+                    Archive application
+                  </button>
+                )}
               </div>
             </section>
           </div>
@@ -528,7 +546,11 @@ function ApplicationContent({ id }: { id: string }) {
           <Bindings applicationId={id} canManage={!!caps?.manage_bindings} />
         )}
         {tab === "Access" && (
-          <Access applicationId={id} canManage={!!caps?.manage_access} />
+          <Access
+            applicationId={id}
+            canManage={!!caps?.manage_access && !permissions.loading}
+            archived={app.lifecycle === "archived"}
+          />
         )}
         {tab === "Preparation" && (
           <Preparation
@@ -590,156 +612,207 @@ function ApplicationContent({ id }: { id: string }) {
           </ActionForm>
         </Dialog>
       )}
-    </>
-  );
-}
-function Access({
-  applicationId,
-  canManage,
-}: {
-  applicationId: string;
-  canManage: boolean;
-}) {
-  const [assign, setAssign] = useState(false);
-  const [subject, setSubject] = useState("user");
-  const [team, setTeam] = useState("");
-  const [remove, setRemove] = useState<Role | null>(null);
-  const { refresh, notify } = useData();
-  const path = `/api/v1/applications/${applicationId}/roles`;
-  return (
-    <section className="panel">
-      <div className="section-heading">
-        <div>
-          <h2>Application access</h2>
-          <p>Explicit roles for people and teams.</p>
-        </div>
-        {canManage && (
-          <AddButton onClick={() => setAssign(true)}>Assign role</AddButton>
-        )}
-      </div>
-      <Paged<Role> path={path} empty="No role assignments">
-        {(items) => (
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Subject</th>
-                  <th>Role</th>
-                  <th>Assigned</th>
-                  <th>
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((role) => (
-                  <tr key={role.id}>
-                    <td className="break-word">
-                      {role.user_id
-                        ? `User #${role.user_id}`
-                        : `Team ${role.team_id}`}
-                    </td>
-                    <td>
-                      <Badge>{role.role}</Badge>
-                    </td>
-                    <td>{date(role.created_at)}</td>
-                    <td>
-                      {canManage && (
-                        <button
-                          className="text-button danger"
-                          aria-label={`Remove ${role.role} for ${role.user_id || role.team_id}`}
-                          onClick={() => setRemove(role)}
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Paged>
-      {assign && (
-        <Dialog
-          title="Assign an application role"
-          onClose={() => setAssign(false)}
-        >
-          <ActionForm
-            submitLabel="Assign role"
-            onCancel={() => setAssign(false)}
-            submit={async (data) => {
-              await api(path, {
-                method: "POST",
-                body: {
-                  role: text(data, "role"),
-                  ...(subject === "user"
-                    ? { user_id: number(data, "user_id") }
-                    : { team_id: text(data, "team_id") }),
-                },
-              });
-              setAssign(false);
-              refresh();
-              notify("Role assigned.");
-            }}
-          >
-            <Field label="Subject type">
-              <select
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-              >
-                <option value="user">Person</option>
-                <option value="team">Team</option>
-              </select>
-            </Field>
-            {subject === "user" ? (
-              <Field label="User ID">
-                <input name="user_id" type="number" min={1} required />
-              </Field>
-            ) : (
-              <ReferenceSelect
-                path="/api/v1/teams"
-                name="team_id"
-                label="Team"
-                value={team}
-                onChange={setTeam}
-              />
-            )}
-            <Field label="Role">
-              <select name="role">
-                {["viewer", "developer", "approver", "operator"].map((role) => (
-                  <option key={role}>{role}</option>
-                ))}
-              </select>
-            </Field>
-            <p className="form-hint">
-              Roles grant platform actions. They do not grant external GitHub or
-              data permissions.
-            </p>
-          </ActionForm>
-        </Dialog>
-      )}
-      {remove && (
-        <Dialog title="Remove role assignment?" onClose={() => setRemove(null)}>
+      {archive && (
+        <Dialog title="Archive application?" onClose={() => setArchive(null)}>
           <p>
-            This removes the {remove.role} assignment. Other direct or team
-            assignments may still provide access.
+            Archiving {archive.name} stops new work and cancels pending access
+            requests. Data and history are preserved. All operations must be
+            resolved first. Restoring an archived application is not currently
+            supported.
           </p>
           <ActionForm
-            submitLabel="Remove assignment"
-            onCancel={() => setRemove(null)}
+            submitLabel="Archive application"
+            onCancel={() => setArchive(null)}
             submit={async () => {
-              await api(`${path}/${remove.id}`, { method: "DELETE" });
-              setRemove(null);
+              await api(`${path}/archive`, {
+                method: "POST",
+                body: { expected_version: archive.version },
+              });
+              setArchive(null);
               refresh();
-              notify("Role assignment removed.");
+              notify("Application archived. History is preserved.");
             }}
           >
             {null}
           </ActionForm>
         </Dialog>
       )}
-    </section>
+    </>
+  );
+}
+function Access({
+  applicationId,
+  canManage,
+  archived,
+}: {
+  applicationId: string;
+  canManage: boolean;
+  archived: boolean;
+}) {
+  const [assign, setAssign] = useState(false);
+  const [subject, setSubject] = useState("user");
+  const [team, setTeam] = useState("");
+  const [remove, setRemove] = useState<Role | null>(null);
+  const [inspectUser, setInspectUser] = useState<number | null>(null);
+  const { refresh, notify } = useData();
+  const path = `/api/v1/applications/${applicationId}/roles`;
+  return (
+    <div className="access-stack">
+      <AccessRequests
+        applicationId={applicationId}
+        canManage={canManage}
+        archived={archived}
+      />
+      <AccessInspector
+        applicationId={applicationId}
+        canManage={canManage}
+        selectedUser={inspectUser}
+        onSelect={setInspectUser}
+      />
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <h2>Application access</h2>
+            <p>Explicit roles for people and teams.</p>
+          </div>
+          {canManage && !archived && (
+            <AddButton onClick={() => setAssign(true)}>Assign role</AddButton>
+          )}
+        </div>
+        <Paged<Role> path={path} empty="No role assignments">
+          {(items) => (
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Subject</th>
+                    <th>Role</th>
+                    <th>Assigned</th>
+                    <th>
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((role) => (
+                    <tr key={role.id}>
+                      <td className="break-word">
+                        {role.user_id
+                          ? `User #${role.user_id}`
+                          : `Team ${role.team_id}`}
+                      </td>
+                      <td>
+                        <Badge>{role.role}</Badge>
+                      </td>
+                      <td>{date(role.created_at)}</td>
+                      <td>
+                        {canManage && (
+                          <button
+                            className="text-button danger"
+                            aria-label={`Remove ${role.role} for ${role.user_id || role.team_id}`}
+                            onClick={() => setRemove(role)}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Paged>
+        {assign && (
+          <Dialog
+            title="Assign an application role"
+            onClose={() => setAssign(false)}
+          >
+            <ActionForm
+              submitLabel="Assign role"
+              onCancel={() => setAssign(false)}
+              submit={async (data) => {
+                await api(path, {
+                  method: "POST",
+                  body: {
+                    role: text(data, "role"),
+                    ...(subject === "user"
+                      ? { user_id: number(data, "user_id") }
+                      : { team_id: text(data, "team_id") }),
+                  },
+                });
+                setAssign(false);
+                refresh();
+                notify("Role assigned.");
+              }}
+            >
+              <Field label="Subject type">
+                <select
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                >
+                  <option value="user">Person</option>
+                  <option value="team">Team</option>
+                </select>
+              </Field>
+              {subject === "user" ? (
+                <Field label="User ID">
+                  <input name="user_id" type="number" min={1} required />
+                </Field>
+              ) : (
+                <ReferenceSelect
+                  path="/api/v1/teams"
+                  name="team_id"
+                  label="Team"
+                  value={team}
+                  onChange={setTeam}
+                />
+              )}
+              <Field label="Role">
+                <select name="role">
+                  {["viewer", "developer", "approver", "operator"].map(
+                    (role) => (
+                      <option key={role}>{role}</option>
+                    ),
+                  )}
+                </select>
+              </Field>
+              <p className="form-hint">
+                Roles grant platform actions. They do not grant external GitHub
+                or data permissions.
+              </p>
+            </ActionForm>
+          </Dialog>
+        )}
+        {remove && (
+          <Dialog
+            title="Remove role assignment?"
+            onClose={() => setRemove(null)}
+          >
+            <p>
+              This removes the {remove.role} assignment. Other direct or team
+              assignments may still provide access.
+            </p>
+            <ActionForm
+              submitLabel="Remove assignment"
+              onCancel={() => setRemove(null)}
+              submit={async () => {
+                await api(`${path}/${remove.id}`, { method: "DELETE" });
+                setInspectUser(remove.user_id ?? inspectUser);
+                setRemove(null);
+                refresh();
+                notify(
+                  remove.user_id
+                    ? "Role assignment removed. Review effective access for the remaining grants."
+                    : "Team role removed. Check a member’s user ID to review their remaining access.",
+                );
+              }}
+            >
+              {null}
+            </ActionForm>
+          </Dialog>
+        )}
+      </section>
+    </div>
   );
 }

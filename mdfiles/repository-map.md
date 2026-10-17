@@ -1,6 +1,6 @@
 # Repository map
 
-Updated for T07 on 2026-09-27. Paths below are current unless labelled proposed. Recheck
+Updated for T11 on 2026-10-17. Paths below are current unless labelled proposed. Recheck
 affected files before editing; avoid a full repository crawl for each task.
 
 ## Current implementation
@@ -81,8 +81,7 @@ Keep the existing import layout initially; a package-wide rename is outside T01.
 
 | Path | Planned content |
 |---|---|
-| `backend/api/endpoints/revisions.py`, `access.py` | Workflow endpoints |
-| `backend/services/access_service.py` | Future access-request workflow logic |
+| `backend/api/endpoints/revisions.py` | Potential future split from delivery routes |
 | `backend/workers/` | Split handlers here when future tasks need them |
 | `backend/integrations/` | Only implemented simulation, artifact, GitHub, Databricks adapters |
 | `templates/python-batch/` | Versioned generated-project assets and tests |
@@ -165,3 +164,16 @@ main resolves the earlier local-only instruction and ignore-file uncertainty.
 | `frontend/src/pages/job-runs.tsx`, `application-dashboard.tsx` | Run form/history and recorded application overview |
 | `tests/unit/test_job_runs.py`, `tests/integration/test_job_runs.py` | Inputs, permissions, rollback, output, recovery, concurrent commands, policy-lock races and migration preservation |
 | `frontend/e2e/workflows.spec.ts` | Full simulated run success/failure, lost-response replay, overview and revoked controls |
+
+### T11 platform access and archive
+
+| Path | Responsibility |
+|---|---|
+| `backend/models/access.py`, `access_schemas.py` | Own-access history, closed commands, safe outcome and effective-access views |
+| `backend/alembic/versions/011_platform_access.py` | Add requests, partial pending uniqueness and decision checks; refuse downgrade with history |
+| `backend/services/access_service.py`, `backend/api/endpoints/access.py` | Request/decision/withdrawal, filtered inboxes, effective grants and transactional archive |
+| `backend/services/policy_service.py` | Application lifecycle locks, refreshed current actor and archive guards shared by commands/workers |
+| `backend/services/application_service.py` | Role and metadata writes serialize with archive/decisions; role revocation remains possible after archive |
+| `frontend/src/pages/access.tsx`, `applications.tsx`, `App.tsx` | Own inbox, manager decisions, retained-access explanation and archive confirmation/read-only affordances |
+| `tests/unit/test_access.py`, `tests/integration/test_access.py` | Privacy, grants/revocation, rollback, history retention, migration and PostgreSQL races |
+| `frontend/e2e/workflows.spec.ts` | Request/approval, retained team grant, complete revocation, stale/unresolved archive rejection and mobile history |

@@ -333,3 +333,19 @@ run-detail layout correction passed frontend checks and the focused run browser 
 again. Final desktop layout and mobile screenshots were reviewed. No host-global
 packages or runtime dependencies were added. Hosted T07 checks must be inspected
 on the actual draft; no real provider execution or old-database migration was run.
+
+## T11 access/archive verification
+
+Use `uv run --locked pytest tests/unit/test_access.py -q` for privacy, closed
+inputs, manager decisions, historical replay, rollback, effective grants, worker
+denial after revocation, archive conflicts and retained delivery artifacts/history.
+Use `TEST_DATABASE_URL` with the existing disposable-schema harness for
+`uv run --locked pytest tests/integration/test_access.py -q`; SQLite cannot prove
+concurrent pending uniqueness or application-row locking. The PostgreSQL cases
+exercise both archive/submission orderings and ownership changes during a wait.
+
+`npm --prefix frontend run test:e2e` includes an outsider request, owner approval,
+retained team access after direct revocation, loss of access after the final grant,
+continued own-outcome reads, unresolved/stale archive rejection and archived mobile
+history. Browser data is disposable and no developer account or database is used.
+Current measured check results and unavailable gates are in next-agent.md.

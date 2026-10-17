@@ -1,9 +1,9 @@
 # Data application control plane: agent entry point
 
-Documentation baseline: 2026-09-27. **T01–T06 are merged. T07 is implemented,
-pending review/merge.** T06 PR #14 merged at
-`004b363dbeaeb34e4f8b20870fff60226ee00118`. React covers preparation, exact-scope
-approval, simulated deployment and job runs, with recorded application activity.
+Documentation baseline: 2026-10-17. **T01–T07 are merged. T11 is implemented,
+pending review/merge and PostgreSQL verification.** T07 PR #15 is on updated main
+at `55105b7`. React covers preparation, exact-scope approval, simulated deployment
+and job runs, access requests, effective grants and archive with retained history.
 No provider activation or external execution is included. See
 [next-agent.md](next-agent.md) for checks and database isolation requirements.
 
@@ -61,8 +61,8 @@ specific version):
 
 > Read AGENTS.md, mdfiles/README.md, and mdfiles/next-agent.md. Inspect Git
 > status, preserve unrelated work, and verify prerequisites on updated main.
-> Review T07 and its checks; leave merging to the user. After merge and assignment,
-> T11 completes the remaining local access-request/archive flow. Preserve the old
+> Review T11 and its checks; leave merging to the user. After merge and assignment,
+> T08 adds GitHub adoption/source capture and CI observations. Preserve the old
 > T05 database, branch and stash; do not activate providers.
 
 The handoff separates implemented behavior from verification and merge status.
