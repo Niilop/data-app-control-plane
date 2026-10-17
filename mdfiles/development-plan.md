@@ -1,7 +1,7 @@
 # Development plan and agent task ledger
 
-Status: **T01–T07 complete and merged; T11 implemented, pending review/merge
-and PostgreSQL verification.** T07 PR #15 merged on 2026-09-27, verified on
+Status: **T01–T07 complete and merged; T11 implemented with passing CI, pending
+review/merge in draft PR #16.** T07 PR #15 merged on 2026-09-27, verified on
 updated main `55105b7` on 2026-10-17.
 T06 PR #14 merged at `004b363dbeaeb34e4f8b20870fff60226ee00118` (verified 2026-09-27).
 T05 PR #13 merged at `8e419050c5069b97ac5b582e02378f77658f3e99` (verified 2026-09-20).
@@ -631,7 +631,7 @@ while the real execution gate remains pending; state both explicitly.
 
 ## T11 — Platform access requests, revocation, and archive
 
-**Status:** implemented, pending review/merge and PostgreSQL verification.
+**Status:** implemented with passing CI, pending review/merge in draft PR #16.
 **Depends on:** T07, merged. Implemented on 2026-10-17; precedes T08.
 
 **Delivered:** migration `011_platform_access` adds own-access request history,
@@ -657,6 +657,13 @@ and history/artifact preservation. PostgreSQL tests cover competing requests and
 decisions, both archive/submission orderings, changed ownership during a lock wait,
 upgrade preservation and downgrade refusal. Browser coverage follows an outsider
 request through approval, retained team access, final revocation and archive.
+
+Hosted [Platform CI run 39032600688](https://github.com/Niilop/data-app-control-plane/actions/runs/39032600688)
+passed at implementation commit `10ed3c2`: actual logs report **213 offline tests,
+28 PostgreSQL tests with no skips, 13 Chromium workflows**, locked browser and
+production frontend builds, and production nginx routing/CSP/session/write/readiness/
+logout smoke all passed. Handoff checks passed. The subsequent evidence update is
+documentation-only; no application code changed after this verified commit.
 
 **Next:** review T11 and its real CI results; user merge only. After merge and a
 separate assignment, T08 is the next bounded implementation task. External

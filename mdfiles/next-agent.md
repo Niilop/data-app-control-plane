@@ -3,6 +3,7 @@
 Inspect Git status, preserve unrelated work, verify prerequisites on updated main,
 and read AGENTS.md before creating or continuing a task branch. Leave merging to
 the user. T11 is implemented for review; this handoff does not claim its PR is merged.
+Draft PR: https://github.com/Niilop/data-app-control-plane/pull/16.
 
 ## Implemented state
 
@@ -68,13 +69,23 @@ Local checks on 2026-10-17:
   installation, real-provider work or infrastructure activation occurred.
 - Docker's WSL launcher reports unavailable integration and ~/code/devstack is
   absent. Local PostgreSQL, container builds and production nginx smoke were not
-  run in this session. Hosted T11 CI is pending; inspect actual results.
+  run in this session; hosted evidence below covers those isolated CI gates.
+
+Hosted verification at implementation commit `10ed3c29894d0885dcaf79b941e6619ecace330f`:
+[Platform CI run 39032600688](https://github.com/Niilop/data-app-control-plane/actions/runs/39032600688)
+passed all three jobs. Actual logs show **213 offline tests passed** (34.88s),
+**28 PostgreSQL tests passed, no skips** (15.29s), and **13 Chromium workflows
+passed** (51.8s). Ruff, mypy and the generated-project check passed. Locked browser
+and production frontend images built; isolated production nginx smoke passed
+routing, CSP, cookie login/reload, authenticated write, readiness and logout.
+The handoff workflow and local handoff checker passed. This evidence update is
+documentation-only; application code is unchanged from that verified commit.
 
 ## Remaining work and limitations
 
-- Review T11, ADR-020 and actual CI. PostgreSQL concurrency/migration behavior
-  requires the hosted integration result; skipped tests do not satisfy that gate.
-  Only the user merges. Execution remains explicitly local simulation.
+- Review T11, ADR-020 and the actual draft checks. Hosted PostgreSQL tests passed;
+  no developer database was migrated. Only the user merges. Execution remains
+  explicitly local simulation.
 - The abandoned T05 database reportedly uses `008_bundle_generation`, while main
   uses `008_prepared_revisions`. Do not stamp/reset/automatically migrate it.
   Preserve its data, abandoned branch and stash; conversion needs separate,
