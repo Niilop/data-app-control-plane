@@ -29,6 +29,10 @@ commit under the fence. Adopted revisions reuse immutable offline validation and
 simulated approval/deployment behavior. CI observations are informational, tied to
 exact commit/run/attempt, and appended by explicit queued refreshes. API GETs never
 fan out to GitHub. Pagination failures do not publish partial observations.
+Accepted CI-refresh command replay rechecks current application access/lifecycle
+before returning its existing operation, even after the binding version changes;
+a new refresh still rejects stale source configuration. Its regression was observed
+failing before the fix and passing afterward.
 
 React shows disabled access, capture status/diagnostics, commit/time, revision
 capture and recorded CI results. A separate downloadable CI overlay contains pinned

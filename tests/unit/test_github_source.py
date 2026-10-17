@@ -269,6 +269,22 @@ def test_capture_revision_validation_ci_and_private_download(
     observed = client.get(path + "/ci-runs", headers=headers[2]).json()["items"]
     assert len(observed) == 1 and observed[0]["commit_sha"] == SHA
     assert len(calls) == count  # Display does not poll providers.
+    from models.platform import EnvironmentBinding
+
+    with Session(engine) as db:
+        db.get(EnvironmentBinding, UUID(binding["id"])).version += 1
+        db.commit()
+    repeated = client.post(
+        refresh, json={}, headers={**headers[2], "Idempotency-Key": "ci"}
+    )
+    assert repeated.status_code == 202
+    assert repeated.json()["operation_id"] == observed[0]["operation_id"]
+    assert (
+        client.post(
+            refresh, json={}, headers={**headers[2], "Idempotency-Key": "new-ci"}
+        ).status_code
+        == 409
+    )
     with Session(engine) as db:
         saved = db.get(SourceCapture, UUID(source["id"]))
         saved.commit_sha = "b" * 40

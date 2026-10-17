@@ -155,17 +155,26 @@ def refresh(
 ) -> Operation:
     with transaction(db):
         source = get_capture(db, actor, capture_id)
-        binding = delivery.check_preparation(
-            db,
-            actor,
-            source.application_id,
-            UUID(source.binding_snapshot["binding_id"]),
-            source.binding_snapshot["binding_version"],
+        require_developer(db, actor, get_application(db, actor, source.application_id))
+        binding = db.get(
+            EnvironmentBinding, UUID(source.binding_snapshot["binding_id"])
+        )
+        assert binding is not None
+        delivery.lock_environment(db, binding.environment_id)
+        require_developer(
+            db, actor, mutable_application(db, actor, source.application_id)
         )
         payload = {"schema_version": 1, "source_capture_id": str(source.id)}
         previous = replay(db, actor, "refresh_github_ci", source.id, key, payload)
         if previous:
             return previous
+        binding = delivery.check_preparation(
+            db,
+            actor,
+            source.application_id,
+            binding.id,
+            source.binding_snapshot["binding_version"],
+        )
         operation = delivery.enqueue(
             db, actor, binding, "refresh_github_ci", payload, request_id
         )
