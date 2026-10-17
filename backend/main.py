@@ -32,6 +32,7 @@ def create_app() -> FastAPI:
     )
 
     from api.endpoints import (
+        access,
         applications,
         auth,
         delivery,
@@ -50,6 +51,7 @@ def create_app() -> FastAPI:
     app.include_router(delivery.router)
     app.include_router(deployments.router)
     app.include_router(job_runs.router)
+    app.include_router(access.router)
 
     @app.get("/")
     def root(settings: Settings = Depends(get_settings)) -> dict[str, str]:

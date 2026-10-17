@@ -16,6 +16,7 @@ from services import audit_service
 from services.policy_service import (
     PolicyError,
     get_application,
+    mutable_application,
     require_admin,
     require_developer,
     require_manager,
@@ -162,11 +163,7 @@ def update_application(
     request_id: str,
 ) -> Application:
     with transaction(db):
-        application = get_application(db, actor, application_id)
-        if application.lifecycle == "archived":
-            raise PolicyError(
-                409, "application_archived", "Archived applications cannot be changed"
-            )
+        application = mutable_application(db, actor, application_id)
         changes = data.model_dump(exclude_unset=True, exclude={"expected_version"})
         ownership = {"owning_team_id", "owner_user_id", "data_owner_user_id"}
         if ownership & changes.keys():
@@ -223,7 +220,7 @@ def assign_role(
     db: Session, actor: User, application_id: UUID, data: RoleCreate, request_id: str
 ) -> ApplicationRole:
     with transaction(db):
-        application = get_application(db, actor, application_id)
+        application = mutable_application(db, actor, application_id)
         require_manager(actor, application)
         if data.user_id is not None:
             active_user(db, data.user_id)
@@ -249,6 +246,11 @@ def remove_role(
     db: Session, actor: User, application_id: UUID, assignment_id: UUID, request_id: str
 ) -> None:
     with transaction(db):
+        # Revocation remains available on archived history; it grants no new access.
+        from services.policy_service import lock_application
+
+        lock_application(db, application_id)
+        db.refresh(actor)
         application = get_application(db, actor, application_id)
         require_manager(actor, application)
         assignment = db.scalar(

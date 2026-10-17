@@ -25,7 +25,9 @@ from services.environment_service import (
 from services.policy_service import (
     PolicyError,
     get_application,
+    mutable_application,
     require_active,
+    require_unarchived,
     role_filter,
 )
 from sqlalchemy import select
@@ -80,6 +82,8 @@ def check_execution(
     if binding is None or binding.application_id != application_id:
         raise PolicyError(422, "invalid_binding", "Binding is unavailable")
     environment = lock_environment(db, binding.environment_id)
+    application = mutable_application(db, actor, application_id)
+    require_operator(db, actor, application)
     db.refresh(binding)
     require_target(environment, binding.bundle_target)
     if version is not None and binding.version != version:
@@ -180,6 +184,7 @@ def create_probe(
         if binding is None or binding.application_id != application_id:
             raise PolicyError(422, "invalid_binding", "Binding is unavailable")
         lock_environment(db, binding.environment_id)
+        require_operator(db, actor, mutable_application(db, actor, application_id))
         db.scalar(
             select(EnvironmentBinding)
             .where(EnvironmentBinding.id == binding.id)
@@ -243,6 +248,7 @@ def command(
 ) -> Operation:
     with transaction(db):
         operation = get_operation(db, actor, operation_id, lock=True)
+        require_unarchived(get_application(db, actor, operation.application_id))
         require_operator(
             db, actor, get_application(db, actor, operation.application_id)
         )

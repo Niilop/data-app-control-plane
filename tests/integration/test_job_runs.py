@@ -9,6 +9,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 from test_deployments import approved
+from test_migrations import HEAD_REVISION
 from test_migrations import isolated_schema as isolated_schema
 from test_migrations import registry_engine as registry_engine
 
@@ -130,7 +131,7 @@ def test_upgrade_preserves_deployment_and_downgrade_retains_runs(
         assert conn.scalar(sa.text("SELECT count(*) FROM job_runs")) == 1
         assert (
             conn.scalar(sa.text("SELECT version_num FROM alembic_version"))
-            == "010_simulated_job_runs"
+            == HEAD_REVISION
         )
 
 

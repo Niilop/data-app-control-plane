@@ -387,3 +387,34 @@ creates new linked records; lost leases reconcile before safe repeat. Unknown or
 revoked reconciliation retains reservations. Runs never mutate deployment success.
 React shows separate results and recorded observation times using authorized DB reads;
 no global dashboard endpoint or live provider polling is needed.
+
+## ADR-020 — Own-access decisions and serialized archive
+
+**T11, 2026-10-17; proposed for review with the implementation.** Keep platform
+requests separate from external identity/ACLs and reuse ApplicationRole grants.
+The requester is always the subject, with one pending request per app/user/role.
+Owner/admin decisions and direct grant creation commit with audit. Self-approval
+requires independent current owner/admin authority. Terminal decision replay never
+recreates a revoked role. The global request inbox is own-only; application managers
+use the per-application inbox. Request responses contain no private app metadata.
+Access-request audit events use the same requester/current-owner/admin visibility
+boundary, filtered in SQL before pagination. Full audit records are preserved;
+ordinary application read access does not expose other users' request outcomes.
+Application audit reads still require application visibility; admin audit remains
+complete, and an outsider's own outcomes stay on the dedicated request endpoints.
+
+Explain effective access by enumerating direct/team grants and owner/data-owner/
+admin relationships. A role deletion remains the existing 204 command; a fresh
+read reports remaining access. No bulk "remove everything" shortcut changes
+ownership, global admin or shared team memberships implicitly. Inactive subjects
+have no effective access. Revoke roles even on archived history when necessary.
+
+Archive holds the application row lock, rejects nonterminal operations and retained
+reservations, cancels pending requests, increments version and audits atomically.
+Keep all data, artifacts, grants and historical observations. No restore or
+external resource cleanup is introduced. All new app commands/grants are blocked;
+global team/environment administration remains separate. Commands and worker policy
+checks acquire environment locks before the application lock, then recheck current
+actor/lifecycle/roles. Archive only reads operation/reservation state, avoiding the
+opposite lock order. This serializes new work with archive without changing the
+existing durable queue, reservation or lease/fencing contracts.

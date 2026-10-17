@@ -298,3 +298,29 @@ creates a linked operation and a new run after current checks. Lease loss first
 marks unknown and reconciles; safe replay is possible because the handler has no
 external effects. Revoked authorization during reconciliation conservatively retains
 unknown state and reservation. Operator reconciliation cannot force a result.
+
+### T11 implemented access and archive policy
+
+An AccessRequest's `requested_by` is also its subject; requests never target a
+second user or a team. Pending uniqueness is application + requester + role.
+Decisions and grants use the existing ApplicationRole table and owner/admin
+policy. A terminal approval is historical evidence, not proof of a currently
+held role; replay cannot recreate a revoked assignment. Requesters can withdraw
+pending requests and always read their own outcome without seeing private app
+metadata. Current owners/admins see and decide application requests.
+Access-request audit events follow that same visibility boundary, including
+decisions and withdrawals; ordinary application-history access does not reveal
+other users' outcomes. Audit records remain intact and are filtered before paging.
+
+Effective-access reads enumerate direct/team assignments and ownership/admin
+relationships. All grants of a role must be removed to remove that role; read
+access may remain through another role or relationship. Inactive accounts have
+no effective access. Queued work rechecks current roles before execution. Already
+executed work is not undone by role revocation.
+
+Archive cancels pending access requests, rejects every nonterminal operation or
+retained reservation, increments metadata version and retains history, artifacts,
+assignments and data. Lifecycle locks serialize it with command acceptance and
+role decisions. New app commands/grants are blocked, but role revocation is still
+allowed to secure archived history. Global team/environment policy remains
+administrable. There is no unarchive or external cleanup action in T11.

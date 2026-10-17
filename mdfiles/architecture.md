@@ -207,3 +207,25 @@ synthetic output before success. Cancellation/retry/reconciliation extend the ex
 operation service. The React overview reads authorized paginated DB history; timestamps
 are observation times, not a claim of live external state. See ADR-019 for the
 operator permission and historical deployment-approval boundary.
+
+### T11 lifecycle serialization and platform access
+
+Access requests are synchronous database workflows using existing ApplicationRole
+and policy primitives. Request/decision/grant/audit transactions are service-owned;
+there is no second permission system or external permission activation.
+
+Registry/role/access writers and archive lock the application row. Commands and
+worker checks lock their environment first, then the application (then a binding
+if required); recovery/worker paths may already hold their operation lock. Archive
+does not acquire environment or operation locks: while holding the application
+lock it queries nonterminal operations and retained reservations. This order avoids
+an application/environment inversion and closes the archive-versus-submit race,
+including empty applications whose first binding is being created. Identity,
+visibility, lifecycle and applicable roles are refreshed after waits. Transactions
+remain short; source/artifact work still uses the existing worker phases.
+
+Revocation uses existing audited role removal and membership administration.
+Effective-access inspection explains remaining grants/relationships. Pending
+requests are cancelled in the archive transaction; request outcome reads remain
+independent from application metadata reads. Archived history is retained and
+readable to current authorized users, and role revocation remains possible.

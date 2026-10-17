@@ -30,6 +30,7 @@ from services.operation_service import audit, remember, replay
 from services.policy_service import (
     PolicyError,
     get_application,
+    mutable_application,
     require_developer,
     visible_applications,
 )
@@ -70,6 +71,8 @@ def check_preparation(
     if binding is None or binding.application_id != application_id:
         raise PolicyError(422, "invalid_binding", "Binding is unavailable")
     environment = lock_environment(db, binding.environment_id)
+    app = mutable_application(db, actor, application_id)
+    require_developer(db, actor, app)
     db.refresh(binding)
     require_target(environment, binding.bundle_target)
     if binding.version != version:
@@ -155,6 +158,7 @@ def generate(
         if binding is None or binding.application_id != application_id:
             raise PolicyError(422, "invalid_binding", "Binding is unavailable")
         lock_environment(db, binding.environment_id)
+        require_developer(db, actor, mutable_application(db, actor, application_id))
         request = data.model_dump(mode="json")
         previous = replay(db, actor, "generate_bundle", application_id, key, request)
         if previous:
@@ -257,6 +261,9 @@ def validate(
         binding = db.get(EnvironmentBinding, revision.binding_id)
         assert binding is not None
         lock_environment(db, binding.environment_id)
+        require_developer(
+            db, actor, mutable_application(db, actor, revision.application_id)
+        )
         payload = {
             "schema_version": 1,
             "revision_id": str(revision.id),

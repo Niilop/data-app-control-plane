@@ -16,6 +16,7 @@ from services.operation_service import remember, replay, require_operator
 from services.policy_service import (
     PolicyError,
     get_application,
+    mutable_application,
     require_active,
     require_developer,
     role_filter,
@@ -94,11 +95,7 @@ def current_revision(
     assert binding is not None
     environment = lock_environment(db, binding.environment_id)
     # Refresh eligibility after a potentially blocking policy lock.
-    db.refresh(actor)
-    require_active(actor)
-    db.refresh(app)
-    if app.lifecycle == "archived":
-        raise PolicyError(409, "archived", "Application is archived")
+    mutable_application(db, actor, revision.application_id)
     db.refresh(binding)
     require_target(environment, binding.bundle_target)
     if preparation.snapshot(db, binding) != revision.binding_snapshot:
@@ -299,6 +296,9 @@ def submit(
         if binding is None or binding.application_id != application_id:
             raise PolicyError(422, "invalid_binding", "Binding is unavailable")
         lock_environment(db, binding.environment_id)
+        app = mutable_application(db, actor, application_id)
+        require_developer(db, actor, app)
+        require_operator(db, actor, app)
         payload = data.model_dump(mode="json")
         previous = replay(db, actor, "deploy_simulated", application_id, key, payload)
         if previous:

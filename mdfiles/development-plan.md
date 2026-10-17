@@ -1,10 +1,12 @@
 # Development plan and agent task ledger
 
-Status: **T01–T06 complete and merged; T07 implemented, pending review/merge.**
+Status: **T01–T07 complete and merged; T11 implemented with passing CI, pending
+review/merge in draft PR #16.** T07 PR #15 merged on 2026-09-27, verified on
+updated main `55105b7` on 2026-10-17.
 T06 PR #14 merged at `004b363dbeaeb34e4f8b20870fff60226ee00118` (verified 2026-09-27).
 T05 PR #13 merged at `8e419050c5069b97ac5b582e02378f77658f3e99` (verified 2026-09-20).
 T04a PR #10 merged at `6503ec152a7bcfbb3310e45c08f5fab78dea27d6`.
-T08–T13 have not started.
+T08–T10 and T12–T13 have not started.
 This plan is implementation-ready guidance,
 not a claim of implemented capabilities. Task order follows dependencies rather
 than estimated calendar dates. Do not implement the entire roadmap in one turn.
@@ -507,7 +509,7 @@ deployment. Every deployment/result shows `execution_mode=simulated`.
 
 ## T07 — Run a simulated job and inspect the application
 
-**Status:** implemented, pending review/merge. **Depends on:** T06, merged.
+**Status:** complete and merged via PR #15 at `55105b7`. **Depends on:** T06, merged.
 
 **Delivered (2026-09-27):** migration `010_simulated_job_runs`, operator-only
 `synthetic_job` commands with strict bounded parameters, separate run history and
@@ -529,9 +531,8 @@ smoke. Screenshot review prompted a small run-detail CSS fix; frontend checks an
 the focused run workflow passed again. See next-agent.md for exact evidence and
 unrun external/application-database checks.
 
-**Next:** review T07 and draft CI, then user merge. After a separate assignment,
-T11 is recommended next to complete the local access-request/archive demonstration;
-T08–T10 external integrations remain separate work.
+**Next:** T11 was assigned after verifying T07 on updated main and is implemented
+below; T08–T10 external integrations remain separate work.
 
 **PR review follow-up (2026-09-27):** fixed loss of pending run keys when capability
 refresh unmounted the controls. Keys now persist by deployment/input in the screen
@@ -630,7 +631,45 @@ while the real execution gate remains pending; state both explicitly.
 
 ## T11 — Platform access requests, revocation, and archive
 
-**Status:** not started. **Depends on:** T07. Can precede T08.
+**Status:** implemented in draft PR #16; audit-privacy review finding fixed and
+verified by hosted CI. Pending review and user merge.
+**Depends on:** T07, merged. Implemented on 2026-10-17; precedes T08.
+
+**Delivered:** migration `011_platform_access` adds own-access request history,
+partial pending uniqueness and decision constraints. Owner/admin decisions grant
+the existing direct application role atomically with audit; decision replay never
+recreates a revoked grant. Requesters see only their own outcomes without private
+application metadata. React supplies requests/decisions/withdrawal, a global own
+inbox, effective direct/team/relationship explanations and archive confirmation.
+Archive version-checks, rejects unresolved operations or retained reservations,
+cancels pending requests, preserves all history/data and blocks new commands.
+Application locks after environment policy locks serialize lifecycle changes with
+new work and recheck current authorization after waits. Revocation stays available
+on archived applications. ADR-020 documents these choices; no new dependencies.
+
+**Review fix:** application audit reads now restrict access-request events to the
+requester/current owner/admin before pagination. Full audit records and ordinary
+application history are retained. Four new offline cases reproduce the leak before
+the fix and pass afterward, covering decisions/withdrawal, pagination, ownership
+transfer and archived history. Added a PostgreSQL JSON-filter/pagination test.
+
+**Review-fix verification:** 217 offline tests passed, changed-file Ruff lint/format
+and mypy (48 modules) passed. Six access integration cases skipped locally because
+TEST_DATABASE_URL is unset; hosted CI below ran all PostgreSQL tests. Frontend,
+generated-project and container checks were not rerun locally for this backend fix.
+
+Hosted [Platform CI run 39034899377](https://github.com/Niilop/data-app-control-plane/actions/runs/39034899377)
+passed at fix commit `82dfc9c`: **217 offline tests, 29 PostgreSQL tests with no
+skips, 13 Chromium workflows**, CI-scoped Ruff (81 files), mypy (48 modules),
+generated-project locked offline installation/tests, frontend checks/builds and
+production nginx smoke all passed. PostgreSQL includes the new audit JSON-filter/
+pagination regression plus existing grant races, archive/submission ordering,
+ownership changes and migration/history preservation. Handoff checks passed.
+The follow-up verification update changes documentation only.
+
+**Next:** review T11 and its real CI results; user merge only. After merge and a
+separate assignment, T08 is the next bounded implementation task. External
+activation and the old abandoned database remain outside this change.
 
 **Read:** persona/permission distinctions, AccessRequest and archive contracts,
 T11 API rows and existing role/operation services.

@@ -16,6 +16,7 @@ import {
   LogOut,
   Menu,
   Network,
+  ShieldCheck,
   Users,
 } from "lucide-react";
 import { api } from "./api";
@@ -30,6 +31,7 @@ import {
 import { DataProvider, useSession } from "./state";
 import type { User } from "./types";
 import { Applications, ApplicationDetail } from "./pages/applications";
+import { MyAccessRequests } from "./pages/access";
 import {
   Teams,
   Environments,
@@ -171,6 +173,7 @@ function Shell() {
           <nav aria-label="Main navigation">
             {[
               ["/applications", "Applications", Boxes],
+              ["/access-requests", "Access requests", ShieldCheck],
               ["/teams", "Teams", Users],
               ["/environments", "Environments", Network],
               ...(user.is_platform_admin
@@ -273,6 +276,7 @@ export default function App() {
       <Route element={<Shell key={user.id} />}>
         <Route path="/applications" element={<Applications />} />
         <Route path="/applications/:id" element={<ApplicationDetail />} />
+        <Route path="/access-requests" element={<MyAccessRequests />} />
         <Route path="/teams" element={<Teams />} />
         <Route path="/environments" element={<Environments />} />
         <Route

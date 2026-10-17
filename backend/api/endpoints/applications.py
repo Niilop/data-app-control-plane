@@ -19,6 +19,7 @@ from models.platform_schemas import (
     RoleResponse,
 )
 from services import application_service as service
+from services.audit_service import visible_application_audit
 from services.pagination import paginate
 from services.policy_service import get_application, role_filter, visible_applications
 from sqlalchemy import select
@@ -70,14 +71,15 @@ def capabilities(application_id: UUID, db: DB, actor: Actor) -> dict[str, bool]:
             )
         )
     )
+    writable = application.lifecycle != "archived"
     return {
-        "edit_metadata": "developer" in roles,
+        "edit_metadata": writable and "developer" in roles,
         "manage_access": actor.is_platform_admin
         or application.owner_user_id == actor.id,
-        "manage_bindings": actor.is_platform_admin,
-        "operate": "operator" in roles,
-        "approve": "approver" in roles,
-        "deploy": {"developer", "operator"}.issubset(roles),
+        "manage_bindings": writable and actor.is_platform_admin,
+        "operate": writable and "operator" in roles,
+        "approve": writable and "approver" in roles,
+        "deploy": writable and {"developer", "operator"}.issubset(roles),
     }
 
 
@@ -139,10 +141,9 @@ def remove_role(
 def audit(
     application_id: UUID, db: DB, actor: Actor, limit: Limit = 20, cursor: Cursor = None
 ) -> dict:
-    get_application(db, actor, application_id)
     return paginate(
         db,
-        select(AuditEvent).where(AuditEvent.application_id == application_id),
+        visible_application_audit(db, actor, application_id),
         AuditEvent,
         limit,
         cursor,

@@ -1224,3 +1224,22 @@ summary {
 .attempt-list li > .run-details {
   display: block;
 }
+/* Access outcomes wrap comfortably on narrow screens and at enlarged text sizes. */
+.access-stack {
+  display: grid;
+  gap: 24px;
+}
+.access-requests {
+  padding: 0 24px;
+}
+.access-request {
+  padding: 20px 0;
+  border-top: 1px solid var(--border);
+}
+.access-request .section-heading {
+  padding: 0;
+  border: 0;
+}
+.access-request .actions {
+  flex-wrap: wrap;
+}
