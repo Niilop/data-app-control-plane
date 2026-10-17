@@ -3,6 +3,7 @@
 Inspect Git status, preserve unrelated work, verify prerequisites on updated main,
 and read AGENTS.md before creating or continuing a task branch. Leave merging to
 the user. T08 is implemented for review; this handoff does not claim it is merged.
+Draft PR: https://github.com/Niilop/data-app-control-plane/pull/17.
 
 ## Implemented state
 
@@ -44,8 +45,8 @@ Local checks on 2026-10-17:
 - `uv run --locked pytest -q`: **261 passed**, including **44 GitHub cases** covering
   command denial, manual retry pins, unstable pagination, malformed archives,
   current policy and cancellation.
-- `uv run --locked mypy`: **55 modules passed**. CI-scoped Ruff format passed;
-  final lint found three import-order/spacing issues, which were fixed and checked.
+- `uv run --locked mypy`: **55 modules passed**. All CI-scoped Ruff lint and format
+  checks passed (85 existing/expanded files plus 8 new source/CI files).
 - All **14 Chromium workflows passed** using disposable API/SQLite and a test-only
   scripted GitHub adapter. Includes failed source diagnostics, adoption/revision,
   exact-commit failed CI observations, repeated refresh keys and narrow viewport.
@@ -63,8 +64,10 @@ Local checks on 2026-10-17:
 
 ## Remaining work and limitations
 
-- Complete final checks, open/review the T08 draft PR, and inspect hosted results,
+- Review the T08 draft PR and inspect hosted results,
   especially migration/schema parity, PostgreSQL fencing and immutable history.
+  The PostgreSQL recovery test explicitly ends its assertion read transaction before
+  invoking the queue command; hosted execution is still pending.
   Only the user merges. A genuine application-repository GitHub CI demonstration
   remains pending separate authorization; platform CI does not satisfy that gate.
 - Adoption supports the approved Python batch v1 manifest/structure and matching

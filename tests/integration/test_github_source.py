@@ -83,6 +83,7 @@ def test_source_pins_fences_and_history_guard(
         finish(db, item, "succeeded", source_result=result)
     with sessions() as db:
         assert db.scalar(sa.select(SourceCapture)).artifact_digest is None
+        db.rollback()  # End the assertion's read transaction before the queue command.
         newer = claim(db, "new-worker", 30)
         assert newer.phase == "reconcile"
         finish(db, newer, "safe_to_retry")
