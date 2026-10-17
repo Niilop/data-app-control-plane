@@ -1,7 +1,7 @@
 # Data application control plane: agent entry point
 
 Documentation baseline: 2026-10-17. **T01–T07 and T11 are merged. T08 is implemented,
-pending review/merge and hosted verification.** T11 PR #16 is on updated main
+pending review/merge with passing implementation checks.** T11 PR #16 is on updated main
 at `3671334`. React covers preparation, GitHub source/CI, exact-scope approval, simulated deployment
 and job runs, access requests, effective grants and archive with retained history.
 No provider activation or external execution is included. See

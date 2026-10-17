@@ -60,18 +60,33 @@ Local checks on 2026-10-17:
 - `scripts/check_ci_onboarding.py` passed locked tooling installation, the documented
   reviewed one-blank-line migration, Ruff, mypy, 2 unittest cases and wheel build.
 - PostgreSQL source/migration selection collected with **8 skips** because
-  TEST_DATABASE_URL is unset. No developer database was migrated. Hosted PostgreSQL
-  tests and container/nginx checks have not yet run for T08.
+  TEST_DATABASE_URL is unset. No developer database was migrated. Hosted evidence
+  below supplies PostgreSQL/container verification; skips are not counted as passes.
 - Browser binaries were downloaded to /tmp, not globally. uv cache access and test
   server startup required sandbox escalation. No provider credentials were activated,
   application workflow run, infrastructure deployed or paid workload started.
+
+Hosted [Platform CI 39039496527](https://github.com/Niilop/data-app-control-plane/actions/runs/39039496527)
+passed all jobs at `332f36761a2d46215abfb75b5aa7175153b32c5b`:
+**261 offline tests, 31 PostgreSQL tests with no skips, and 14 Chromium workflows**.
+Ruff lint/format (93 files), mypy (55 modules), unchanged generated-project locked
+offline installation/tests, and the new CI overlay installation/lint/types/unit/
+wheel-build check passed. Locked frontend/browser images and production nginx smoke
+passed routing, CSP, cookie login/reload, authenticated write, readiness and logout.
+The first PostgreSQL run found a test-only active read transaction before queue claim;
+the corrected test then exercised recovery and downgrade refusal successfully.
+
+At `06f80ea`, the later accepted-CI-refresh replay fix passed all 44 focused GitHub
+tests, Ruff and mypy locally, plus hosted offline and PostgreSQL jobs in
+[run 39039632922](https://github.com/Niilop/data-app-control-plane/actions/runs/39039632922).
+Its frontend is unchanged from the fully passing run above. This evidence update
+changes documentation only; inspect the latest PR check status before merge.
+The local handoff checker and `git diff --check` passed.
 
 ## Remaining work and limitations
 
 - Review the T08 draft PR and inspect hosted results,
   especially migration/schema parity, PostgreSQL fencing and immutable history.
-  The PostgreSQL recovery test explicitly ends its assertion read transaction before
-  invoking the queue command; hosted execution is still pending.
   Only the user merges. A genuine application-repository GitHub CI demonstration
   remains pending separate authorization; platform CI does not satisfy that gate.
 - Adoption supports the approved Python batch v1 manifest/structure and matching

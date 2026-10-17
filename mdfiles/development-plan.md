@@ -1,7 +1,7 @@
 # Development plan and agent task ledger
 
-Status: **T01–T07 and T11 complete and merged; T08 implemented for review,
-with hosted verification and a genuine application CI demonstration pending.**
+Status: **T01–T07 and T11 complete and merged; T08 implemented in draft PR #17
+with passing checks. A genuine application CI demonstration remains pending.**
 T11 PR #16 merged at `3671334aee3ff964d7f233313c63314db7c3b747` on 2026-10-17.
 T06 PR #14 merged at `004b363dbeaeb34e4f8b20870fff60226ee00118` (verified 2026-09-27).
 T05 PR #13 merged at `8e419050c5069b97ac5b582e02378f77658f3e99` (verified 2026-09-20).
@@ -560,7 +560,7 @@ credentials or local storage paths.
 
 ## T08 — Adopt an existing GitHub repository and run CI
 
-**Status:** implemented for review on 2026-10-17; hosted verification pending.
+**Status:** implemented in draft PR #17 on 2026-10-17; implementation checks pass.
 Real application-repository CI gate remains pending separate authorization.
 **Depends on:** T07; T11 also merged before this work.
 
@@ -586,9 +586,15 @@ All 14 Chromium workflows passed, plus a focused adoption rerun after UI polish.
 Mypy passed 55 modules; generated CI overlay passed locked install, Ruff, mypy,
 two unit tests and wheel build. PostgreSQL source/migration selection collected
 with 8 skips because TEST_DATABASE_URL is unset. Current final evidence is recorded
-in next-agent.md; hosted PostgreSQL/containers are not yet claimed.
+in next-agent.md. Hosted [Platform CI 39039496527](https://github.com/Niilop/data-app-control-plane/actions/runs/39039496527)
+passed at `332f367`: 261 offline, 31 PostgreSQL (no skips), 14 Chromium workflows,
+93-file Ruff scope, mypy (55 modules), both generated-project checks, locked
+frontend builds and production nginx smoke. A recovery test read-transaction setup
+error was corrected before that pass. The subsequent CI-refresh replay fix has a
+regression observed failing before the fix and passing afterward; 44 focused tests,
+Ruff and mypy passed locally, and its hosted backend checks passed at `06f80ea`.
 
-**Next:** finish checks and review T08. Leave merge to the user. A real application
+**Next:** review T08 and the latest PR checks. Leave merge to the user. A real application
 CI demo needs its own authorization; T09 dispatch/reconciliation remains separate.
 
 **Read:** source-capture/CI sections in [integrations](integrations.md), T08 API rows.
